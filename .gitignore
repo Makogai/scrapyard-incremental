@@ -1,0 +1,19 @@
+# Project place file
+/merge-a-snowman.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+sourcemap.json
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# Local toolchain bootstrap binary; versions are pinned in rokit.toml
+/rokit.exe

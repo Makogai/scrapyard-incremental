@@ -1,0 +1,26 @@
+--!strict
+
+return table.freeze({
+	GameName = "Scrapyard Incremental",
+	IsDevelopment = false,
+	EnableDebugLogging = false,
+	UseDevelopmentDataStore = false,
+	DataStoreName = "ScrapyardIncremental_PlayerData_v1",
+	DevelopmentDataStoreName = "ScrapyardIncremental_Development_v1",
+	AutoSaveIntervalSeconds = 120,
+	AutoSaveJitterFraction = 0.15,
+	DataStoreRetryCount = 4,
+	DataStoreRetryBaseSeconds = 1,
+	SessionLeaseSeconds = 300,
+	MaximumPlayers = 12,
+	MaximumMoney = 1e15,
+	MaximumGears = 1000000,
+	MaximumStoredWeight = 1e9,
+	MaximumStoredValue = 1e12,
+	MaximumUpgradeLevel = 100,
+	MaximumActiveScrap = 300,
+	MaximumScrapCandidatesPerQuery = 32,
+	CollectionQueryIntervalSeconds = 0.15,
+	MaximumRemoteRequestsPerWindow = 12,
+	RemoteRateLimitWindowSeconds = 5,
+})

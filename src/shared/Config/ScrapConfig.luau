@@ -1,0 +1,156 @@
+--!strict
+
+local GameTypes = require(script.Parent.Parent.Types.GameTypes)
+
+local function freezeScrap(definition: GameTypes.ScrapDefinition): GameTypes.ScrapDefinition
+	table.freeze(definition.AreaIds)
+	table.freeze(definition.Size)
+	return table.freeze(definition)
+end
+
+local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
+	MetalCan = freezeScrap({
+		Id = "MetalCan",
+		DisplayName = "Metal Can",
+		Weight = 1,
+		BaseValue = 3,
+		RequiredMagnetStrength = 1,
+		AreaIds = { "FrontYard" },
+		SpawnWeight = 36,
+		RespawnSeconds = 3,
+		Size = { 1.2, 1.7, 1.2 },
+		Rarity = "Common",
+		ModelName = "MetalCan",
+	}),
+	LooseBolt = freezeScrap({
+		Id = "LooseBolt",
+		DisplayName = "Loose Bolt",
+		Weight = 0.5,
+		BaseValue = 2,
+		RequiredMagnetStrength = 1,
+		AreaIds = { "FrontYard" },
+		SpawnWeight = 30,
+		RespawnSeconds = 2.5,
+		Size = { 0.8, 0.8, 0.8 },
+		Rarity = "Common",
+		ModelName = "LooseBolt",
+	}),
+	SmallMetalPlate = freezeScrap({
+		Id = "SmallMetalPlate",
+		DisplayName = "Small Metal Plate",
+		Weight = 3,
+		BaseValue = 9,
+		RequiredMagnetStrength = 3,
+		AreaIds = { "FrontYard" },
+		SpawnWeight = 22,
+		RespawnSeconds = 4,
+		Size = { 2.4, 0.35, 1.8 },
+		Rarity = "Common",
+		ModelName = "SmallMetalPlate",
+	}),
+	Tire = freezeScrap({
+		Id = "Tire",
+		DisplayName = "Tire",
+		Weight = 6,
+		BaseValue = 20,
+		RequiredMagnetStrength = 6,
+		AreaIds = { "FrontYard", "WorkshopYard" },
+		SpawnWeight = 12,
+		RespawnSeconds = 6,
+		Size = { 2.5, 2.5, 1.1 },
+		Rarity = "Uncommon",
+		ModelName = "Tire",
+	}),
+	BrokenAppliance = freezeScrap({
+		Id = "BrokenAppliance",
+		DisplayName = "Broken Appliance",
+		Weight = 14,
+		BaseValue = 55,
+		RequiredMagnetStrength = 10,
+		AreaIds = { "WorkshopYard" },
+		SpawnWeight = 34,
+		RespawnSeconds = 8,
+		Size = { 3.4, 3, 2.8 },
+		Rarity = "Uncommon",
+		ModelName = "BrokenAppliance",
+	}),
+	EnginePart = freezeScrap({
+		Id = "EnginePart",
+		DisplayName = "Engine Part",
+		Weight = 28,
+		BaseValue = 135,
+		RequiredMagnetStrength = 16,
+		AreaIds = { "WorkshopYard", "VehicleGraveyard" },
+		SpawnWeight = 24,
+		RespawnSeconds = 11,
+		Size = { 3.2, 2.4, 2.8 },
+		Rarity = "Rare",
+		ModelName = "EnginePart",
+	}),
+	CarDoor = freezeScrap({
+		Id = "CarDoor",
+		DisplayName = "Car Door",
+		Weight = 42,
+		BaseValue = 240,
+		RequiredMagnetStrength = 24,
+		AreaIds = { "WorkshopYard", "VehicleGraveyard" },
+		SpawnWeight = 12,
+		RespawnSeconds = 14,
+		Size = { 4.5, 0.5, 3.4 },
+		Rarity = "Rare",
+		ModelName = "CarDoor",
+	}),
+	ScrapCar = freezeScrap({
+		Id = "ScrapCar",
+		DisplayName = "Scrap Car",
+		Weight = 160,
+		BaseValue = 1250,
+		RequiredMagnetStrength = 45,
+		AreaIds = { "VehicleGraveyard" },
+		SpawnWeight = 5,
+		RespawnSeconds = 24,
+		Size = { 8, 3.5, 5 },
+		Rarity = "Epic",
+		ModelName = "ScrapCar",
+	}),
+}
+
+local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
+	Normal = table.freeze({
+		Id = "Normal",
+		DisplayName = "Normal",
+		ValueMultiplier = 1,
+		SpawnWeight = 9450,
+		Color = Color3.fromRGB(155, 165, 170),
+	}),
+	Silver = table.freeze({
+		Id = "Silver",
+		DisplayName = "Silver",
+		ValueMultiplier = 2,
+		SpawnWeight = 450,
+		Color = Color3.fromRGB(205, 220, 225),
+		EffectName = "RareShimmer",
+	}),
+	Gold = table.freeze({
+		Id = "Gold",
+		DisplayName = "Gold",
+		ValueMultiplier = 5,
+		SpawnWeight = 90,
+		Color = Color3.fromRGB(245, 190, 55),
+		EffectName = "RareShimmer",
+	}),
+	Rainbow = table.freeze({
+		Id = "Rainbow",
+		DisplayName = "Rainbow",
+		ValueMultiplier = 15,
+		SpawnWeight = 10,
+		Color = Color3.fromRGB(105, 225, 205),
+		EffectName = "RainbowShimmer",
+	}),
+}
+
+return table.freeze({
+	ById = table.freeze(scrapById),
+	Variants = table.freeze(variantById),
+	VariantRollTotal = 10000,
+})
