@@ -187,6 +187,10 @@ No Snowman-specific runtime source remains. Historical references exist only in 
 - Added the authored Exclusive Shop with four permanent passes and six repeatable developer products. Central configuration uses zero-ID safe placeholders, Studio admin-only grant simulation, live Marketplace price lookup, join-time pass reconciliation, and idempotent receipt delivery saved before acknowledgement.
 - Added the premium Quantum Magnet at 25 strength/32 range with a pink/cyan two-emitter effect and inventory card. Permanent benefits are 2x sale value, +50% storage, 2x collection speed, and Quantum ownership; all survive prestige.
 - Fresh-profile Studio QA verified baseline-to-premium stats (storage 20 to 30, collection 24 to 48, sale value 1 to 2), Mega Bundle delivery ($100,000 and 10 of each potion), and Quantum equip/effect. Profile was reset afterward.
+- Created branch `ui/full-rework` and rebuilt the complete authored `ScrapyardUI` around the Epic UI Pack base elements. HUD, storage, navigation, all eight menus, Admin, notifications, loading, and code rewards now share vivid toy-like gradients, cream card surfaces, plum construction borders, highlights, and consistent close controls.
+- Added modal world dimming, automatic Backpack hotbar suppression while overlays are open, compact viewport scaling, and a full-canvas phone modal strategy. Fixed the storage bar anchor and included Exclusive Shop in navigation collapse behavior.
+- Device Simulator QA passed iPhone 17 Pro landscape (749x361), iPad Pro M5 13-inch landscape (1374x1030), and default desktop. Simulator returned to default, Studio returned to Edit mode, and client bootstrap completed.
+- Fixed the Exclusive Shop controller's nested-card lookup: `WaitForChild(..., true)` incorrectly treated the timeout parameter as recursive search; binding now uses asserted recursive `FindFirstChild`.
 
 ## Blockers and Manual Work
 

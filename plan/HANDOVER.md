@@ -19,6 +19,7 @@ Date: 2026-08-06
 - Rojo builds `scrapyard-incremental.rbxlx`.
 - Persistence, plot assignment, owner-only scrap collection/selling, authored UI, 12 plot slots, and shared hub exist.
 - The authored Exclusive Shop, schema-v6 entitlements/receipt history, secure Marketplace receipt service, and premium Quantum Magnet are implemented. Marketplace IDs remain safe `0` placeholders until created in Creator Dashboard; setup is documented in `docs/MONETIZATION_SETUP.md`.
+- Branch `ui/full-rework` contains the full Epic-derived cartoon interface rework and responsive/modal controller changes. The authored visual tree is saved in Studio; preserve its stable binding names and `Rework*` design-system instances.
 
 ## New Session Start
 

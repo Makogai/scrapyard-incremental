@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -55,11 +56,51 @@ function UIController.Start()
 	local navigation = requireChild(safeArea, "Navigation")
 	local menus = requireChild(safeArea, "Menus")
 	local notification = requireChild(safeArea, "Notification") :: GuiObject
+	local modalDimmer = safeArea:FindFirstChild("ModalDimmer") :: GuiObject?
 	local notificationMessage = requireChild(notification, "Message") :: TextLabel
 	local adminToggle = safeArea:FindFirstChild("AdminToggle") :: GuiObject?
+	local function responsiveScale(target: Instance, scale: number)
+		local scaler = target:FindFirstChild("ReworkResponsiveScale")
+		if scaler and scaler:IsA("UIScale") then
+			scaler.Scale = scale
+		end
+	end
+	local function refreshResponsiveLayout()
+		local camera = workspace.CurrentCamera
+		local compact = camera ~= nil and camera.ViewportSize.Y < 500
+		responsiveScale(topBar, if compact then 0.78 else 1)
+		responsiveScale(navigation, if compact then 0.72 else 1)
+		for _, menu in menus:GetChildren() do
+			if menu:IsA("GuiObject") then
+				responsiveScale(menu, if compact then 0.58 else 1)
+			end
+		end
+		for _, overlayName in { "AdminPanel", "CodeRewardPopup" } do
+			local overlay = safeArea:FindFirstChild(overlayName)
+			if overlay then
+				responsiveScale(overlay, if compact then 0.82 else 1)
+			end
+		end
+		storagePanel.Size = if compact then UDim2.fromOffset(350, 64) else UDim2.fromOffset(430, 72)
+		storagePanel.Position = if compact
+			then UDim2.new(0.5, 0, 1, -58)
+			else UDim2.new(0.5, 0, 1, -24)
+	end
+	refreshResponsiveLayout()
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera
+			:GetPropertyChangedSignal("ViewportSize")
+			:Connect(refreshResponsiveLayout)
+	end
 	local function anyMenuVisible(): boolean
 		for _, child in menus:GetChildren() do
 			if child:IsA("GuiObject") and child.Visible then
+				return true
+			end
+		end
+		for _, overlayName in { "AdminPanel", "CodeRewardPopup" } do
+			local overlay = safeArea:FindFirstChild(overlayName)
+			if overlay and overlay:IsA("GuiObject") and overlay.Visible then
 				return true
 			end
 		end
@@ -67,6 +108,12 @@ function UIController.Start()
 	end
 	local function refreshOverlayVisibility()
 		local menuOpen = anyMenuVisible()
+		if modalDimmer then
+			modalDimmer.Visible = menuOpen
+		end
+		pcall(function()
+			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, not menuOpen)
+		end)
 		if adminToggle then
 			adminToggle.Visible = AdminConfig.IsAdmin(Players.LocalPlayer.UserId) and not menuOpen
 		end
@@ -75,6 +122,12 @@ function UIController.Start()
 		end
 	end
 	local moneyValue = requireChild(moneyPanel, "Value") :: TextLabel
+	for _, overlayName in { "AdminPanel", "CodeRewardPopup" } do
+		local overlay = safeArea:FindFirstChild(overlayName)
+		if overlay and overlay:IsA("GuiObject") then
+			overlay:GetPropertyChangedSignal("Visible"):Connect(refreshOverlayVisibility)
+		end
+	end
 	local gearsValue = requireChild(gearsPanel, "Value") :: TextLabel
 	local storageValue = requireChild(storagePanel, "Value") :: TextLabel
 	local upgradesMenu = requireChild(menus, "UpgradesMenu") :: GuiObject
@@ -726,6 +779,7 @@ function UIController.Start()
 			SettingsButton = "SETTINGS",
 			PrestigeButton = "PRESTIGE",
 			InventoryButton = "INVENTORY",
+			ExclusiveShopButton = "EXCLUSIVE",
 		}
 		collapseButton.Activated:Connect(function()
 			collapsed = not collapsed
@@ -760,6 +814,11 @@ function UIController.Start()
 		InventoryButton = "InventoryMenu",
 		ExclusiveShopButton = "ExclusiveShopMenu",
 	}
+	for _, child in menus:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:GetPropertyChangedSignal("Visible"):Connect(refreshOverlayVisibility)
+		end
+	end
 	local codeRewardPopup = safeArea:FindFirstChild("CodeRewardPopup")
 	if codeRewardPopup and codeRewardPopup:IsA("GuiObject") then
 		local close = requireChild(codeRewardPopup, "CloseButton") :: GuiButton
@@ -770,7 +829,6 @@ function UIController.Start()
 	for buttonName, menuName in menuBindings do
 		local button = requireChild(navigation, buttonName) :: GuiButton
 		local menu = requireChild(menus, menuName) :: GuiObject
-		menu:GetPropertyChangedSignal("Visible"):Connect(refreshOverlayVisibility)
 		button.Activated:Connect(function()
 			for _, child in menus:GetChildren() do
 				if child:IsA("GuiObject") then

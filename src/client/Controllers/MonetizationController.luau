@@ -47,7 +47,8 @@ function MonetizationController.Start()
 
 	for _, passId in MonetizationConfig.PassOrder do
 		local definition = MonetizationConfig.Passes[passId]
-		local card = menu:WaitForChild(`PassCard_{passId}`, true)
+		local card =
+			assert(menu:FindFirstChild(`PassCard_{passId}`, true), `PassCard_{passId} is missing`)
 		local button = card:WaitForChild("BuyButton") :: GuiButton
 		if definition.MarketplaceId > 0 then
 			task.spawn(function()
@@ -79,7 +80,10 @@ function MonetizationController.Start()
 
 	for _, productId in MonetizationConfig.ProductOrder do
 		local definition = MonetizationConfig.Products[productId]
-		local card = menu:WaitForChild(`ProductCard_{productId}`, true)
+		local card = assert(
+			menu:FindFirstChild(`ProductCard_{productId}`, true),
+			`ProductCard_{productId} is missing`
+		)
 		local button = card:WaitForChild("BuyButton") :: GuiButton
 		button.Text = `R$ {definition.DisplayPrice}`
 		if definition.MarketplaceId > 0 then
