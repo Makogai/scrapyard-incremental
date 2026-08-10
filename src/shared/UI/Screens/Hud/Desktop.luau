@@ -58,8 +58,8 @@ local e = React.createElement
 
 local MARGIN = 24
 
---- Vertical room the bottom-right friend widget occupies, so boosts stack above it.
-local FRIEND_LANE = 82
+--- Vertical room the bottom-left status cluster occupies, so the currencies sit above it.
+local STATUS_LANE = 74
 
 local function HudDesktop(props)
 	local state = props.state
@@ -122,8 +122,27 @@ local function HudDesktop(props)
 				cash = state.cash,
 				gears = state.gears,
 				prestige = state.prestige,
+				--[[
+					Lifted by the status cluster's height: the friend boost and spin wheel now live in this
+					corner, directly under the currencies, and the two must not overlap.
+				]]
+				position = UDim2.new(0, MARGIN, 1, -(MARGIN + bottomLift + STATUS_LANE)),
+				anchorPoint = Vector2.new(0, 1),
+			}),
+			--[[
+				BOTTOM LEFT: friend boost and the spin wheel, as bare outlined glyphs with their value
+				underneath and a popup on hover -- the same class of readout as the potion tiles opposite.
+			]]
+			e(Parts.StatusCluster, {
+				key = "StatusCluster",
+				friendCount = state.friendCount,
+				friendBoost = state.friendBoost,
+				spinsAvailable = state.spinsAvailable,
 				position = UDim2.new(0, MARGIN, 1, -(MARGIN + bottomLift)),
 				anchorPoint = Vector2.new(0, 1),
+				onOpenSpin = function()
+					actions.openScreen("spin")
+				end,
 			}),
 			e(Parts.StorageMeter, {
 				key = "Storage",
@@ -141,28 +160,8 @@ local function HudDesktop(props)
 			e(Parts.BoostTimers, {
 				key = "Boosts",
 				boosts = state.boosts,
-				--[[
-					Lifted above the friend icon rather than sharing the corner. Boost tiles come and
-					go, so overlapping them with a permanent widget means the corner reflows every
-					time a potion expires.
-				]]
-				position = UDim2.new(1, -MARGIN, 1, -(MARGIN + bottomLift + FRIEND_LANE)),
-				anchorPoint = Vector2.new(1, 1),
-			}),
-			--[[
-				BOTTOM RIGHT, as asked. It is a permanent fixture rather than a notification: the
-				point of the friend boost is that it is always visible, so a player who has none
-				knows there is something to get.
-			]]
-			e(Parts.FriendBoost, {
-				key = "FriendBoost",
-				count = state.friendCount,
-				boost = state.friendBoost,
 				position = UDim2.new(1, -MARGIN, 1, -(MARGIN + bottomLift)),
 				anchorPoint = Vector2.new(1, 1),
-				onClick = function()
-					actions.openScreen("spin")
-				end,
 			}),
 			--- Above the storage meter, which is the other thing that fills as you play.
 			e(Parts.PlaytimeTrack, {
@@ -170,7 +169,7 @@ local function HudDesktop(props)
 				milestones = state.playtimeMilestones,
 				claimed = state.playtimeClaimed,
 				seconds = state.playtimeSeconds,
-				position = UDim2.new(0.5, 0, 1, -(MARGIN + bottomLift + 74)),
+				position = UDim2.new(0.5, 0, 1, -(MARGIN + bottomLift + 78)),
 				anchorPoint = Vector2.new(0.5, 1),
 				onClaim = actions.claimPlaytime,
 			}),

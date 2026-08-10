@@ -96,6 +96,8 @@ Assets.Icons = {
 	bag = "rbxassetid://125806058579575", -- inventory
 	-- Friend boost. Blank keeps the drawn two-figure glyph; drop an id here to replace it.
 	friends = "",
+	-- Spin wheel. Blank keeps the drawn colour-wheel glyph.
+	wheel = "",
 
 	-- plot and chrome
 	ground = "",

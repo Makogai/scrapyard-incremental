@@ -1,19 +1,21 @@
 --[[
 	DailyRewardsScreen.luau
 
-	DAILY REWARDS: a seven-day track that loops. Days behind you carry a tick and a dim wash, today
-	is ringed in green, day 7 keeps its premium purple.
+	DAILY REWARDS: a seven-day calendar that loops.
 
-	THE STREAK IS THE FEATURE, not the reward. A reward for logging in is pleasant; a streak you
-	lose by not logging in is a reason to log in. So the streak is what the footer leads with, and
-	the bonus it is worth is spelled out rather than left implicit.
+	LAYOUT: two rows of three on the left, and day 7 as a tall HERO card on the right spanning both
+	rows. Six small cards plus one big one, which is what makes the last day read as the thing worth
+	keeping a streak for -- a seventh identical card in a row of seven does not.
 
-	Reads real config and real server state now. It used to render `Mock.dailyRewards` against a
-	`claimedDays` that was always zero, and its claim button called an empty function -- the screen
-	existed and the feature did not.
+	Days behind the current one carry a tick and a dim wash, today is ringed, and the hero keeps its
+	gold.
 
-	CLAIMING TAKES NO ARGUMENT. It used to pass the day it thought was claimable, which is exactly
-	the value a server must never accept from a client. The server reads that from saved data.
+	THE STREAK IS THE FEATURE, not the reward. A reward for logging in is pleasant; a streak you lose
+	by not logging in is a reason to log in. So the streak is what the footer leads with, and the bonus
+	it is worth is spelled out rather than left implicit.
+
+	CLAIMING TAKES NO ARGUMENT. It used to pass the day it thought was claimable, which is exactly the
+	value a server must never accept from a client. The server reads that from saved data.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,9 +33,14 @@ local Overlays = require(UI.Components.Overlays)
 
 local e = React.createElement
 
+--- Small card in the 3x2 block, and the hero that spans both of its rows.
+local CARD = Vector2.new(150, 158)
+local HERO = Vector2.new(232, CARD.Y * 2 + 12)
+local GAP = 12
+
 --[[
-	The reward line on a card. Derived from the reward itself rather than authored twice, so a
-	config change cannot leave the card lying about what it gives.
+	The reward line on a card. Derived from the reward itself rather than authored twice, so a config
+	change cannot leave the card lying about what it gives.
 ]]
 local function amountText(day: { [string]: any }): string
 	local parts = {}
@@ -60,34 +67,56 @@ local function DailyRewardsScreen(props)
 	local claimable = state.dailyClaimable == true
 	local streak = state.dailyStreak or 0
 
-	local cards = {}
-	for index, day in ipairs(days) do
-		--[[
-			"claimed" means behind the current day in the calendar, NOT claimed today. Those are
-			different questions and conflating them is what makes a looping calendar confusing: on
-			day 3 you want days 1 and 2 dimmed whether or not today's claim is still pending.
-		]]
-		local dayState
-		if day.Day < currentDay then
-			dayState = "claimed"
-		elseif day.Day == currentDay then
-			dayState = if claimable then "current" else "claimed"
-		else
-			dayState = "locked"
+	--[[
+		"claimed" means behind the current day in the calendar, NOT claimed today. Those are different
+		questions, and conflating them is what makes a looping calendar confusing: on day 3 you want
+		days 1 and 2 dimmed whether or not today's claim is still pending.
+	]]
+	local function stateFor(dayNumber: number): string
+		if dayNumber < currentDay then
+			return "claimed"
+		elseif dayNumber == currentDay then
+			return if claimable then "current" else "claimed"
 		end
+		return "locked"
+	end
 
-		cards[#cards + 1] = e(Rows.RewardCard, {
+	--[[
+		The hero is whichever day carries `Hero` in config, falling back to the last day. Data-driven so
+		moving the big reward moves the big card with it.
+	]]
+	local heroIndex = #days
+	for index, day in ipairs(days) do
+		if day.Hero then
+			heroIndex = index
+			break
+		end
+	end
+
+	local smallCards = {}
+	local heroCard = nil
+	for index, day in ipairs(days) do
+		local card = e(Rows.RewardCard, {
 			key = "Day" .. day.Day,
 			day = day.Day,
 			label = day.Label,
 			amount = amountText(day),
 			glyph = day.Glyph,
-			premium = day.Day == #days,
-			state = dayState,
+			premium = index == heroIndex,
+			state = stateFor(day.Day),
+			size = if index == heroIndex
+				then UDim2.fromOffset(HERO.X, HERO.Y)
+				else UDim2.fromOffset(CARD.X, CARD.Y),
 			layoutOrder = index,
 		})
+		if index == heroIndex then
+			heroCard = card
+		else
+			smallCards[#smallCards + 1] = card
+		end
 	end
 
+	local blockWidth = CARD.X * 3 + GAP * 2
 	local bonusPercent = math.floor(math.min(math.max(0, streak - 1) * 5, 100))
 
 	return e(Overlays.Modal, {
@@ -95,9 +124,8 @@ local function DailyRewardsScreen(props)
 		title = "Daily Rewards",
 		glyph = "calendar",
 		headerColor = Theme.Gradient.Green,
-		width = 1080,
-		-- A single row of 178px day cards.
-		contentHeight = 200,
+		width = blockWidth + HERO.X + GAP + 56,
+		contentHeight = HERO.Y + 8,
 		onClose = actions.closeScreen,
 		footerHeight = 70,
 		footer = e(P.Group, {
@@ -113,7 +141,7 @@ local function DailyRewardsScreen(props)
 					font = Theme.Font.Bold,
 					color = if streak > 0 then Theme.Color.Gold else Theme.Color.Gray,
 					align = Enum.TextXAlignment.Left,
-					size = UDim2.new(0, 320, 1, 0),
+					size = UDim2.new(0, 300, 1, 0),
 				}),
 				e(Buttons.Button, {
 					key = "ClaimButton",
@@ -122,7 +150,7 @@ local function DailyRewardsScreen(props)
 					variant = if claimable then "Primary" else "Neutral",
 					disabled = not claimable,
 					textSize = if claimable then Theme.TextSize.Heading else Theme.TextSize.Body,
-					size = UDim2.fromOffset(320, 56),
+					size = UDim2.fromOffset(300, 56),
 					position = UDim2.fromScale(0.5, 0.5),
 					anchorPoint = Vector2.new(0.5, 0.5),
 					-- No argument: the server decides what is claimable.
@@ -140,15 +168,37 @@ local function DailyRewardsScreen(props)
 		}),
 		children = {
 			e(P.Group, {
-				key = "RewardTrack",
-				size = UDim2.fromScale(1, 1),
-				layout = P.list({
-					direction = Enum.FillDirection.Horizontal,
-					padding = 10,
-					hAlign = Enum.HorizontalAlignment.Center,
-					vAlign = Enum.VerticalAlignment.Center,
-				}),
-				children = cards,
+				key = "Calendar",
+				size = UDim2.fromOffset(blockWidth + GAP + HERO.X, HERO.Y),
+				position = UDim2.fromScale(0.5, 0.5),
+				anchorPoint = Vector2.new(0.5, 0.5),
+				children = P.compact(
+					--[[
+						The six small days as a 3-wide grid, which wraps to two rows on its own. A grid
+						rather than two hand-built rows so a calendar of a different length still lays out
+						without touching this file.
+					]]
+					e(P.Group, {
+						key = "Block",
+						size = UDim2.fromOffset(blockWidth, HERO.Y),
+						layout = P.grid({
+							cell = UDim2.fromOffset(CARD.X, CARD.Y),
+							padding = UDim2.fromOffset(GAP, GAP),
+							maxCells = 3,
+						}),
+						children = smallCards,
+					}),
+					--- The hero, pinned right and spanning the full height of the block.
+					if heroCard
+						then e(P.Group, {
+							key = "HeroSlot",
+							size = UDim2.fromOffset(HERO.X, HERO.Y),
+							position = UDim2.fromScale(1, 0.5),
+							anchorPoint = Vector2.new(1, 0.5),
+							children = { heroCard },
+						})
+						else nil
+				),
 			}),
 		},
 	})

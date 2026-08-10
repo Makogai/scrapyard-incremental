@@ -28,9 +28,12 @@ return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
 	name = "HUD Widgets",
-	summary = "Friend boost, playtime track and the tutorial caption.",
+	summary = "Bottom-left status cluster, playtime track and the tutorial caption.",
 	controls = {
 		Friends = UILabs.Slider(2, 0, 10, 1),
+		Spins = UILabs.Slider(2, 0, 9, 1),
+		--- Forces the hover popup open, since a story cannot hold a mouse still.
+		ShowTooltip = UILabs.Boolean(false),
 		PlaytimeSeconds = UILabs.Slider(1100, 0, 7200, 10),
 		ClaimedMilestones = UILabs.Slider(2, 0, #RewardsConfig.Playtime.Milestones, 1),
 		TutorialStep = UILabs.Slider(1, 0, #TutorialConfig.Steps, 1),
@@ -57,6 +60,16 @@ return UILabs.CreateReactStory({
 			key = `Friends{count}`,
 			count = count,
 			boost = count * RewardsConfig.Friends.BoostPerFriend,
+			tooltipVisible = controls.ShowTooltip,
+		})
+	end
+
+	local spinStates = {}
+	for _, spins in { 0, 1, 5 } do
+		spinStates[#spinStates + 1] = e(Parts.SpinWheel, {
+			key = `Spins{spins}`,
+			spins = spins,
+			tooltipVisible = controls.ShowTooltip,
 		})
 	end
 
@@ -64,20 +77,30 @@ return UILabs.CreateReactStory({
 		title = "Return to play — HUD widgets",
 		sections = {
 			{
-				title = "Friend boost (playground)",
+				--[[
+					The shipped bottom-left cluster. Reviewed as one unit because the two icons have to
+					read as a matched pair -- same glyph weight, same value line, same popup behaviour.
+				]]
+				title = "Status cluster (the real bottom-left corner)",
 				items = {
-					e(Parts.FriendBoost, {
-						key = "Playground",
-						count = controls.Friends,
-						boost = controls.Friends * RewardsConfig.Friends.BoostPerFriend,
+					e(Parts.StatusCluster, {
+						key = "Cluster",
+						friendCount = controls.Friends,
+						friendBoost = controls.Friends * RewardsConfig.Friends.BoostPerFriend,
+						spinsAvailable = controls.Spins,
 					}),
 				},
-				itemSize = UDim2.fromOffset(70, 84),
+				itemSize = UDim2.fromOffset(130, 90),
 			},
 			{
 				title = "Friend boost — 0, 1, 3 and 10 friends",
 				items = friendStates,
-				itemSize = UDim2.fromOffset(70, 84),
+				itemSize = UDim2.fromOffset(80, 110),
+			},
+			{
+				title = "Spin wheel — 0, 1 and 5 spins",
+				items = spinStates,
+				itemSize = UDim2.fromOffset(80, 110),
 			},
 			{
 				title = "Playtime track (playground)",

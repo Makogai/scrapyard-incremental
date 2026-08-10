@@ -133,24 +133,24 @@ local function HudMobile(props)
 			else nil,
 
 		--[[
-			Friend boost, bottom right on mobile too -- but ABOVE the menu toggle rather than beside
-			it, because the right edge at thumb height is the toggle's and a 750x361 landscape phone
-			has no room for two things there. Hidden while the drawer is open, like the boosts.
+			BOTTOM LEFT status cluster, matching desktop. On a 750x361 landscape phone the left edge
+			below the currencies is the only corner with room for two icons -- the right edge at thumb
+			height belongs to the menu toggle.
 		]]
-		if not open
-			then e(Parts.FriendBoost, {
-				key = "FriendBoost",
-				count = state.friendCount,
-				boost = state.friendBoost,
-				extent = 44,
-				position = UDim2.new(1, -MARGIN, 1, -(TOGGLE_BOTTOM + TOGGLE_HEIGHT + 8)),
-				anchorPoint = Vector2.new(1, 1),
-				zIndex = 11,
-				onClick = function()
-					actions.openScreen("spin")
-				end,
-			})
-			else nil,
+		e(Parts.StatusCluster, {
+			key = "StatusCluster",
+			friendCount = state.friendCount,
+			friendBoost = state.friendBoost,
+			spinsAvailable = state.spinsAvailable,
+			extent = 40,
+			gap = 8,
+			position = UDim2.new(0, MARGIN, 1, -Theme.Safe.BottomBand),
+			anchorPoint = Vector2.new(0, 1),
+			zIndex = 11,
+			onOpenSpin = function()
+				actions.openScreen("spin")
+			end,
+		}),
 
 		--[[
 			Playtime sits just above the storage meter. Narrow on purpose: at 750px wide there is not

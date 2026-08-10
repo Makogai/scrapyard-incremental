@@ -447,6 +447,28 @@ function Glyphs.Trophy(props)
 end
 
 --[[
+	Prize wheel, for the spin button.
+
+	Four coloured quadrant discs behind a white hub, which is the same read as the colour-wheel icon
+	in the reference: unmistakably a wheel at 40px without needing radial fill, which Roblox has no
+	way to draw. The discs overlap slightly so there are no seams between them.
+
+	Deliberately not four rotated wedges. A wedge needs rotation, and a rotated GuiObject ignores its
+	ancestors' `ClipsDescendants` -- fine here, but four of them would be four chances to get it
+	wrong for no gain over discs.
+]]
+function Glyphs.Wheel(props)
+	local hub = props.color or Theme.Color.White
+	return e("Frame", { key = "Wheel", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1) }, {
+		disc("QuadTop", 0.5, 0.28, 0.56, Theme.Color.Red, 1),
+		disc("QuadRight", 0.72, 0.5, 0.56, Theme.Color.Yellow, 1),
+		disc("QuadBottom", 0.5, 0.72, 0.56, Theme.Color.Green, 1),
+		disc("QuadLeft", 0.28, 0.5, 0.56, Theme.Color.Purple, 1),
+		disc("Hub", 0.5, 0.5, 0.3, hub, 3),
+	})
+end
+
+--[[
 	Two figures, for the friend boost.
 
 	Drawn back to front so the near one overlaps the far one, which is what makes it read as "two
@@ -724,6 +746,8 @@ Glyphs.byName = {
 	storage = Glyphs.Crate,
 	recycle = Glyphs.Recycle,
 	prestige = Glyphs.Recycle,
+	wheel = Glyphs.Wheel,
+	spin = Glyphs.Wheel,
 	friends = Glyphs.Friends,
 	friend = Glyphs.Friends,
 	paw = Glyphs.Paw,

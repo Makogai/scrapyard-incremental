@@ -56,12 +56,13 @@ Parts.UTILITY_ITEMS = {
 	{ id = "settings", glyph = "sliders", variant = "Neutral" },
 	{ id = "collection", glyph = "book", variant = "Premium" },
 	--[[
-		The two return-to-play windows. They live here rather than in `MENU_ITEMS` because the 2x3
-		menu grid is for things you spend at -- upgrades, pets, rebirth -- and these are things you
-		collect from. Putting them in the grid would push a core tile off it.
+		Daily rewards lives here rather than in `MENU_ITEMS` because the 2x3 menu grid is for things you
+		spend at -- upgrades, pets, rebirth -- and this is something you collect from.
+
+		The spin wheel is deliberately NOT here: it is in the bottom-left status cluster, and a window
+		reachable from two places in the same HUD is the mistake rule 9 exists to stop.
 	]]
 	{ id = "daily", glyph = "calendar", variant = "Primary" },
-	{ id = "spin", glyph = "star", variant = "Event" },
 }
 
 --------------------------------------------------------------------------------
@@ -334,6 +335,7 @@ Parts.BOOST_VARIANTS = {
 			NumberSequenceKeypoint.new(0, 0.5),
 			NumberSequenceKeypoint.new(1, 1),
 		}),
+		--- `stroke`, not `strokeThickness`: this is a variant table BoostTile reads as `look.stroke`.
 		stroke = 0,
 	},
 	Solid = {
@@ -874,73 +876,220 @@ function Parts.ContextActions(props)
 end
 
 --------------------------------------------------------------------------------
--- FriendBoost
+-- StatusIcon: FriendBoost and SpinWheel
 --------------------------------------------------------------------------------
 
 --[[
-	Bottom-right friend icon. +10% money per friend in this server.
+	The bottom-left status cluster: a plain OUTLINED GLYPH with a small value under it, and a popup
+	on hover. No button slab behind it -- the reference has bare icons sitting on the world, and a
+	panel around them makes the corner look like a toolbar.
 
-	It sits in the corner and STATES the boost rather than hiding it in a menu, because being seen
-	is the whole mechanic -- a boost nobody notices motivates nobody to bring a friend. The count
-	comes from `FriendBoostService`, which checks real friendship server-side.
+	The hover popup is the same `Overlays.Tooltip` the potion tiles use, so these read as the same
+	class of thing: a passive status readout you can interrogate, not a menu entry.
+
+	A `TextButton` root, not a Frame with MouseEnter. Roblox only routes hover to a Frame when nothing
+	interactive sits above it, and `usePressable` is the hover path every other pressable in the kit
+	uses -- see `BoostTile`, which learned this the hard way.
+]]
+local function StatusIcon(props)
+	local extent = props.extent or 46
+	local valueHeight = 16
+	--[[
+		`onClick` goes THROUGH `usePressable`, which wires `Activated` itself and gates it on
+		`disabled`. Wiring `Activated` separately on the root would double-fire on some input paths.
+	]]
+	local press = Motion.usePressable({
+		hoverScale = 1.08,
+		pressScale = 0.96,
+		onClick = props.onClick,
+	})
+
+	local rootProps = {
+		key = props.key,
+		Text = "",
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Size = UDim2.fromOffset(extent, extent + valueHeight),
+		Position = props.position,
+		AnchorPoint = props.anchorPoint,
+		LayoutOrder = props.layoutOrder,
+		ZIndex = props.zIndex,
+	}
+	for event, handler in pairs(press.events) do
+		rootProps[event] = handler
+	end
+
+	return e(
+		"TextButton",
+		rootProps,
+		P.compact(
+			e("UIScale", { key = "Scale", Scale = press.scale }),
+			--[[
+				`plain` draws the glyph with no tile behind it. The glyph art already carries the heavy
+				dark outline the house style wants, so it reads as an outlined icon on its own.
+			]]
+			e(Icon, {
+				key = "Glyph",
+				glyph = props.glyph,
+				plain = true,
+				size = UDim2.fromOffset(extent, extent),
+				zIndex = 2,
+			}),
+			--[[
+				The value sits DIRECTLY under the glyph, not pinned to the root's bottom edge -- "at the
+				bottom but not too far", which is what the reference does. The root is exactly as tall as
+				glyph plus value, so there is no dead band to fall through.
+			]]
+			e(P.Label, {
+				key = "Value",
+				text = props.value,
+				textSize = Theme.TextSize.Small,
+				color = props.valueColor or Theme.Color.White,
+				position = UDim2.fromOffset(0, extent - 2),
+				size = UDim2.new(1, 0, 0, valueHeight),
+				zIndex = 3,
+			}),
+			--- Count pip, top-right, only when there is something to count.
+			if props.badge
+				then e(Indicators.Badge, {
+					key = "Badge",
+					text = props.badge,
+					gradient = props.badgeGradient or Theme.Gradient.Red,
+					textSize = Theme.TextSize.Micro,
+					position = UDim2.new(1, 4, 0, -2),
+					anchorPoint = Vector2.new(1, 0),
+					zIndex = 5,
+				})
+				else nil,
+			--[[
+				Opens UP and to the RIGHT: this cluster is in the bottom-left corner, so a tooltip
+				growing down or left runs off the screen. The mirror of what `BoostTile` does in the
+				bottom-right.
+			]]
+			if press.hovered or props.tooltipVisible
+				then e(Overlays.Tooltip, {
+					key = "Tip",
+					title = props.tipTitle,
+					body = props.tipBody,
+					width = 260,
+					position = UDim2.fromOffset(-6, -10),
+					anchorPoint = Vector2.new(0, 1),
+					zIndex = Theme.Layer.Tooltip,
+				})
+				else nil
+		)
+	)
+end
+
+Parts.StatusIcon = StatusIcon
+
+--[[
+	Friend boost. +10% money per friend in this server.
 
 	Shown at zero friends too, deliberately: "+0%" beside a friend icon is an invitation. Hiding it
-	until you already have friends means the player who most needs the nudge never sees it.
+	until you already have friends means the player who most needs the nudge never sees it -- and the
+	hover popup is where the mechanic gets explained, which is why it exists at zero.
 ]]
 function Parts.FriendBoost(props)
 	local count = props.count or 0
 	local boost = props.boost or 0
-	local extent = props.extent or 54
+	local percent = math.floor(boost * 100 + 0.5)
 	local active = count > 0
 
-	return e(P.Group, {
+	return e(StatusIcon, {
 		key = props.key or "FriendBoost",
-		size = UDim2.fromOffset(extent, extent + 20),
+		glyph = props.glyph or "friends",
+		extent = props.extent,
+		value = `+{percent}%`,
+		valueColor = if active then Theme.Color.Cash else Theme.Color.GrayDark,
+		badge = if active then tostring(count) else nil,
+		badgeGradient = Theme.Gradient.Cyan,
+		tipTitle = "FRIEND BOOST",
+		tipBody = if active
+			then `+{percent}% money from {count} friend{if count == 1 then "" else "s"} in this server. Bring more and it climbs.`
+			else "Play with friends in the same server for +10% money each. Nobody here yet.",
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		layoutOrder = props.layoutOrder,
+		zIndex = props.zIndex,
+		tooltipVisible = props.tooltipVisible,
+		onClick = props.onClick,
+	})
+end
+
+--[[
+	Spin wheel. The count of spins banked is the number that matters, so it is both the value under
+	the glyph and the badge.
+]]
+function Parts.SpinWheel(props)
+	local spins = props.spins or 0
+	local ready = spins > 0
+
+	return e(StatusIcon, {
+		key = props.key or "SpinWheel",
+		glyph = props.glyph or "wheel",
+		extent = props.extent,
+		value = if ready then `{spins}` else "-",
+		valueColor = if ready then Theme.Color.Gold else Theme.Color.GrayDark,
+		badge = if ready then tostring(spins) else nil,
+		badgeGradient = Theme.Gradient.Red,
+		tipTitle = "DAILY SPIN",
+		tipBody = if ready
+			then `{spins} spin{if spins == 1 then "" else "s"} ready. Top prize is the God Potion.`
+			else "No spins left. One free spin every day, and the calendar hands out more.",
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		layoutOrder = props.layoutOrder,
+		zIndex = props.zIndex,
+		tooltipVisible = props.tooltipVisible,
+		onClick = props.onClick,
+	})
+end
+
+--[[
+	The two of them as one bottom-left cluster, laid out rather than hand-positioned so adding a third
+	status icon later costs one entry instead of three offsets.
+]]
+function Parts.StatusCluster(props)
+	local extent = props.extent or 46
+	local gap = props.gap or 10
+
+	return e(P.Group, {
+		key = props.key or "StatusCluster",
+		size = UDim2.fromOffset(extent * 2 + gap, extent + 16),
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
-		--[[
-			`P.compact`, not a table literal.
-
-			A literal `{ icon, conditional, label }` whose conditional is nil leaves a HOLE in the
-			array, and `ipairs` stops dead at it -- which silently dropped the "+0%" readout for every
-			player with no friends. That is precisely the player this widget exists to talk to. Caught
-			in Play: the icon rendered and the label did not. Any children list with an optional entry
-			that is not last has to go through this.
-		]]
-		children = P.compact(
-			e(Buttons.IconButton, {
-				key = "Icon",
-				glyph = props.glyph or "friends",
-				variant = if active then "Event" else "Neutral",
-				size = UDim2.fromOffset(extent, extent),
-				onClick = props.onClick,
-			}),
+		layout = P.list({
+			direction = Enum.FillDirection.Horizontal,
+			padding = gap,
+			hAlign = Enum.HorizontalAlignment.Left,
+			vAlign = Enum.VerticalAlignment.Bottom,
+		}),
+		children = {
 			--[[
-				Friend count as a corner pip, drawn only when there is one -- an empty server should
-				show a clean icon, not a "0" badge that reads like something is broken.
+				NO `onClick`. The friend boost is a status readout whose interaction is the hover popup --
+				wiring it to open some other window would be a lie about what the icon is.
+
+				The obvious thing to put here is `SocialService:PromptGameInvite`, which is exactly the
+				action the boost is asking for. It is left unwired because that API yields and needs a
+				`CanSendGameInviteAsync` check, and this pass could not be Play-tested.
 			]]
-			if active
-				then e(Indicators.Badge, {
-					key = "Count",
-					text = tostring(count),
-					gradient = Theme.Gradient.Cyan,
-					textSize = Theme.TextSize.Tiny,
-					position = UDim2.new(1, 2, 0, -2),
-					anchorPoint = Vector2.new(1, 0),
-					zIndex = 4,
-				})
-				else nil,
-			e(P.Label, {
-				key = "Boost",
-				text = `+{math.floor(boost * 100 + 0.5)}%`,
-				textSize = Theme.TextSize.Small,
-				color = if active then Theme.Color.Cash else Theme.Color.GrayDark,
-				position = UDim2.fromScale(0.5, 1),
-				anchorPoint = Vector2.new(0.5, 1),
-				size = UDim2.fromOffset(extent + 12, 18),
-			})
-		),
+			e(Parts.FriendBoost, {
+				key = "FriendBoost",
+				count = props.friendCount,
+				boost = props.friendBoost,
+				extent = extent,
+				layoutOrder = 1,
+			}),
+			e(Parts.SpinWheel, {
+				key = "SpinWheel",
+				spins = props.spinsAvailable,
+				extent = extent,
+				layoutOrder = 2,
+				onClick = props.onOpenSpin,
+			}),
+		},
 	})
 end
 
@@ -986,7 +1135,7 @@ function Parts.PlaytimeTrack(props)
 		zIndex = props.zIndex,
 		gradient = Theme.Gradient.PanelDeep,
 		radius = Theme.Radius.Card,
-		stroke = Theme.Stroke.Card,
+		strokeThickness = Theme.Stroke.Card,
 		studs = false,
 		children = {
 			e(P.Label, {
@@ -1081,7 +1230,7 @@ function Parts.TutorialCaption(props)
 		zIndex = props.zIndex,
 		gradient = Theme.Gradient.Panel,
 		radius = Theme.Radius.Panel,
-		stroke = Theme.Stroke.Panel,
+		strokeThickness = Theme.Stroke.Panel,
 		studs = false,
 		children = {
 			--- Points down at the caption, and is the only moving thing on the strip.

@@ -43,14 +43,24 @@ local dailyDays = {
 	}),
 	table.freeze({ Day = 5, Money = 12000, Glyph = "cash", Accent = "Green", Label = "$12,000" }),
 	table.freeze({ Day = 6, Spins = 3, Glyph = "star", Accent = "Cyan", Label = "3 Spins" }),
+	--[[
+		Day 7 is the hero card: it spans two rows on its own in the modal, so it carries the heaviest
+		reward and the magnet glyph, which is the most recognisable object in the game.
+
+		It does NOT grant a magnet. The calendar loops, so a magnet here would be worthless from the
+		second week on. If you want the magnet itself as a day-7 prize it has to be conditional on not
+		already owning it, with cash as the fallback -- worth doing, but it is a real branch rather
+		than a config line.
+	]]
 	table.freeze({
 		Day = 7,
 		Money = 50000,
 		Items = table.freeze({ GodPotion = 1 }),
 		Spins = 2,
-		Glyph = "crown",
+		Glyph = "magnet",
 		Accent = "Gold",
 		Label = "MEGA",
+		Hero = true,
 	}),
 }
 
@@ -154,14 +164,22 @@ local spinSegments = {
 		Accent = "Cyan",
 		Glyph = "star",
 	}),
+	--[[
+		THE BEST PRIZE. `Best` is a flag, not a hardcoded id in the UI: the wheel finds whichever
+		segment carries it and gives that one the gold treatment, the crown, and the shine layer. Move
+		the flag and the presentation follows -- which is the point of driving it from data.
+
+		Only one segment should carry it. The wheel takes the first it finds.
+	]]
 	table.freeze({
 		Id = "Jackpot",
 		Weight = 1,
 		Money = 250000,
 		Items = table.freeze({ GodPotion = 1 }),
-		Label = "JACKPOT",
-		Accent = "Pink",
-		Glyph = "crown",
+		Label = "GOD POTION",
+		Accent = "Gold",
+		Glyph = "potion",
+		Best = true,
 	}),
 }
 

@@ -473,6 +473,13 @@ function P.Panel(props)
 		LayoutOrder = if props.shadow then nil else props.layoutOrder,
 		ZIndex = if props.shadow then 1 else props.zIndex,
 		ClipsDescendants = props.clip,
+		--[[
+			READ AGENTS.md RULE 11 BEFORE USING THIS. A GuiObject with non-zero `Rotation` ignores every
+			ancestor's `ClipsDescendants`, so a rotated panel inside a scrolling list or a clipped window
+			paints over the whole screen. It is only safe on something that never needs clipping -- the
+			spin wheel's spokes, which sit in a fixed-size area with margin around them.
+		]]
+		Rotation = props.rotation,
 	}, body)
 
 	if not props.shadow then
@@ -695,6 +702,8 @@ function P.Group(props)
 		ZIndex = props.zIndex,
 		ClipsDescendants = props.clip,
 		Visible = props.visible,
+		--- Same warning as `P.Panel.rotation`: see AGENTS.md rule 11.
+		Rotation = props.rotation,
 	}, children)
 end
 
