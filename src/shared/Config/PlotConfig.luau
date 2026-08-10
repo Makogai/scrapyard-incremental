@@ -1,8 +1,8 @@
 --!strict
 
 return table.freeze({
-	PlotCount = 12,
-	StreetCount = 4,
+	PlotCount = 6,
+	StreetCount = 2,
 	PlotsPerStreet = 3,
 	Width = 130,
 	Depth = 170,

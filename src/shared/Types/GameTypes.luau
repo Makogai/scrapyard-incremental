@@ -9,8 +9,18 @@ export type ScrapId =
 	| "EnginePart"
 	| "CarDoor"
 	| "ScrapCar"
+	| "RustyPipe"
+	| "CrushedBucket"
+	| "CopperWire"
+	| "ToolBox"
+	| "BrakeDisc"
+	| "Radiator"
+	| "MotorCoil"
+	| "ExhaustPipe"
+	| "Axle"
+	| "FuelTank"
 
-export type VariantId = "Normal" | "Silver" | "Gold" | "Rainbow"
+export type VariantId = "Normal" | "Rare" | "Epic" | "Legendary" | "Nebula"
 export type AreaId = "FrontYard" | "WorkshopYard" | "VehicleGraveyard"
 export type UpgradeId =
 	"MagnetStrength"
@@ -19,6 +29,8 @@ export type UpgradeId =
 	| "MovementSpeed"
 	| "ScrapValue"
 	| "CollectionSpeed"
+	| "ScrapFlow"
+	| "Rarity"
 
 export type Rarity = "Common" | "Uncommon" | "Rare" | "Epic"
 
@@ -31,9 +43,15 @@ export type ScrapDefinition = {
 	AreaIds: { AreaId },
 	SpawnWeight: number,
 	RespawnSeconds: number,
+	--[[
+		The footprint this scrap is meant to occupy, {x, y, z}. Authored models are
+		normalised to it, so it is the one place that decides how big a piece of scrap
+		looks in the world.
+	]]
 	Size: { number },
-	Rarity: Rarity,
 	ModelName: string,
+	--- Art multiplier on top of that normalisation. Default 1.
+	ModelScale: number?,
 }
 
 export type VariantDefinition = {
@@ -41,6 +59,7 @@ export type VariantDefinition = {
 	DisplayName: string,
 	ValueMultiplier: number,
 	SpawnWeight: number,
+	LuckExponent: number,
 	Color: Color3,
 	EffectName: string?,
 }
@@ -48,13 +67,36 @@ export type VariantDefinition = {
 export type UpgradeDefinition = {
 	Id: UpgradeId,
 	DisplayName: string,
-	MaximumLevel: number,
+	BaseMaximumLevel: number,
+	LevelsPerPrestige: number,
 	BaseCost: number,
 	GrowthRate: number,
+	CostPower: number,
 	BaseEffect: number,
 	EffectPerLevel: number,
+	EffectCurve: "Power" | "Diminishing" | "Exponential" | "Reduction",
+	CurvePower: number,
 	EffectCap: number,
 	EffectUnit: string,
+}
+
+export type PetRarity = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Secret"
+
+export type PetDefinition = {
+	Id: string,
+	DisplayName: string,
+	EggId: string,
+	Rarity: PetRarity,
+	RollWeight: number,
+	MoneyMultiplier: number,
+	Effects: { [string]: number },
+	Premium: boolean?,
+	Ability: string?,
+	AbilityPower: number?,
+	Description: string,
+	ModelName: string,
+	IconAssetId: string,
+	FallbackColor: Color3,
 }
 
 export type AreaDefinition = {

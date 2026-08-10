@@ -2,15 +2,46 @@
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.CurrentVersion = 6
+PlayerDataSchema.CurrentVersion = 14
+
+local PET_IDS = {
+	"Pup",
+	"Zebra",
+	"QueenKitty",
+	"PastelAngel",
+	"AutumnDragon",
+	"MythicAutumnDragon",
+	"WrenchMouse",
+	"SpringFrog",
+	"WelderBear",
+	"MotorMole",
+	"ChromeWolf",
+	"CoreDragon",
+	"NeonCrab",
+	"CircuitOwl",
+	"PlasmaPanda",
+	"MagnetManta",
+	"NovaLion",
+	"Singularity",
+	"NebulaLeviathan",
+	"DemonicGhost",
+	"SinisterLord",
+}
+local EGG_IDS = { "JunkyardEgg", "WorkshopEgg", "QuantumEgg" }
+local MAXIMUM_OWNED_PER_PET = 999
+local MAXIMUM_PET_SLOT_UPGRADES = 2
+local BASE_PET_SLOTS = 1
+local PASS_PET_SLOTS = 2
 
 local UPGRADE_MAXIMUMS = {
-	MagnetStrength = 20,
-	MagnetRange = 20,
-	StorageCapacity = 25,
-	MovementSpeed = 10,
-	ScrapValue = 20,
-	CollectionSpeed = 15,
+	MagnetStrength = 1000000,
+	MagnetRange = 1000000,
+	StorageCapacity = 1000000,
+	MovementSpeed = 1000000,
+	ScrapValue = 1000000,
+	CollectionSpeed = 1000000,
+	ScrapFlow = 1000000,
+	Rarity = 1000000,
 }
 
 local AREA_IDS = { "FrontYard", "WorkshopYard", "VehicleGraveyard" }
@@ -23,8 +54,18 @@ local SCRAP_IDS = {
 	"EnginePart",
 	"CarDoor",
 	"ScrapCar",
+	"RustyPipe",
+	"CrushedBucket",
+	"CopperWire",
+	"ToolBox",
+	"BrakeDisc",
+	"Radiator",
+	"MotorCoil",
+	"ExhaustPipe",
+	"Axle",
+	"FuelTank",
 }
-local VARIANT_IDS = { Normal = true, Silver = true, Gold = true, Rainbow = true }
+local VARIANT_IDS = { Normal = true, Rare = true, Epic = true, Legendary = true, Nebula = true }
 
 local MAXIMUM_MONEY = 1e15
 local MAXIMUM_GEARS = 1000000
@@ -34,6 +75,26 @@ local MAXIMUM_COLLECTED = 1e15
 local MAXIMUM_TIMESTAMP = 32503680000
 local MAXIMUM_PLOT_STAGE = 4
 local MAXIMUM_CRUSHER_LEVEL = 100
+
+--[[
+	Bounds for the return-to-play systems.
+
+	DUPLICATED FROM `RewardsConfig` AND `TutorialConfig` ON PURPOSE. This module requires nothing --
+	it is loaded by the Lune test runner, which has no `ReplicatedStorage` -- so every table in
+	here (pets, eggs, upgrades, scrap) is a literal that mirrors a config. Keep them in step; the
+	test suite asserts the ones that matter.
+
+	These are all "free value on a timer", which makes an unbounded one a direct exploit: an
+	uncapped `SpinsAvailable` is unlimited jackpots, an uncapped `DailyStreak` is an uncapped cash
+	multiplier.
+]]
+local MAXIMUM_DAY_NUMBER = 400000 -- ~1095 years of day numbers
+local MAXIMUM_DAILY_STREAK = 3650
+local DAILY_CALENDAR_LENGTH = 7
+local MAXIMUM_PLAYTIME_SECONDS = 86400
+local PLAYTIME_MILESTONE_COUNT = 5
+local MAXIMUM_STORED_SPINS = 25
+local TUTORIAL_STEP_COUNT = 4
 
 local function finite(value: any): boolean
 	return typeof(value) == "number" and value == value and value > -math.huge and value < math.huge
@@ -109,11 +170,20 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		LastLoginTimestamp = timestamp,
 		LastSaveTimestamp = 0,
 		PlotStage = 1,
+		--[[
+			Which area theme the plot is currently built as. Unlocking an area no longer opens
+			a region inside the plot; it lets the player convert the whole plot to that theme.
+			See docs/PLOT_UPGRADES.md.
+		]]
+		ActivePlotTheme = "FrontYard",
 		PlotUpgradeLevels = {},
 		UnlockedScrapTypes = {
 			MetalCan = true,
 			LooseBolt = true,
 			SmallMetalPlate = true,
+			RustyPipe = true,
+			CrushedBucket = true,
+			CopperWire = true,
 			Tire = true,
 		},
 		UnlockedMachines = { Crusher = true },
@@ -124,11 +194,50 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		PrestigeCount = 0,
 		OwnedMagnets = { MagnetBasic = true },
 		EquippedMagnet = "MagnetBasic",
-		Inventory = { CashPotion = 0, StrengthPotion = 0 },
-		ActiveBoosts = { CashBoostEndsAt = 0, StrengthBoostEndsAt = 0 },
+		Inventory = { CashPotion = 0, StrengthPotion = 0, LuckPotion = 0, GodPotion = 0 },
+		ActiveBoosts = {
+			CashBoostEndsAt = 0,
+			StrengthBoostEndsAt = 0,
+			LuckBoostEndsAt = 0,
+			GodBoostEndsAt = 0,
+		},
 		RedeemedCodes = {},
 		Entitlements = {},
 		ProcessedReceipts = {},
+		OwnedPets = {},
+		EquippedPets = {},
+		PetSlotUpgradeLevel = 0,
+		EggOpenCounts = {},
+
+		--[[
+			Return-to-play systems. See `RewardsConfig` and `docs/GAME_AUDIT.md`.
+
+			Days are stored as a DAY NUMBER (`os.time() // 86400`), never a timestamp. Comparing
+			day numbers is what makes "have they claimed today" and "was that yesterday" trivial;
+			comparing raw timestamps is how a daily reward ends up claimable twice in one evening.
+		]]
+		DailyStreak = 0,
+		DailyLastClaimDay = 0,
+		--- Which of the seven calendar days they are offered next, 1-based.
+		DailyCalendarDay = 1,
+
+		PlaytimeSecondsToday = 0,
+		PlaytimeDay = 0,
+		PlaytimeClaimed = {},
+
+		SpinsAvailable = 0,
+		SpinLastGrantDay = 0,
+
+		--- 0 = not started. N = step N is the current objective. Past the last step = finished.
+		TutorialStep = 0,
+		TutorialComplete = false,
+
+		--[[
+			Transient: it describes the room, not the player, so it resets to 0 on load. Stored in
+			`data` rather than beside it purely so `derivedStats` can read it without a second
+			lookup keyed by Player.
+		]]
+		FriendBoostCount = 0,
 	}
 end
 
@@ -175,6 +284,120 @@ local function migrateVersionFive(raw: { [string]: any })
 	raw.SchemaVersion = 6
 end
 
+local function migrateVersionSix(raw: { [string]: any })
+	raw.UpgradeLevels = raw.UpgradeLevels or {}
+	raw.UpgradeLevels.ScrapFlow = raw.UpgradeLevels.ScrapFlow or 0
+	raw.SchemaVersion = 7
+end
+
+local function migrateVersionSeven(raw: { [string]: any })
+	raw.OwnedPets = raw.OwnedPets or {}
+	raw.EquippedPets = raw.EquippedPets or {}
+	raw.PetSlotUpgradeLevel = raw.PetSlotUpgradeLevel or 0
+	raw.EggOpenCounts = raw.EggOpenCounts or {}
+	raw.SchemaVersion = 8
+end
+
+local function migrateVersionEight(raw: { [string]: any })
+	raw.Inventory = raw.Inventory or {}
+	raw.ActiveBoosts = raw.ActiveBoosts or {}
+	raw.Inventory.LuckPotion = raw.Inventory.LuckPotion or 0
+	raw.Inventory.GodPotion = raw.Inventory.GodPotion or 0
+	raw.ActiveBoosts.LuckBoostEndsAt = raw.ActiveBoosts.LuckBoostEndsAt or 0
+	raw.ActiveBoosts.GodBoostEndsAt = raw.ActiveBoosts.GodBoostEndsAt or 0
+	raw.SchemaVersion = 9
+end
+
+local function migrateVersionNine(raw: { [string]: any })
+	raw.UpgradeLevels = raw.UpgradeLevels or {}
+	raw.UpgradeLevels.Rarity = raw.UpgradeLevels.Rarity or 0
+	if typeof(raw.DiscoveredScrap) == "table" then
+		local legacyVariants = { Silver = "Rare", Gold = "Epic", Rainbow = "Legendary" }
+		for _, discovery in raw.DiscoveredScrap do
+			if typeof(discovery) == "table" and legacyVariants[discovery.HighestVariant] then
+				discovery.HighestVariant = legacyVariants[discovery.HighestVariant]
+			end
+		end
+	end
+	raw.SchemaVersion = 10
+end
+
+--[[
+	The six Junkyard pets were renamed to match the models authored under
+	`Workspace.Pets/Junkyard Egg/`. Carry owned counts across rather than dropping
+	them: a rename is not a reason to take a player's pets away.
+]]
+local JUNKYARD_RENAMES = {
+	TinPup = "Pup",
+	BoltBunny = "Zebra",
+	CanCat = "QueenKitty",
+	GearFox = "PastelAngel",
+	GoldenRaccoon = "AutumnDragon",
+	TrashTitan = "MythicAutumnDragon",
+}
+
+local function migrateVersionTen(raw: { [string]: any })
+	if typeof(raw.OwnedPets) == "table" then
+		for oldId, newId in JUNKYARD_RENAMES do
+			local owned = raw.OwnedPets[oldId]
+			if typeof(owned) == "number" and owned > 0 then
+				raw.OwnedPets[newId] = (raw.OwnedPets[newId] or 0) + owned
+			end
+			raw.OwnedPets[oldId] = nil
+		end
+	end
+	if typeof(raw.EquippedPets) == "table" then
+		for index, petId in raw.EquippedPets do
+			if JUNKYARD_RENAMES[petId] then
+				raw.EquippedPets[index] = JUNKYARD_RENAMES[petId]
+			end
+		end
+	end
+	raw.SchemaVersion = 11
+end
+
+--[[
+	Version 12 briefly carried a `LightTheme` setting. It was removed again before
+	release, and the version stays at 12 rather than dropping back to 11: saves were
+	already written at 12, and a server that claims to be older would reject them as
+	"newer than this server". A stray field in an old save is simply ignored by
+	validation, so there is nothing to clean up.
+]]
+local function migrateVersionEleven(raw: { [string]: any })
+	raw.SchemaVersion = 12
+end
+
+--- Everyone starts on the theme they already had: the scrapyard.
+local function migrateVersionTwelve(raw: { [string]: any })
+	raw.ActivePlotTheme = raw.ActivePlotTheme or "FrontYard"
+	raw.SchemaVersion = 13
+end
+
+--[[
+	Return-to-play systems arrive.
+
+	Cheap: every field is a default, and the sanitiser fills anything left nil. Existing players
+	start on day 1 of the calendar with no streak, which is right -- a streak they never earned
+	would hand them the day-7 multiplier for free.
+
+	`TutorialStep = 0` means "not started", and `TutorialService` decides on join whether an
+	established player should be offered the chain at all (they should not).
+]]
+local function migrateVersionThirteen(raw: { [string]: any })
+	raw.DailyStreak = raw.DailyStreak or 0
+	raw.DailyLastClaimDay = raw.DailyLastClaimDay or 0
+	raw.DailyCalendarDay = raw.DailyCalendarDay or 1
+	raw.PlaytimeSecondsToday = raw.PlaytimeSecondsToday or 0
+	raw.PlaytimeDay = raw.PlaytimeDay or 0
+	raw.PlaytimeClaimed = raw.PlaytimeClaimed or {}
+	raw.SpinsAvailable = raw.SpinsAvailable or 0
+	raw.SpinLastGrantDay = raw.SpinLastGrantDay or 0
+	raw.TutorialStep = raw.TutorialStep or 0
+	raw.TutorialComplete = raw.TutorialComplete or false
+	raw.FriendBoostCount = 0
+	raw.SchemaVersion = 14
+end
+
 function PlayerDataSchema.migrate(
 	rawValue: any,
 	nowTimestamp: number
@@ -205,6 +428,30 @@ function PlayerDataSchema.migrate(
 	end
 	if raw.SchemaVersion == 5 then
 		migrateVersionFive(raw)
+	end
+	if raw.SchemaVersion == 6 then
+		migrateVersionSix(raw)
+	end
+	if raw.SchemaVersion == 7 then
+		migrateVersionSeven(raw)
+	end
+	if raw.SchemaVersion == 8 then
+		migrateVersionEight(raw)
+	end
+	if raw.SchemaVersion == 9 then
+		migrateVersionNine(raw)
+	end
+	if raw.SchemaVersion == 10 then
+		migrateVersionTen(raw)
+	end
+	if raw.SchemaVersion == 11 then
+		migrateVersionEleven(raw)
+	end
+	if raw.SchemaVersion == 12 then
+		migrateVersionTwelve(raw)
+	end
+	if raw.SchemaVersion == 13 then
+		migrateVersionThirteen(raw)
 	end
 	return true, raw, nil
 end
@@ -282,11 +529,15 @@ function PlayerDataSchema.validate(
 	clean.Inventory = {
 		CashPotion = boundedInteger(inventory.CashPotion, 0, 0, 9999),
 		StrengthPotion = boundedInteger(inventory.StrengthPotion, 0, 0, 9999),
+		LuckPotion = boundedInteger(inventory.LuckPotion, 0, 0, 9999),
+		GodPotion = boundedInteger(inventory.GodPotion, 0, 0, 9999),
 	}
 	local boosts = if typeof(raw.ActiveBoosts) == "table" then raw.ActiveBoosts else {}
 	clean.ActiveBoosts = {
 		CashBoostEndsAt = boundedInteger(boosts.CashBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
 		StrengthBoostEndsAt = boundedInteger(boosts.StrengthBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
+		LuckBoostEndsAt = boundedInteger(boosts.LuckBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
+		GodBoostEndsAt = boundedInteger(boosts.GodBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
 	}
 	clean.RedeemedCodes = {}
 	if typeof(raw.RedeemedCodes) == "table" then
@@ -319,9 +570,55 @@ function PlayerDataSchema.validate(
 			end
 		end
 	end
+	clean.OwnedPets = {}
+	local ownedPets = if typeof(raw.OwnedPets) == "table" then raw.OwnedPets else {}
+	for _, petId in PET_IDS do
+		clean.OwnedPets[petId] = boundedInteger(ownedPets[petId], 0, 0, MAXIMUM_OWNED_PER_PET)
+	end
+	clean.PetSlotUpgradeLevel =
+		boundedInteger(raw.PetSlotUpgradeLevel, 0, 0, MAXIMUM_PET_SLOT_UPGRADES)
+	local entitlementPetSlots = if clean.Entitlements.ExtraPetSlots == true
+		then PASS_PET_SLOTS
+		else 0
+	local maximumEquipped = BASE_PET_SLOTS + clean.PetSlotUpgradeLevel + entitlementPetSlots
+	clean.EquippedPets = {}
+	local equippedCounts = {}
+	if typeof(raw.EquippedPets) == "table" then
+		for _, petId in raw.EquippedPets do
+			if
+				typeof(petId) == "string"
+				and clean.OwnedPets[petId] ~= nil
+				and clean.OwnedPets[petId] > 0
+				and (equippedCounts[petId] or 0) < clean.OwnedPets[petId]
+				and #clean.EquippedPets < maximumEquipped
+			then
+				equippedCounts[petId] = (equippedCounts[petId] or 0) + 1
+				table.insert(clean.EquippedPets, petId)
+			end
+		end
+	end
+	clean.EggOpenCounts = {}
+	local eggOpenCounts = if typeof(raw.EggOpenCounts) == "table" then raw.EggOpenCounts else {}
+	for _, eggId in EGG_IDS do
+		clean.EggOpenCounts[eggId] = boundedInteger(eggOpenCounts[eggId], 0, 0, MAXIMUM_COLLECTED)
+	end
 	clean.PlotTheme = if typeof(raw.PlotTheme) == "string" and #raw.PlotTheme <= 40
 		then raw.PlotTheme
 		else "ToyScrapyard"
+	--[[
+		WAS NEVER SANITISED, so it was never loaded: `createDefault` set it and the migration set
+		it, but nothing copied it out of `raw`, which meant every player came back as `FrontYard`
+		however many times they had converted their plot. Validated against the real area list so a
+		theme that no longer exists falls back rather than producing a plot nobody can build.
+	]]
+	local savedTheme = raw.ActivePlotTheme
+	clean.ActivePlotTheme = "FrontYard"
+	for _, areaId in AREA_IDS do
+		if savedTheme == areaId then
+			clean.ActivePlotTheme = areaId
+			break
+		end
+	end
 	clean.PlotUpgradeLevels = {}
 	if typeof(raw.PlotUpgradeLevels) == "table" then
 		for key, value in raw.PlotUpgradeLevels do
@@ -339,6 +636,11 @@ function PlayerDataSchema.validate(
 	end
 	clean.UnlockedScrapTypes.MetalCan = true
 	clean.UnlockedScrapTypes.LooseBolt = true
+	clean.UnlockedScrapTypes.SmallMetalPlate = true
+	clean.UnlockedScrapTypes.RustyPipe = true
+	clean.UnlockedScrapTypes.CrushedBucket = true
+	clean.UnlockedScrapTypes.CopperWire = true
+	clean.UnlockedScrapTypes.Tire = true
 	clean.UnlockedMachines = { Crusher = true }
 	if typeof(raw.UnlockedMachines) == "table" then
 		for key, value in raw.UnlockedMachines do
@@ -372,6 +674,45 @@ function PlayerDataSchema.validate(
 			end
 		end
 	end
+
+	--[[
+		Return-to-play systems.
+
+		Every one of these is bounded, because they are all "free money on a timer" and a corrupt
+		or edited value is a direct exploit: an unbounded `SpinsAvailable` is unlimited jackpots,
+		and an unbounded `DailyStreak` is an unbounded cash multiplier.
+	]]
+	clean.DailyStreak = boundedInteger(raw.DailyStreak, 0, 0, MAXIMUM_DAILY_STREAK)
+	clean.DailyLastClaimDay = boundedInteger(raw.DailyLastClaimDay, 0, 0, MAXIMUM_DAY_NUMBER)
+	clean.DailyCalendarDay = boundedInteger(raw.DailyCalendarDay, 1, 1, DAILY_CALENDAR_LENGTH)
+
+	clean.PlaytimeSecondsToday =
+		boundedInteger(raw.PlaytimeSecondsToday, 0, 0, MAXIMUM_PLAYTIME_SECONDS)
+	clean.PlaytimeDay = boundedInteger(raw.PlaytimeDay, 0, 0, MAXIMUM_DAY_NUMBER)
+	clean.PlaytimeClaimed = {}
+	if typeof(raw.PlaytimeClaimed) == "table" then
+		for index, claimed in raw.PlaytimeClaimed do
+			-- keys survive a JSON round-trip as strings, so accept either
+			local milestoneIndex = if typeof(index) == "number" then index else tonumber(index)
+			if
+				milestoneIndex ~= nil
+				and milestoneIndex >= 1
+				and milestoneIndex <= PLAYTIME_MILESTONE_COUNT
+				and claimed == true
+			then
+				clean.PlaytimeClaimed[math.floor(milestoneIndex)] = true
+			end
+		end
+	end
+
+	clean.SpinsAvailable = boundedInteger(raw.SpinsAvailable, 0, 0, MAXIMUM_STORED_SPINS)
+	clean.SpinLastGrantDay = boundedInteger(raw.SpinLastGrantDay, 0, 0, MAXIMUM_DAY_NUMBER)
+
+	clean.TutorialStep = boundedInteger(raw.TutorialStep, 0, 0, TUTORIAL_STEP_COUNT + 1)
+	clean.TutorialComplete = boolean(raw.TutorialComplete, false)
+
+	--- Always zero on load: it describes the server the player is in, not the player.
+	clean.FriendBoostCount = 0
 
 	return true, clean, nil
 end

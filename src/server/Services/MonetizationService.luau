@@ -8,6 +8,9 @@ local RunService = game:GetService("RunService")
 local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local PlayerStateService = require(script.Parent.PlayerStateService)
+local LeaderboardService = require(script.Parent.LeaderboardService)
+local PlotService = require(script.Parent.PlotService)
+local ScrapService = require(script.Parent.ScrapService)
 local RemoteService = require(script.Parent.RemoteService)
 
 local MonetizationService = {}
@@ -59,12 +62,21 @@ function MonetizationService.Start()
 		if player == nil or productId == nil or not PlayerStateService.IsLoaded(player) then
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
-		local granted = PlayerStateService.GrantDeveloperProduct(
-			player,
-			productId,
-			tostring(receiptInfo.PurchaseId)
-		)
+		local purchaseId = tostring(receiptInfo.PurchaseId)
+		local alreadyProcessed = PlayerStateService.HasProcessedReceipt(player, purchaseId)
+		local granted = PlayerStateService.GrantDeveloperProduct(player, productId, purchaseId)
 		if granted then
+			if productId == "SkipRebirth" then
+				PlotService.RefreshAppearance(player)
+				ScrapService.RefreshPlayer(player)
+			end
+			if not alreadyProcessed then
+				local configuredPrice = MonetizationConfig.Products[productId].DisplayPrice
+				local actualPrice = if typeof(receiptInfo.CurrencySpent) == "number"
+					then receiptInfo.CurrencySpent
+					else configuredPrice
+				LeaderboardService.RecordRobuxSpent(player, actualPrice)
+			end
 			notify(
 				player,
 				true,
@@ -84,6 +96,22 @@ function MonetizationService.Start()
 			if passId then
 				local granted, message = PlayerStateService.GrantEntitlement(player, passId)
 				if granted then
+					local definition = MonetizationConfig.Passes[passId]
+					local price = definition.DisplayPrice
+					local infoSucceeded, productInfo = pcall(
+						MarketplaceService.GetProductInfo,
+						MarketplaceService,
+						marketplaceId,
+						Enum.InfoType.GamePass
+					)
+					if
+						infoSucceeded
+						and typeof(productInfo) == "table"
+						and typeof(productInfo.PriceInRobux) == "number"
+					then
+						price = productInfo.PriceInRobux
+					end
+					LeaderboardService.RecordRobuxSpent(player, price)
 					notify(player, true, message)
 				end
 			end
@@ -109,6 +137,10 @@ function MonetizationService.Start()
 					:GenerateGUID(false)}`
 				local success, message =
 					PlayerStateService.GrantDeveloperProduct(player, catalogId, purchaseId)
+				if success and catalogId == "SkipRebirth" then
+					PlotService.RefreshAppearance(player)
+					ScrapService.RefreshPlayer(player)
+				end
 				notify(player, success, `STUDIO TEST: {message}`)
 			end
 		end)

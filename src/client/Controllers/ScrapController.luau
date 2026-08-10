@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
@@ -30,11 +31,34 @@ end
 function ScrapController.Start()
 	local effect = ReplicatedStorage.Remotes:WaitForChild("GameplayEffect") :: RemoteEvent
 	effect.OnClientEvent:Connect(function(effectName: string, first: any, second: any)
+		if effectName == "NebulaSpawn" then
+			if ClientPreferences.Get("ScreenEffectsEnabled") then
+				local flash = Instance.new("ColorCorrectionEffect")
+				flash.Name = "NebulaSpawnFlash"
+				flash.Brightness = 0.18
+				flash.Contrast = 0.08
+				flash.Saturation = 0.35
+				flash.TintColor = Color3.fromRGB(125, 255, 230)
+				flash.Parent = Lighting
+				TweenService:Create(
+					flash,
+					TweenInfo.new(1.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+					{
+						Brightness = 0,
+						Contrast = 0,
+						Saturation = 0,
+						TintColor = Color3.new(1, 1, 1),
+					}
+				):Play()
+				Debris:AddItem(flash, 1.7)
+			end
+			return
+		end
 		if effectName == "Sold" then
 			if ClientPreferences.Get("ScreenEffectsEnabled") then
-				for _, plot in workspace.Plots:GetChildren() do
+				for _, plot in workspace.NewMap.Plots:GetChildren() do
 					if plot:GetAttribute("OwnerUserId") == Players.LocalPlayer.UserId then
-						local crusher = plot:FindFirstChild("StarterCrusher", true)
+						local crusher = plot:FindFirstChild("Crusher", true)
 						if crusher then
 							local moving = { crusher:FindFirstChild("Top") }
 							local teeth = crusher:FindFirstChild("Teeth")
@@ -85,9 +109,10 @@ function ScrapController.Start()
 			if root and root:IsA("BasePart") then
 				local colors = {
 					Normal = Color3.fromRGB(155, 165, 170),
-					Silver = Color3.fromRGB(205, 220, 225),
-					Gold = Color3.fromRGB(245, 190, 55),
-					Rainbow = Color3.fromRGB(105, 225, 205),
+					Rare = Color3.fromRGB(73, 157, 255),
+					Epic = Color3.fromRGB(185, 83, 255),
+					Legendary = Color3.fromRGB(255, 188, 46),
+					Nebula = Color3.fromRGB(90, 255, 225),
 				}
 				for index = 1, 6 do
 					local spark = Instance.new("Part")

@@ -1,7 +1,5 @@
 --!strict
 
-local Players = game:GetService("Players")
-
 local PlotBuildService = {}
 
 local function setRequiredStageVisibility(plot: Model, stage: number)
@@ -22,69 +20,56 @@ local function setRequiredStageVisibility(plot: Model, stage: number)
 	end
 end
 
+--[[
+	Publish who owns a plot and how they are doing, as attributes on its `OwnerSign`.
+
+	The server stays the only thing that knows this, but it no longer draws it. It used to
+	poke text into an authored `Card` inside a `BillboardGui` floating twelve studs above
+	the board -- which is the "floating shi" this replaces. `PlotSignController` reads these
+	attributes and renders the real UI kit onto a SurfaceGui on the board itself, so the
+	sign looks like the rest of the game instead of like a debug label.
+
+	Attributes rather than a remote because they replicate per-instance for free, arrive
+	with the plot, and a late-joining client gets the current values without asking.
+
+	`Money` is public information here in the same sense the richest-player podium makes it
+	public: it is on a sign anyone can walk up to.
+]]
 local function updateSign(plot: Model, player: Player?, plotState: { [string]: any }?)
 	local sign = plot:FindFirstChild("OwnerSign")
-	local board = if sign then sign:FindFirstChild("Board") else nil
+	if sign == nil then
+		return
+	end
+
+	--[[
+		The authored billboard is retired. The client puts its own marker above the plot,
+		visible only to that plot's owner, which is the thing that was actually useful about
+		a floating label -- finding your own yard.
+	]]
+	local board = sign:FindFirstChild("Board")
 	local billboard = if board then board:FindFirstChild("OwnerBillboard") else nil
-	local card = if billboard then billboard:FindFirstChild("Card") else nil
 	if billboard and billboard:IsA("BillboardGui") then
-		billboard.AlwaysOnTop = true
-		billboard.MaxDistance = 0
-		billboard.StudsOffset = Vector3.new(0, 12, 0)
+		billboard.Enabled = false
 	end
-	if card == nil then
-		return
-	end
-	local ownerName = card:FindFirstChild("OwnerName") :: TextLabel?
-	local plotStats = card:FindFirstChild("PlotStats") :: TextLabel?
-	local avatar = card:FindFirstChild("OwnerAvatar") :: ImageLabel?
+
 	if player == nil or plotState == nil then
-		if billboard and billboard:IsA("BillboardGui") then
-			billboard.Enabled = false
-		end
-		if ownerName then
-			ownerName.Text = "AVAILABLE PLOT"
-		end
-		if plotStats then
-			plotStats.Text = "STAGE 1  •  0 PRESTIGE\n0 TOTAL SCRAP"
-		end
-		if avatar then
-			avatar.Image = ""
-			local placeholder = avatar:FindFirstChild("Placeholder")
-			if placeholder and placeholder:IsA("GuiObject") then
-				placeholder.Visible = true
-			end
-		end
+		sign:SetAttribute("Occupied", false)
+		sign:SetAttribute("OwnerUserId", 0)
+		sign:SetAttribute("OwnerName", "")
+		sign:SetAttribute("Rebirths", 0)
+		sign:SetAttribute("Money", 0)
+		sign:SetAttribute("TotalScrap", 0)
+		sign:SetAttribute("Stage", 1)
 		return
 	end
-	if billboard and billboard:IsA("BillboardGui") then
-		billboard.Enabled = true
-	end
-	if ownerName then
-		ownerName.Text = string.upper(`{player.DisplayName}'S YARD`)
-	end
-	if plotStats then
-		plotStats.Text =
-			`STAGE {plotState.PlotStage}  •  {plotState.PrestigeCount} PRESTIGE\n{plotState.TotalScrapCollected} TOTAL SCRAP`
-	end
-	if avatar then
-		task.spawn(function()
-			local succeeded, image = pcall(function()
-				return Players:GetUserThumbnailAsync(
-					player.UserId,
-					Enum.ThumbnailType.HeadShot,
-					Enum.ThumbnailSize.Size150x150
-				)
-			end)
-			if succeeded and plot:GetAttribute("OwnerUserId") == player.UserId then
-				avatar.Image = image
-				local placeholder = avatar:FindFirstChild("Placeholder")
-				if placeholder and placeholder:IsA("GuiObject") then
-					placeholder.Visible = false
-				end
-			end
-		end)
-	end
+
+	sign:SetAttribute("Occupied", true)
+	sign:SetAttribute("OwnerUserId", player.UserId)
+	sign:SetAttribute("OwnerName", player.DisplayName)
+	sign:SetAttribute("Rebirths", plotState.PrestigeCount or 0)
+	sign:SetAttribute("Money", plotState.Money or 0)
+	sign:SetAttribute("TotalScrap", plotState.TotalScrapCollected or 0)
+	sign:SetAttribute("Stage", plotState.PlotStage or 1)
 end
 
 local function updateUpgradeDisplay(plot: Model, upgradeLevels: { [string]: number }?)
@@ -179,6 +164,17 @@ local function updateAreaGates(
 			end
 		end
 	end
+end
+
+--[[
+	Just the sign, without the visibility and gate work `Refresh` does.
+
+	Cash and total scrap move constantly, and a sign showing a number from whenever the
+	player last unlocked something is worse than no number. This is cheap to call on a
+	timer: attributes only replicate when the value actually changes.
+]]
+function PlotBuildService.RefreshSign(plot: Model, player: Player?, plotState: { [string]: any }?)
+	updateSign(plot, player, plotState)
 end
 
 function PlotBuildService.Apply(plot: Model, player: Player, plotState: { [string]: any })

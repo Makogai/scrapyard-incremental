@@ -4,6 +4,9 @@
     "$className": "DataModel",
 
     "ReplicatedStorage": {
+      "Packages": {
+        "$path": "Packages"
+      },
       "Shared": {
         "$path": "src/shared"
       }
@@ -12,6 +15,16 @@
     "ServerScriptService": {
       "Server": {
         "$path": "src/server"
+      }
+    },
+
+    "ServerStorage": {
+      "$ignoreUnknownInstances": true,
+      "DevPackages": {
+        "$path": "DevPackages"
+      },
+      "Stories": {
+        "$path": "src/stories"
       }
     },
 
@@ -35,24 +48,6 @@
       "$ignoreUnknownInstances": true,
       "$properties": {
         "FilteringEnabled": true
-      },
-      "Baseplate": {
-        "$className": "Part",
-        "$properties": {
-          "Anchored": true,
-          "Color": [0.36, 0.55, 0.28],
-          "Locked": true,
-          "Position": [
-            0,
-            -10,
-            0
-          ],
-          "Size": [
-            512,
-            20,
-            512
-          ]
-        }
       }
     },
     "Lighting": {

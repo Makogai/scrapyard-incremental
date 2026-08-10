@@ -6,6 +6,7 @@ local PrestigeConfig = require(script.Parent.Parent.Config.PrestigeConfig)
 local PlotConfig = require(script.Parent.Parent.Config.PlotConfig)
 local ScrapConfig = require(script.Parent.Parent.Config.ScrapConfig)
 local UpgradeConfig = require(script.Parent.Parent.Config.UpgradeConfig)
+local PetConfig = require(script.Parent.Parent.Config.PetConfig)
 local GameMath = require(script.Parent.GameMath)
 
 local FoundationValidator = {}
@@ -62,27 +63,47 @@ function FoundationValidator.validate()
 
 	for upgradeId, upgrade in UpgradeConfig.ById do
 		assert(upgrade.Id == upgradeId, `Upgrade key mismatch for {upgradeId}`)
-		positive(upgrade.MaximumLevel, `{upgradeId}.MaximumLevel`)
+		positive(upgrade.BaseMaximumLevel, `{upgradeId}.BaseMaximumLevel`)
+		positive(upgrade.LevelsPerPrestige, `{upgradeId}.LevelsPerPrestige`)
 		positive(upgrade.BaseCost, `{upgradeId}.BaseCost`)
+		positive(upgrade.CostPower, `{upgradeId}.CostPower`)
 		assert(
 			upgrade.GrowthRate >= 1 and GameMath.isFinite(upgrade.GrowthRate),
 			`{upgradeId}.GrowthRate must be at least one`
 		)
 		nonnegative(upgrade.BaseEffect, `{upgradeId}.BaseEffect`)
 		nonnegative(upgrade.EffectPerLevel, `{upgradeId}.EffectPerLevel`)
-		assert(
-			upgrade.EffectCap >= upgrade.BaseEffect,
-			`{upgradeId}.EffectCap is below its base effect`
-		)
-		assert(
-			upgrade.MaximumLevel <= Environment.MaximumUpgradeLevel,
-			`{upgradeId} exceeds environment level cap`
-		)
+		positive(upgrade.CurvePower, `{upgradeId}.CurvePower`)
+		if upgrade.EffectCurve == "Reduction" then
+			positive(upgrade.EffectCap, `{upgradeId}.EffectCap`)
+			assert(
+				upgrade.EffectCap <= upgrade.BaseEffect,
+				`{upgradeId}.EffectCap must be a lower reduction floor`
+			)
+		else
+			assert(
+				upgrade.EffectCap >= upgrade.BaseEffect,
+				`{upgradeId}.EffectCap is below its base effect`
+			)
+		end
+	end
+	for eggId, egg in PetConfig.Eggs do
+		positive(egg.Price, `{eggId}.Price`)
+		assert(AreaConfig.ById[egg.RequiredArea] ~= nil, `{eggId} references an unknown area`)
+		assert(#egg.PetIds == 6, `{eggId} must contain exactly six pets`)
+		local totalWeight = 0
+		for _, petId in egg.PetIds do
+			local pet = PetConfig.Pets[petId]
+			assert(pet ~= nil and pet.EggId == eggId, `{eggId} has an invalid pet {petId}`)
+			totalWeight += pet.RollWeight
+		end
+		assert(totalWeight == PetConfig.RollTotal, `{eggId} roll weights must match RollTotal`)
 	end
 
-	positive(PrestigeConfig.MoneyRequirement, "Prestige.MoneyRequirement")
+	positive(PrestigeConfig.BaseMoneyRequirement, "Prestige.BaseMoneyRequirement")
+	positive(PrestigeConfig.RequirementGrowth, "Prestige.RequirementGrowth")
 	positive(PrestigeConfig.MaximumGearsPerPrestige, "Prestige.MaximumGearsPerPrestige")
-	positive(PrestigeConfig.ValueBonusPerGear, "Prestige.ValueBonusPerGear")
+	positive(PrestigeConfig.GearPower, "Prestige.GearPower")
 	assert(
 		PrestigeConfig.MaximumGearValueMultiplier >= 1,
 		"Prestige multiplier cap must be at least one"

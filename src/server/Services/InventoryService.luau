@@ -98,6 +98,8 @@ function InventoryService.Start()
 		local success, message
 		if action == "EquipMagnet" then
 			success, message = PlayerStateService.TryEquipMagnet(player, itemId)
+		elseif action == "UnequipMagnet" then
+			success, message = PlayerStateService.TryUnequipMagnet(player, itemId)
 		elseif action == "UseConsumable" then
 			success, message = PlayerStateService.TryUseConsumable(player, itemId)
 		else

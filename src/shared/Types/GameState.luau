@@ -9,6 +9,9 @@ export type DerivedStats = {
 	MovementSpeed: number,
 	ScrapValue: number,
 	CollectionSpeed: number,
+	RespawnMultiplier: number,
+	RarityLuck: number,
+	PetMoneyMultiplier: number,
 }
 
 export type PublicPlayerState = {
@@ -19,6 +22,7 @@ export type PublicPlayerState = {
 	UpgradeLevels: { [GameTypes.UpgradeId]: number },
 	UnlockedAreas: { [GameTypes.AreaId]: boolean },
 	DerivedStats: DerivedStats,
+	UpgradeMaximumLevels: { [GameTypes.UpgradeId]: number },
 }
 
 return table.freeze({})

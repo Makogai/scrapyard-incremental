@@ -1,0 +1,18 @@
+[package]
+name = "makogai/scrapyard-incremental"
+description = "Scrapyard Incremental"
+version = "0.1.0"
+license = "MIT"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+exclude = ["**"]
+
+[dependencies]
+React = "jsdotlua/react@17.2.1"
+ReactRoblox = "jsdotlua/react-roblox@17.2.1"
+Ripple = "littensy/ripple@0.9.3"
+Charm = "littensy/charm@0.11.0"
+ReactCharm = "littensy/react-charm@0.4.0"
+
+[dev-dependencies]
+UILabs = "pepeeltoro41/ui-labs@2.4.2"

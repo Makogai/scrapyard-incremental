@@ -18,6 +18,16 @@ local InventoryService = require(script.Services.InventoryService)
 local CodeService = require(script.Services.CodeService)
 local ShopService = require(script.Services.ShopService)
 local MonetizationService = require(script.Services.MonetizationService)
+local PetService = require(script.Services.PetService)
+local LeaderboardService = require(script.Services.LeaderboardService)
+local TeleportService = require(script.Services.TeleportService)
+local RichestPlayerService = require(script.Services.RichestPlayerService)
+local PlotThemeService = require(script.Services.PlotThemeService)
+local DailyRewardService = require(script.Services.DailyRewardService)
+local PlaytimeRewardService = require(script.Services.PlaytimeRewardService)
+local SpinService = require(script.Services.SpinService)
+local FriendBoostService = require(script.Services.FriendBoostService)
+local TutorialService = require(script.Services.TutorialService)
 
 FoundationValidator.validate()
 RemoteService.Start()
@@ -34,4 +44,22 @@ InventoryService.Start()
 CodeService.Start()
 ShopService.Start()
 MonetizationService.Start()
+PetService.Start()
+LeaderboardService.Start()
+TeleportService.Start()
+RichestPlayerService.Start()
+--[[
+	After PlotService: it subscribes to plot assignment so it can build each plot from the
+	owner's saved theme. See docs/PLOT_UPGRADES.md.
+]]
+PlotThemeService.Start()
+--[[
+	Return-to-play systems. All five need PlayerStateService up, and nothing else -- they read and
+	commit through it rather than touching data directly. See docs/GAME_AUDIT.md for why they exist.
+]]
+DailyRewardService.Start()
+PlaytimeRewardService.Start()
+SpinService.Start()
+FriendBoostService.Start()
+TutorialService.Start()
 print(string.format("[%s] Server bootstrap ready", Environment.GameName))

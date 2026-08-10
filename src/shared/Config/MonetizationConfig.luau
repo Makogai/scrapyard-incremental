@@ -35,6 +35,38 @@ local passes = {
 		DisplayPrice = 399,
 		Color = Color3.fromRGB(255, 76, 167),
 	}),
+	ExtraPetSlots = table.freeze({
+		Id = "ExtraPetSlots",
+		MarketplaceId = 0,
+		DisplayName = "+2 Pet Slots",
+		Description = "Equip two additional pets permanently (maximum five).",
+		DisplayPrice = 249,
+		Color = Color3.fromRGB(91, 214, 246),
+	}),
+	SingularityPet = table.freeze({
+		Id = "SingularityPet",
+		MarketplaceId = 0,
+		DisplayName = "Singularity Pet",
+		Description = "Copies twice the effects of your strongest equipped normal pet.",
+		DisplayPrice = 499,
+		Color = Color3.fromRGB(49, 224, 255),
+	}),
+	DemonicGhostPet = table.freeze({
+		Id = "DemonicGhostPet",
+		MarketplaceId = 0,
+		DisplayName = "Demonic Ghost Pet",
+		Description = "Increases every combined pet bonus by 35%.",
+		DisplayPrice = 699,
+		Color = Color3.fromRGB(255, 65, 88),
+	}),
+	SinisterLordPet = table.freeze({
+		Id = "SinisterLordPet",
+		MarketplaceId = 0,
+		DisplayName = "Sinister Lord Pet",
+		Description = "Ultimate premium pet that doubles all combined pet bonuses.",
+		DisplayPrice = 999,
+		Color = Color3.fromRGB(171, 54, 255),
+	}),
 }
 
 local products = {
@@ -95,11 +127,29 @@ local products = {
 		}),
 		Color = Color3.fromRGB(255, 76, 167),
 	}),
+	SkipRebirth = table.freeze({
+		Id = "SkipRebirth",
+		MarketplaceId = 0,
+		DisplayName = "Instant Rebirth",
+		Description = "Completes one rebirth immediately without the cash requirement.",
+		DisplayPrice = 149,
+		Rewards = table.freeze({ SpecialAction = "SkipPrestige" }),
+		Color = Color3.fromRGB(255, 91, 184),
+	}),
 }
 
 return table.freeze({
 	Passes = table.freeze(passes),
-	PassOrder = table.freeze({ "DoubleCash", "StoragePlus", "FastCollector", "QuantumMagnet" }),
+	PassOrder = table.freeze({
+		"DoubleCash",
+		"StoragePlus",
+		"FastCollector",
+		"QuantumMagnet",
+		"ExtraPetSlots",
+		"SingularityPet",
+		"DemonicGhostPet",
+		"SinisterLordPet",
+	}),
 	Products = table.freeze(products),
 	ProductOrder = table.freeze({
 		"CashSmall",
@@ -108,5 +158,6 @@ return table.freeze({
 		"BoosterPair",
 		"BoosterBundle",
 		"MegaBundle",
+		"SkipRebirth",
 	}),
 })

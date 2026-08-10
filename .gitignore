@@ -17,3 +17,9 @@ sourcemap.json
 
 # Local toolchain bootstrap binary; versions are pinned in rokit.toml
 /rokit.exe
+
+# Wally
+/Packages
+/DevPackages
+/ServerPackages
+globalTypes.d.luau

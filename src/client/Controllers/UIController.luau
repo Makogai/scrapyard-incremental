@@ -211,36 +211,42 @@ function UIController.Start()
 			local priceLabel = requireChild(row, "Price") :: TextLabel
 			local buyButton = requireChild(row, "BuyButton") :: GuiButton
 			local level = state.UpgradeLevels[upgradeId]
-			local isMax = level >= definition.MaximumLevel
-			local currentEffect = GameMath.upgradeEffect(
+			local maximumLevel = state.UpgradeMaximumLevels[upgradeId]
+			local isMaximum = level >= maximumLevel
+			local currentEffect = GameMath.incrementalUpgradeEffect(
 				definition.BaseEffect,
 				definition.EffectPerLevel,
 				level,
+				definition.EffectCurve,
+				definition.CurvePower,
 				definition.EffectCap
 			)
-			local nextEffect = GameMath.upgradeEffect(
+			local nextEffect = GameMath.incrementalUpgradeEffect(
 				definition.BaseEffect,
 				definition.EffectPerLevel,
-				math.min(level + 1, definition.MaximumLevel),
+				level + 1,
+				definition.EffectCurve,
+				definition.CurvePower,
 				definition.EffectCap
 			)
-			local price = GameMath.upgradeCost(
+			local price = GameMath.incrementalUpgradeCost(
 				definition.BaseCost,
 				definition.GrowthRate,
+				definition.CostPower,
 				level,
 				Environment.MaximumMoney
 			)
-			levelLabel.Text = `LV. {level} / {definition.MaximumLevel}`
-			effectLabel.Text = if isMax
-				then `MAX: {string.format("%.1f", currentEffect)}{definition.EffectUnit}`
-				else `{string.format("%.1f", currentEffect)}  >  {string.format(
-					"%.1f",
+			levelLabel.Text = `LV. {level} / {maximumLevel}`
+			effectLabel.Text = if isMaximum
+				then `CAP REACHED - PRESTIGE TO EXPAND`
+				else `{string.format("%.2f", currentEffect)}  >  {string.format(
+					"%.2f",
 					nextEffect
 				)}{definition.EffectUnit}`
-			priceLabel.Text = if isMax then "MAXED" else `$ {formatNumber(price)}`
-			buyButton.Active = not isMax
-			buyButton.AutoButtonColor = not isMax
-			local affordable = not isMax and state.Money >= price
+			priceLabel.Text = if isMaximum then "PRESTIGE" else `$ {formatNumber(price)}`
+			buyButton.Active = not isMaximum
+			buyButton.AutoButtonColor = not isMaximum
+			local affordable = not isMaximum and state.Money >= price
 			buyButton:SetAttribute("Affordable", affordable)
 			local accentColor = buyButton:GetAttribute("AccentColor")
 			buyButton.BackgroundColor3 = if affordable and typeof(accentColor) == "Color3"
@@ -466,24 +472,30 @@ function UIController.Start()
 				requireChild(prestigeContent, "CurrentMultiplier") :: TextLabel
 			local nextMultiplier = requireChild(prestigeContent, "NextMultiplier") :: TextLabel
 			local action = requireChild(prestigeMenu, "PrestigeAction") :: TextButton
-			local reward = GameMath.prestigeGearReward(
+			local prestigeRequirement = GameMath.prestigeRequirement(
+				PrestigeConfig.BaseMoneyRequirement,
+				PrestigeConfig.RequirementGrowth,
+				state.PrestigeCount,
+				Environment.MaximumMoney
+			)
+			local reward = GameMath.scaledPrestigeGearReward(
 				state.Money,
-				PrestigeConfig.MoneyRequirement,
+				prestigeRequirement,
+				state.PrestigeCount,
 				PrestigeConfig.MaximumGearsPerPrestige
 			)
 			local current = GameMath.gearValueMultiplier(
 				state.Gears,
-				PrestigeConfig.ValueBonusPerGear,
+				PrestigeConfig.GearPower,
 				PrestigeConfig.MaximumGearValueMultiplier
 			)
 			local nextValue = GameMath.gearValueMultiplier(
 				state.Gears + math.max(reward, 1),
-				PrestigeConfig.ValueBonusPerGear,
+				PrestigeConfig.GearPower,
 				PrestigeConfig.MaximumGearValueMultiplier
 			)
 			local valueCapReached = current >= PrestigeConfig.MaximumGearValueMultiplier
-			progress.Text =
-				`$ {formatNumber(state.Money)} / $ {formatNumber(PrestigeConfig.MoneyRequirement)}`
+			progress.Text = `$ {formatNumber(state.Money)} / $ {formatNumber(prestigeRequirement)}`
 			rewardLabel.Text = if reward > 0 then `REWARD: +{reward} GEARS` else "REWARD: LOCKED"
 			currentMultiplier.Text = if valueCapReached
 				then `CURRENT VALUE: {string.format("%.1f", current)}x (MAX)`

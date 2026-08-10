@@ -34,6 +34,8 @@ export type PlayerData = {
 	LastLoginTimestamp: number,
 	LastSaveTimestamp: number,
 	PlotStage: number,
+	--- Area id the plot is built as; see docs/PLOT_UPGRADES.md.
+	ActivePlotTheme: string,
 	PlotUpgradeLevels: { [string]: number },
 	UnlockedScrapTypes: { [GameTypes.ScrapId]: boolean },
 	UnlockedMachines: { [string]: boolean },
@@ -49,6 +51,10 @@ export type PlayerData = {
 	RedeemedCodes: { [string]: boolean },
 	Entitlements: { [string]: boolean },
 	ProcessedReceipts: { [string]: boolean },
+	OwnedPets: { [string]: number },
+	EquippedPets: { string },
+	PetSlotUpgradeLevel: number,
+	EggOpenCounts: { [string]: number },
 }
 
 return table.freeze({})

@@ -1,0 +1,772 @@
+--!nonstrict
+--[[
+	Store.luau
+	The seam between the UI kit and the game.
+
+	Every screen in the kit consumes exactly `state` and `actions`. That contract
+	is unchanged from the standalone kit -- what changed is everything behind it:
+
+		before   local React state seeded from Mock.luau
+		now      Charm atoms fed by the server, and actions that fire remotes
+
+	Because the contract held, all eighteen screens migrated without edits.
+
+	Two modes:
+
+		live (default)  atoms are populated by State/Bridge from StateChanged;
+		                actions send bare intents to the server
+		mock            atoms are seeded from Mock.luau and actions mutate them
+		                locally, so UI Labs stories still run in Edit mode with no
+		                server, no remotes and no DataStore
+
+	`Store.use()` returns the same shape in both, so a screen cannot tell which
+	it is running under -- which is the point: the storybook exercises the real
+	components, not a parallel copy of them.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
+local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
+local TutorialConfig = require(ReplicatedStorage.Shared.Config.TutorialConfig)
+local React = require(ReplicatedStorage.Packages.React)
+local ReactCharm = require(ReplicatedStorage.Packages.ReactCharm)
+
+local UI = script.Parent.Parent
+local Atoms = require(UI.State.Atoms)
+local Bridge = require(UI.State.Bridge)
+local GameData = require(UI.GameData)
+local Mock = require(UI.Mock)
+local Sound = require(UI.Sound)
+
+local useAtom = ReactCharm.useAtom
+
+local Store = {}
+
+Store.Context = React.createContext(nil)
+
+-- Re-exported so screens and controllers can reach the raw layers when they need
+-- something the flattened `state` does not carry.
+Store.Atoms = Atoms
+Store.Bridge = Bridge
+Store.GameData = GameData
+
+--------------------------------------------------------------------------------
+-- Mock seeding, for stories only
+--------------------------------------------------------------------------------
+
+local function seedMock()
+	Atoms.money(Mock.player.cash)
+	Atoms.gears(Mock.player.gears)
+	Atoms.storedWeight(Mock.player.storage)
+	Atoms.storedValue(Mock.player.storageValue)
+	Atoms.prestigeCount(Mock.player.prestige)
+	Atoms.totalScrapCollected(Mock.player.totalScrap)
+	Atoms.equippedMagnet(Mock.player.equippedMagnet)
+	Atoms.equippedPets(table.clone(Mock.player.equippedPets))
+
+	local derived = Atoms.derived()
+	local copy = table.clone(derived)
+	copy.StorageCapacity = Mock.player.capacity
+	Atoms.derived(copy)
+
+	local levels, owned, inventory = {}, {}, {}
+	for _, definition in ipairs(Mock.upgrades) do
+		levels[definition.id] = definition.level
+	end
+	for _, magnet in ipairs(Mock.magnets) do
+		owned[magnet.id] = magnet.owned == true
+	end
+	for _, potion in ipairs(Mock.potions) do
+		inventory[potion.id] = potion.owned
+	end
+	Atoms.upgradeLevels(levels)
+	Atoms.ownedMagnets(owned)
+	Atoms.inventory(inventory)
+
+	local areas = {}
+	for _, area in ipairs(Mock.areas) do
+		areas[area.id] = area.unlocked
+	end
+	Atoms.unlockedAreas(areas)
+
+	--[[
+		Return-to-play state, seeded mid-progress rather than empty: a story showing "streak 0, no
+		spins, nothing claimable" demonstrates none of the states worth reviewing. This is a player
+		three days into a streak, an hour into the day, with a spin banked and two friends on.
+	]]
+	Atoms.dailyStreak(3)
+	Atoms.dailyCalendarDay(4)
+	Atoms.dailyClaimable(true)
+	Atoms.playtimeSeconds(1100)
+	Atoms.playtimeClaimed({ [1] = true, [2] = true })
+	Atoms.spinsAvailable(2)
+	Atoms.spinRoll(nil)
+	Atoms.friendCount(2)
+	Atoms.tutorialStep(2)
+	Atoms.tutorialComplete(false)
+
+	Atoms.loaded(true)
+end
+
+--------------------------------------------------------------------------------
+-- Actions
+--------------------------------------------------------------------------------
+
+--[[
+	Client-only actions. Identical in both modes, because opening a window or
+	selecting a tab is never the server's business.
+]]
+local function localActions()
+	local self = {}
+
+	function self.openScreen(name: string)
+		Atoms.screen(name)
+		Atoms.detail(nil)
+	end
+
+	function self.closeScreen()
+		Atoms.screen(nil)
+		Atoms.detail(nil)
+	end
+
+	function self.openDetail(kind: string, id: string)
+		Atoms.detail({ Kind = kind, Id = id })
+	end
+
+	function self.closeDetail()
+		Atoms.detail(nil)
+	end
+
+	function self.setBuyAmount(amount: string)
+		Atoms.buyAmount(amount)
+	end
+
+	function self.confirm(spec)
+		Atoms.confirm(spec)
+	end
+
+	function self.closeConfirm()
+		Atoms.confirm(nil)
+	end
+
+	function self.openEggSummon(eggId: string)
+		Atoms.eggSummon(eggId)
+	end
+
+	function self.closeEggSummon()
+		Atoms.eggSummon(nil)
+	end
+
+	--[[
+		Starts the takeover, then sends the intent. The overlay goes up first on
+		purpose: the shake is the round trip, so it has to begin before the request
+		rather than after the answer.
+	]]
+	function self.summonEgg(eggId: string)
+		if Atoms.eggRoll() ~= nil then
+			return
+		end
+		Atoms.eggRoll({ EggId = eggId, Phase = "shaking" })
+		Bridge.openEgg(eggId)
+	end
+
+	function self.dismissEggRoll()
+		Atoms.eggRoll(nil)
+	end
+
+	function self.dismissAnnounce()
+		Atoms.announce(nil)
+	end
+
+	function self.notify(toast)
+		Bridge.notify({
+			Title = toast.title or toast.Title,
+			Body = toast.body or toast.Body,
+			Reward = toast.reward or toast.Reward,
+			Glyph = toast.glyph or toast.Glyph,
+			Accent = toast.accent or toast.Accent,
+		})
+	end
+
+	function self.dismissToast(id: number)
+		local kept = {}
+		for _, toast in ipairs(Atoms.toasts()) do
+			if toast.Id ~= id then
+				table.insert(kept, toast)
+			end
+		end
+		Atoms.toasts(kept)
+	end
+
+	return self
+end
+
+--[[
+	Live actions. Each one sends an intent and nothing else; the authoritative
+	result arrives back through StateChanged and re-renders whatever is on screen.
+
+	Note what is absent: no optimistic mutation of money, levels or unlocks. The
+	server is the only thing that may move those numbers, so the UI waits.
+]]
+local function liveActions()
+	local self = localActions()
+
+	function self.buyUpgrade(upgradeId: string)
+		Sound.play("purchase")
+		Bridge.requestUpgrade(upgradeId)
+	end
+
+	function self.unlockArea(areaId: string)
+		Sound.play("purchase")
+		Bridge.requestAreaUnlock(areaId)
+	end
+
+	function self.teleport(areaId: string)
+		Bridge.requestTeleport(areaId)
+	end
+
+	function self.teleportHome()
+		-- "MyPlot" is the id TeleportService accepts; "Home" was silently rejected.
+		Bridge.requestTeleport("MyPlot")
+	end
+
+	function self.prestige()
+		Sound.play("prestige")
+		Bridge.requestPrestige()
+	end
+
+	function self.equipMagnet(magnetId: string)
+		Sound.play("equip")
+		Bridge.equipMagnet(magnetId)
+	end
+
+	function self.equipSkin() end
+
+	function self.usePotion(itemId: string)
+		Sound.play("equip")
+		Bridge.useConsumable(itemId)
+	end
+
+	function self.buyMagnet(magnetId: string)
+		Sound.play("purchase")
+		Bridge.buyMagnet(magnetId)
+	end
+
+	function self.purchase(id: string, kind: string?)
+		Sound.play("purchase")
+		if kind == "Product" then
+			Bridge.promptProduct(id)
+		else
+			Bridge.promptPass(id)
+		end
+	end
+
+	function self.equipPet(petId: string)
+		Bridge.petAction("EquipPet", petId)
+	end
+
+	function self.unequipPet(petId: string)
+		Bridge.petAction("UnequipPet", petId)
+	end
+
+	function self.deletePet(petId: string)
+		Bridge.petAction("DeletePet", petId)
+	end
+
+	function self.buyPetSlot()
+		Bridge.petAction("BuyPetSlot", "slot")
+	end
+
+	function self.hatchEgg(eggId: string)
+		Bridge.openEgg(eggId)
+	end
+
+	--[[
+		PetService has no bulk equip/unequip. Screens that want those send one
+		EquipPet/UnequipPet intent per pet, so each is validated individually.
+	]]
+	function self.equipBestPets() end
+
+	function self.unequipAllPets()
+		for _, petId in ipairs(Atoms.equippedPets()) do
+			Bridge.petAction("UnequipPet", petId)
+		end
+	end
+
+	function self.setSetting(key: string, value: any)
+		-- Echo locally so a slider tracks the thumb, then let the server confirm.
+		local settings = table.clone(Atoms.settings())
+		settings[key] = value
+		Atoms.settings(settings)
+		Bridge.updateSetting(key, value)
+	end
+
+	function self.resetSettings()
+		for key, value in pairs({
+			ParticlesEnabled = true,
+			ScreenEffectsEnabled = true,
+			SoundEnabled = true,
+			MusicEnabled = true,
+			SoundVolume = 0.8,
+			MusicVolume = 0.55,
+		}) do
+			self.setSetting(key, value)
+		end
+	end
+
+	--[[
+		Return-to-play intents. `claimDaily` takes NO ARGUMENT on purpose: the screen used to pass
+		the day it believed was claimable, and the server must never take a claim target from the
+		client. Any argument passed here is ignored.
+	]]
+	function self.claimDaily()
+		Bridge.claimDaily()
+	end
+
+	function self.claimPlaytime(milestoneIndex: number)
+		Bridge.claimPlaytime(milestoneIndex)
+	end
+
+	function self.spinWheel()
+		--[[
+			Refused locally when there is nothing to spend, so a mistimed click does not spend a
+			remote call to be told no. The server still checks -- this is politeness, not security.
+		]]
+		if Atoms.spinsAvailable() <= 0 or Atoms.spinRoll() ~= nil then
+			return
+		end
+		Bridge.requestSpin()
+	end
+
+	--- Clears the wheel takeover once the player has seen their prize.
+	function self.closeSpin()
+		Atoms.spinRoll(nil)
+	end
+
+	function self.skipTutorial()
+		Bridge.skipTutorial()
+	end
+
+	function self.redeemCode(code: string)
+		Bridge.redeemCode(code)
+	end
+
+	--[[
+		Selling is a Touched event on the plot's CrusherSellZone, so the button
+		teleports the player onto it rather than asking the server for money.
+	]]
+	function self.sell()
+		Bridge.requestTeleport("MyCrusher")
+	end
+
+	-- Present in the kit but meaningless against a live server.
+	--[[
+		Stories have no server, so mock mode plays the server's half of the roll
+		itself: pick from the egg's real weights and reveal after the same beat.
+	]]
+	function self.summonEgg(eggId: string)
+		if Atoms.eggRoll() ~= nil then
+			return
+		end
+		Atoms.eggRoll({ EggId = eggId, Phase = "shaking" })
+
+		local egg = GameData.eggRoll(eggId)
+		if egg == nil then
+			return
+		end
+		local roll = math.random()
+		local cursor = 0
+		local won = egg.pets[1]
+		for _, pet in ipairs(egg.pets) do
+			cursor += pet.chance
+			if roll <= cursor then
+				won = pet
+				break
+			end
+		end
+
+		task.delay(1.4, function()
+			local current = Atoms.eggRoll()
+			if current ~= nil and current.Phase == "shaking" then
+				local owned = table.clone(Atoms.ownedPets())
+				owned[won.id] = (owned[won.id] or 0) + 1
+				Atoms.ownedPets(owned)
+				Atoms.eggRoll({ EggId = eggId, Phase = "revealed", PetId = won.id })
+			end
+		end)
+	end
+
+	function self.collect() end
+	function self.grant() end
+	function self.reset() end
+	function self.setCosmetic() end
+	function self.toggleAutoCollect() end
+
+	return self
+end
+
+--[[
+	Mock actions. Mutate the atoms directly so stories stay interactive without a
+	server. Deliberately not shared with the live path: a story that fakes a
+	purchase must never be able to do so in game.
+]]
+local function mockActions()
+	local self = localActions()
+
+	function self.buyUpgrade(upgradeId: string)
+		local levels = table.clone(Atoms.upgradeLevels())
+		levels[upgradeId] = (levels[upgradeId] or 0) + 1
+		Atoms.upgradeLevels(levels)
+		Sound.play("purchase")
+	end
+
+	function self.unlockArea(areaId: string)
+		local areas = table.clone(Atoms.unlockedAreas())
+		areas[areaId] = true
+		Atoms.unlockedAreas(areas)
+	end
+
+	function self.equipMagnet(magnetId: string)
+		Atoms.equippedMagnet(magnetId)
+	end
+
+	function self.usePotion(itemId: string)
+		local inventory = table.clone(Atoms.inventory())
+		inventory[itemId] = math.max(0, (inventory[itemId] or 0) - 1)
+		Atoms.inventory(inventory)
+	end
+
+	function self.prestige()
+		Atoms.money(0)
+		Atoms.prestigeCount(Atoms.prestigeCount() + 1)
+	end
+
+	function self.setSetting(key: string, value: any)
+		local settings = table.clone(Atoms.settings())
+		settings[key] = value
+		Atoms.settings(settings)
+	end
+
+	function self.grant(amount: number)
+		Atoms.money(Atoms.money() + amount)
+	end
+
+	function self.reset()
+		seedMock()
+	end
+
+	function self.sell()
+		Atoms.money(Atoms.money() + Atoms.storedValue())
+		Atoms.storedWeight(0)
+	end
+
+	function self.collect(amount: number)
+		Atoms.storedWeight(math.min(Atoms.derived().StorageCapacity, Atoms.storedWeight() + amount))
+	end
+
+	--[[
+		Mock reward systems, so the stories are actually usable without a server. Deliberately not
+		shared with the live path -- a story that fakes a claim must never be able to do so in game.
+	]]
+	function self.claimDaily()
+		if not Atoms.dailyClaimable() then
+			return
+		end
+		Atoms.dailyClaimable(false)
+		Atoms.dailyStreak(Atoms.dailyStreak() + 1)
+		Atoms.dailyCalendarDay((Atoms.dailyCalendarDay() % 7) + 1)
+		Atoms.money(Atoms.money() + 2500)
+	end
+
+	function self.spinWheel()
+		if Atoms.spinsAvailable() <= 0 or Atoms.spinRoll() ~= nil then
+			return
+		end
+		Atoms.spinsAvailable(Atoms.spinsAvailable() - 1)
+		local segments = RewardsConfig.Spin.Segments
+		local index = math.random(1, #segments)
+		local segment = segments[index]
+		Atoms.spinRoll({
+			Phase = "spinning",
+			SegmentId = segment.Id,
+			Index = index,
+			Label = segment.Label,
+		})
+		task.delay(RewardsConfig.Spin.AnimationSeconds, function()
+			local current = Atoms.spinRoll()
+			if current ~= nil and current.Phase == "spinning" then
+				Atoms.spinRoll({
+					Phase = "revealed",
+					SegmentId = segment.Id,
+					Index = index,
+					Label = segment.Label,
+				})
+				Atoms.money(Atoms.money() + (segment.Money or 0))
+			end
+		end)
+	end
+
+	function self.closeSpin()
+		Atoms.spinRoll(nil)
+	end
+
+	for _, name in ipairs({
+		"teleport",
+		"teleportHome",
+		"equipSkin",
+		"buyMagnet",
+		"purchase",
+		"equipPet",
+		"unequipPet",
+		"deletePet",
+		"buyPetSlot",
+		"hatchEgg",
+		"equipBestPets",
+		"unequipAllPets",
+		"resetSettings",
+		"redeemCode",
+		"claimPlaytime",
+		"skipTutorial",
+		"setCosmetic",
+		"toggleAutoCollect",
+	}) do
+		if not self[name] then
+			self[name] = function() end
+		end
+	end
+
+	return self
+end
+
+--------------------------------------------------------------------------------
+-- Provider
+--------------------------------------------------------------------------------
+
+function Store.Provider(props)
+	local mock = props.mock == true
+
+	local actions = React.useMemo(function()
+		return if mock then mockActions() else liveActions()
+	end, { mock })
+
+	React.useEffect(function()
+		if mock then
+			seedMock()
+			return
+		end
+
+		-- Connecting yields on WaitForChild, so it cannot run during render.
+		-- Bridge.start only latches once it has the Remotes folder, so retrying
+		-- is safe and a slow server boot cannot leave the UI permanently blank.
+		local cancelled = false
+		task.spawn(function()
+			for attempt = 1, 10 do
+				if cancelled then
+					return
+				end
+				if Bridge.start() then
+					print(string.format("[ScrapyardUI] Bridge connected on attempt %d", attempt))
+					return
+				end
+				task.wait(1)
+			end
+			if not cancelled then
+				warn("[ScrapyardUI] Bridge never connected - UI is showing defaults")
+			end
+		end)
+
+		return function()
+			cancelled = true
+		end
+	end, { mock })
+
+	-- One-second client tick: expire toasts and count down boost timers. Boost
+	-- expiry timestamps are absolute and server-issued, so this only re-renders;
+	-- it never invents remaining time.
+	React.useEffect(function()
+		if props.live == false then
+			return
+		end
+
+		local accumulator = 0
+		local connection = RunService.Heartbeat:Connect(function(delta)
+			accumulator += delta
+			if accumulator >= 1 then
+				local seconds = math.floor(accumulator)
+				accumulator -= seconds
+				Bridge.expireToasts(seconds)
+			end
+		end)
+
+		return function()
+			connection:Disconnect()
+		end
+	end, { props.live })
+
+	local value = React.useMemo(function()
+		return { actions = actions }
+	end, { actions })
+
+	return React.createElement(Store.Context.Provider, { value = value }, props.children)
+end
+
+--------------------------------------------------------------------------------
+-- Hook
+--------------------------------------------------------------------------------
+
+--[[
+	Returns `state, actions`.
+
+	`state` is assembled fresh from the atoms each render. Every field a screen
+	reads is subscribed individually, so a money change re-renders the currency
+	row and nothing else.
+]]
+function Store.use()
+	local context = React.useContext(Store.Context)
+
+	local money = useAtom(Atoms.money)
+	local gears = useAtom(Atoms.gears)
+	local storedWeight = useAtom(Atoms.storedWeight)
+	local storedValue = useAtom(Atoms.storedValue)
+	local derived = useAtom(Atoms.derived)
+	local upgradeLevels = useAtom(Atoms.upgradeLevels)
+	local unlockedAreas = useAtom(Atoms.unlockedAreas)
+	local prestigeCount = useAtom(Atoms.prestigeCount)
+	local ownedMagnets = useAtom(Atoms.ownedMagnets)
+	local equippedMagnet = useAtom(Atoms.equippedMagnet)
+	local inventory = useAtom(Atoms.inventory)
+	local activeBoosts = useAtom(Atoms.activeBoosts)
+	local entitlements = useAtom(Atoms.entitlements)
+	local ownedPets = useAtom(Atoms.ownedPets)
+	local equippedPets = useAtom(Atoms.equippedPets)
+	local maximumEquippedPets = useAtom(Atoms.maximumEquippedPets)
+	local discoveredScrap = useAtom(Atoms.discoveredScrap)
+	local settings = useAtom(Atoms.settings)
+	local loaded = useAtom(Atoms.loaded)
+
+	local screen = useAtom(Atoms.screen)
+	local detail = useAtom(Atoms.detail)
+	local confirm = useAtom(Atoms.confirm)
+	local toasts = useAtom(Atoms.toasts)
+	local buyAmount = useAtom(Atoms.buyAmount)
+	local eggSummon = useAtom(Atoms.eggSummon)
+	local eggRoll = useAtom(Atoms.eggRoll)
+	local announce = useAtom(Atoms.announce)
+
+	local dailyStreak = useAtom(Atoms.dailyStreak)
+	local dailyCalendarDay = useAtom(Atoms.dailyCalendarDay)
+	local dailyClaimable = useAtom(Atoms.dailyClaimable)
+	local playtimeSeconds = useAtom(Atoms.playtimeSeconds)
+	local playtimeClaimed = useAtom(Atoms.playtimeClaimed)
+	local spinsAvailable = useAtom(Atoms.spinsAvailable)
+	local spinRoll = useAtom(Atoms.spinRoll)
+	local friendCount = useAtom(Atoms.friendCount)
+	local tutorialStep = useAtom(Atoms.tutorialStep)
+	local tutorialComplete = useAtom(Atoms.tutorialComplete)
+
+	-- Boosts arrive as absolute expiry timestamps; the HUD wants seconds left.
+	local now = os.time()
+	local boosts = {}
+	for boostId, expiresAt in pairs(activeBoosts) do
+		local remaining = expiresAt - now
+		if remaining > 0 then
+			-- Resolve the potion behind the boost so the HUD can show its bottle
+			-- and say what it does; unknown boosts fall back to their raw id.
+			local potion = GameData.boost(boostId)
+			table.insert(boosts, {
+				-- Normalised: the snapshot key is "<BoostId>EndsAt".
+				id = GameData.boostId(boostId),
+				label = if potion then potion.name else boostId,
+				description = if potion then potion.description else nil,
+				image = if potion then potion.image else nil,
+				seconds = remaining,
+			})
+		end
+	end
+	table.sort(boosts, function(a, b)
+		return a.seconds > b.seconds
+	end)
+
+	local state = {
+		loaded = loaded,
+
+		cash = money,
+		gears = gears,
+		eventTokens = nil,
+		prestige = prestigeCount,
+		storage = storedWeight,
+		storageValue = storedValue,
+		capacity = derived.StorageCapacity,
+		derived = derived,
+
+		upgradeLevels = upgradeLevels,
+		unlockedAreas = unlockedAreas,
+		ownedMagnets = ownedMagnets,
+		equippedMagnet = equippedMagnet,
+		equippedSkin = nil,
+		potionCounts = inventory,
+		entitlements = entitlements,
+		ownedPets = ownedPets,
+		equippedPets = equippedPets,
+		-- The server's number, not a guess derived from what is equipped.
+		petSlots = maximumEquippedPets,
+		discoveredScrap = discoveredScrap,
+		settings = settings,
+
+		boosts = boosts,
+		screen = screen,
+		detail = if detail then { kind = detail.Kind, id = detail.Id } else nil,
+		confirm = confirm,
+		toasts = toasts,
+		buyAmount = buyAmount,
+		eggSummon = eggSummon,
+		eggRoll = eggRoll,
+		announce = announce,
+		autoCollect = nil,
+		cosmetics = {},
+
+		--[[
+			Return-to-play state. `claimedDays` is kept because `DailyRewardsScreen` already read it,
+			but it now means what it says: how many days of the current calendar are behind you.
+		]]
+		claimedDays = math.max(0, dailyCalendarDay - 1),
+		dailyStreak = dailyStreak,
+		dailyDays = RewardsConfig.Daily.Days,
+		--- Seconds until the reset, so the screen can show a live countdown.
+		dailyResetSeconds = DayClock.secondsUntilNextDay(os.time()),
+		dailyCalendarDay = dailyCalendarDay,
+		dailyClaimable = dailyClaimable,
+		playtimeSeconds = playtimeSeconds,
+		playtimeClaimed = playtimeClaimed,
+		playtimeMilestones = RewardsConfig.Playtime.Milestones,
+		spinsAvailable = spinsAvailable,
+		spinRoll = spinRoll,
+		spinSegments = RewardsConfig.Spin.Segments,
+		friendCount = friendCount,
+		friendBoost = friendCount * RewardsConfig.Friends.BoostPerFriend,
+		--[[
+			`tutorialStep` is the CURRENT objective, so the step definition is resolved here rather
+			than in three different components. nil once finished, which is what hides the overlay.
+		]]
+		tutorialStep = if tutorialComplete then nil else TutorialConfig.Steps[tutorialStep],
+		tutorialTotal = #TutorialConfig.Steps,
+		tutorialComplete = tutorialComplete,
+	}
+
+	local actions = if context then context.actions else Store.noopActions
+	return state, actions
+end
+
+--------------------------------------------------------------------------------
+-- Fallback, for a component rendered with no Provider above it
+--------------------------------------------------------------------------------
+
+Store.noopActions = setmetatable({}, {
+	__index = function()
+		return function() end
+	end,
+})
+
+return Store

@@ -8,8 +8,9 @@ Studio owns Workspace terrain, lighting art, props, machines, gates, spawn marke
 
 ```text
 Workspace/
-  Plots/
-    Plot01 ... Plot12/
+  NewMap/
+    Plots/
+      Plot01 ... Plot06/
       Boundaries/
       PlayerSpawn
       Entrance/
@@ -24,7 +25,7 @@ Workspace/
   SharedHub/
 ```
 
-The 12 slots are 130x170 studs, grouped as three plots on each of four short streets. North, east, south, and west districts face inward toward a 156-stud central plaza, avoiding a single long row while preserving at least 34 studs lateral separation. Every plot keeps the same authored local front/back contract after rotation. Crushers are local X=0/Z=58, leaving 27 studs of back clearance. Markers and runtime scrap carry `PlotId`, `OwnerUserId`, type, variant, and reservation identity. Sell zones and bounds are anchored nonvisual query parts. Model templates have no unknown scripts.
+The active map has six 130x170 authored plot floors arranged around its central hub. Each production plot contains gameplay-only anchors, an owner sign, 22 scrap markers, runtime storage, a cloned authored NewMap crusher, and an invisible sell zone aligned with its sell plate. Markers and runtime scrap carry `PlotId`, `OwnerUserId`, type, variant, and reservation identity. The old world is archived under `ServerStorage/RetiredWorld_NewMapMigration`.
 
 The campus sits on a 1000-stud landscaped island surrounded by Terrain water. District rows are centered 325 studs from the hub, leaving 15 studs of clear space between the nearest corners of adjacent streets. Island surfaces terminate at or below Y=0 so they do not clip through plot foundations. The central hub contains authored reservations for leaderboards, featured purchases, daily rewards, prestige, and a rotating showcase. Curbs, lamps, trees, rocks, beach edging, clouds, atmosphere, and warm outdoor lighting establish the environment without runtime world construction.
 

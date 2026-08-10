@@ -39,7 +39,14 @@ function AudioController.Start()
 		end
 	end)
 	local notify = remotes:WaitForChild("Notify") :: RemoteEvent
-	notify.OnClientEvent:Connect(function(message: string)
+	notify.OnClientEvent:Connect(function(message: unknown)
+		-- `Notify` is a plain string by contract, but a producer sending the wrong shape must not
+		-- take the audio controller down with it -- this connection dying silently kills every
+		-- later sound hook, which is far harder to trace back than a missing sell chime.
+		if typeof(message) ~= "string" then
+			warn(`[AudioController] Notify expected a string, got {typeof(message)}`)
+			return
+		end
 		if string.find(message, "SOLD", 1, true) then
 			playHook("SellSound")
 		else

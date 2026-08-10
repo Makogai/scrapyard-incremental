@@ -14,7 +14,7 @@ local function refreshPlot(plot: Model)
 end
 
 function AreaPromptController.Start()
-	local plots = workspace:WaitForChild("Plots")
+	local plots = workspace:WaitForChild("NewMap"):WaitForChild("Plots")
 	for _, plot in plots:GetChildren() do
 		if plot:IsA("Model") then
 			refreshPlot(plot)

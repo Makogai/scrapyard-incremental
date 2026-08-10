@@ -7,9 +7,9 @@
 | First collection | <= 5 seconds |
 | First sale | 20-30 seconds |
 | First upgrade | 30-45 seconds |
-| Workshop unlock | 5-8 minutes |
-| Vehicle Graveyard | 20-30 minutes |
-| First Gear prestige | 45-75 minutes |
+| Workshop unlock | 4-8 minutes |
+| Vehicle Graveyard | 20-35 minutes |
+| First Gear prestige | 30-50 minutes |
 
 ## Scrap Baseline
 
@@ -17,13 +17,23 @@ Phase 1 starting weight/value/strength values are: Can 1/3/1, Bolt 0.5/2/1, Plat
 
 Variants multiply base value after normal scrap value bonuses: Normal 1, Silver 2, Gold 5, Rainbow 15. Spawn weights, not client randomness, determine variants.
 
-## Upgrade Formula
+## Prestige-Capped Upgrade Formula
 
-Each upgrade defines base price, growth rate, maximum level, and an effect function/table. Default price shape: `floor(basePrice * growthRate ^ currentLevel)`. Strength uses discrete thresholds; range, storage, and collection speed use bounded curves; movement speed has a conservative hard cap; value multiplier stacking is capped.
+All seven run upgrades have an upgrade-specific starting cap. Every prestige expands those caps, turning each run into a visible completion target while preserving long-term scaling. Prices use a hybrid polynomial/root-exponential curve:
 
-Phase 1 uses bounded linear effects by level: Strength starts at 4 and caps at 54; Range 18-48 studs; Storage 20-220 weight; Movement 16-24 WalkSpeed; Scrap Value 1-3.4x; Collection Speed 24-60 studs/second. Initial prices are 45, 60, 40, 125, 180, and 90 respectively, each with its own configured growth rate.
+`floor(baseCost * (level + 1) ^ costPower * growthRate ^ sqrt(level))`.
 
-Workshop Yard costs 6,500 and Vehicle Graveyard costs 90,000. First prestige requires 750,000 money and grants one Gear per full requirement multiple, capped at 100 per prestige. Each Gear contributes +10% value, with the total Gear multiplier capped at 10x.
+This keeps early levels understandable while allowing later prestige runs to grow substantially longer.
+
+- Magnet Strength, Storage Capacity, and Collection Speed use power curves and continue growing.
+- Magnet Range starts at 9 studs, grows gradually, and remains bounded at 42 studs.
+- Movement Speed approaches 28 without destabilizing character control.
+- Scrap Value compounds by 8.5% per level within server numeric bounds.
+- Scrap Flow is the seventh upgrade. It multiplies each scrap definition's respawn delay and approaches a safe 0.18x floor; the service also enforces an absolute 0.45-second minimum.
+
+The schema permits levels up to one million only as an exploit-defense numeric boundary. Prestige resets all seven run levels and raises their next-run caps.
+
+Workshop Yard costs 12,500, Vehicle Graveyard costs 125,000, and Advanced Magnet costs 60,000. Pet eggs provide optional sinks at 3,500, 35,000, and 250,000.
 
 ## Selling
 
@@ -31,7 +41,9 @@ Stored weight controls capacity; stored value records the sum of server-approved
 
 ## Prestige
 
-The first prestige threshold is configured against earned progression, not a client-submitted balance. Gear reward uses a simple bounded formula based on money above threshold. Gear multiplier should provide meaningful acceleration without skipping the entire early loop; initial target is approximately +10% value per Gear with a configured cap/curve.
+The first prestige requires 350,000 Scrap Cash. Requirement N is `350,000 * 2.25 ^ PrestigeCount`, bounded at the global currency ceiling. Permanent pets and Gears accelerate repeat runs while expanded upgrade caps provide new spending room.
+
+Gear reward scales with the square root of money above the current requirement plus a 15% veteran factor per previous prestige. The first exact-threshold prestige grants one Gear. Permanent Gear value uses `(1 + Gears) ^ 0.55`, avoiding the former reachable 10x hard cap while keeping early acceleration controlled.
 
 ## Telemetry Questions
 

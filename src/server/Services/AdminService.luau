@@ -19,7 +19,13 @@ local limiter = RateLimiter.new(
 )
 
 local function boundedAmount(command: string, value: any): number?
-	if command ~= "AddMoney" and command ~= "AddGears" then
+	if
+		command ~= "AddMoney"
+		and command ~= "AddGears"
+		and command ~= "GrantPet"
+		and command ~= "GrantConsumable"
+		and command ~= "AddUpgradeLevels"
+	then
 		return nil
 	end
 	if typeof(value) ~= "number" or value ~= value then
@@ -27,7 +33,8 @@ local function boundedAmount(command: string, value: any): number?
 	end
 	local maximum = if command == "AddMoney"
 		then AdminConfig.MaximumGrantMoney
-		else AdminConfig.MaximumGrantGears
+		elseif command == "AddGears" then AdminConfig.MaximumGrantGears
+		else 9999
 	return math.floor(math.clamp(value, 0, maximum))
 end
 
@@ -36,24 +43,46 @@ function AdminService.Start()
 		limiter:Remove(tostring(player.UserId))
 	end)
 	RemoteService.GetEvent("AdminCommand").OnServerEvent
-		:Connect(function(admin, command, amount, targetMode)
+		:Connect(function(admin, command, amount, targetMode, targetUserId, itemId)
 			if
 				not AdminConfig.IsAdmin(admin.UserId)
 				or typeof(command) ~= "string"
-				or (targetMode ~= "Self" and targetMode ~= "All")
+				or (targetMode ~= "Self" and targetMode ~= "All" and targetMode ~= "Player")
+				or (targetMode == "Player" and typeof(targetUserId) ~= "number")
+				or (itemId ~= nil and typeof(itemId) ~= "string")
 				or ((command == "ResetTestProfile" or command == "GrantTestItems") and (not RunService:IsStudio() or targetMode ~= "Self"))
 				or not limiter:Allow(tostring(admin.UserId))
 			then
 				return
 			end
 			local safeAmount = boundedAmount(command, amount)
-			if (command == "AddMoney" or command == "AddGears") and safeAmount == nil then
+			if
+				(
+					command == "AddMoney"
+					or command == "AddGears"
+					or command == "GrantPet"
+					or command == "GrantConsumable"
+					or command == "AddUpgradeLevels"
+				) and safeAmount == nil
+			then
 				return
 			end
-			local targets = if targetMode == "All" then Players:GetPlayers() else { admin }
+			local selectedPlayer = if targetMode == "Player"
+				then Players:GetPlayerByUserId(math.floor(targetUserId :: number))
+				else nil
+			if targetMode == "Player" and selectedPlayer == nil then
+				RemoteService.GetEvent("Notify")
+					:FireClient(admin, "ADMIN: Selected player left the server")
+				return
+			end
+			local targets = if targetMode == "All"
+				then Players:GetPlayers()
+				elseif selectedPlayer then { selectedPlayer }
+				else { admin }
 			local applied = 0
 			for _, target in targets do
-				local succeeded = PlayerStateService.AdminMutate(target, command, safeAmount)
+				local succeeded =
+					PlayerStateService.AdminMutate(target, command, safeAmount, itemId)
 				if succeeded then
 					applied += 1
 					PlotService.RefreshAppearance(target)
