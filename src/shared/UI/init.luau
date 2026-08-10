@@ -54,6 +54,8 @@ return {
 	ModelView = require(Components.ModelView),
 	Announcement = require(Components.Announcement),
 	Shop = require(Components.Shop),
+	--- The pie-wedge prize wheel. See the module for why wedges are a fan of rotated bars.
+	Wheel = require(Components.Wheel).Wheel,
 
 	-- screens
 	Screens = {

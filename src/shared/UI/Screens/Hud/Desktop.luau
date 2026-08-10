@@ -122,24 +122,27 @@ local function HudDesktop(props)
 				cash = state.cash,
 				gears = state.gears,
 				prestige = state.prestige,
-				--[[
-					Lifted by the status cluster's height: the friend boost and spin wheel now live in this
-					corner, directly under the currencies, and the two must not overlap.
-				]]
-				position = UDim2.new(0, MARGIN, 1, -(MARGIN + bottomLift + STATUS_LANE)),
+				position = UDim2.new(0, MARGIN, 1, -(MARGIN + bottomLift)),
 				anchorPoint = Vector2.new(0, 1),
 			}),
 			--[[
-				BOTTOM LEFT: friend boost and the spin wheel, as bare outlined glyphs with their value
-				underneath and a popup on hover -- the same class of readout as the potion tiles opposite.
+				BOTTOM RIGHT: daily login boost, friend boost, spin wheel. Bare outlined glyphs with their
+				value underneath and a popup on hover -- the same class of readout as the potion tiles,
+				which is why they share this corner and the boosts sit directly above them.
 			]]
 			e(Parts.StatusCluster, {
 				key = "StatusCluster",
+				dailyStreak = state.dailyStreak,
+				dailyBoostPercent = state.dailyBoostPercent,
+				dailyClaimable = state.dailyClaimable,
 				friendCount = state.friendCount,
 				friendBoost = state.friendBoost,
 				spinsAvailable = state.spinsAvailable,
-				position = UDim2.new(0, MARGIN, 1, -(MARGIN + bottomLift)),
-				anchorPoint = Vector2.new(0, 1),
+				position = UDim2.new(1, -MARGIN, 1, -(MARGIN + bottomLift)),
+				anchorPoint = Vector2.new(1, 1),
+				onOpenDaily = function()
+					actions.openScreen("daily")
+				end,
 				onOpenSpin = function()
 					actions.openScreen("spin")
 				end,
@@ -160,18 +163,9 @@ local function HudDesktop(props)
 			e(Parts.BoostTimers, {
 				key = "Boosts",
 				boosts = state.boosts,
-				position = UDim2.new(1, -MARGIN, 1, -(MARGIN + bottomLift)),
+				--- Stacked above the status cluster, which owns the corner itself.
+				position = UDim2.new(1, -MARGIN, 1, -(MARGIN + bottomLift + STATUS_LANE)),
 				anchorPoint = Vector2.new(1, 1),
-			}),
-			--- Above the storage meter, which is the other thing that fills as you play.
-			e(Parts.PlaytimeTrack, {
-				key = "PlaytimeTrack",
-				milestones = state.playtimeMilestones,
-				claimed = state.playtimeClaimed,
-				seconds = state.playtimeSeconds,
-				position = UDim2.new(0.5, 0, 1, -(MARGIN + bottomLift + 78)),
-				anchorPoint = Vector2.new(0.5, 1),
-				onClaim = actions.claimPlaytime,
 			}),
 			--[[
 				Centred under the travel bar, where the player is already looking, and only while the

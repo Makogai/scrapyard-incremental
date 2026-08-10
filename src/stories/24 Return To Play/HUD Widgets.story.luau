@@ -1,8 +1,7 @@
 --[[
 	The three HUD pieces the return-to-play systems added, in isolation:
 
-		FriendBoost      bottom-right friend icon, +10% money per friend
-		PlaytimeTrack    progress to the next milestone, and its ready state
+		StatusCluster    bottom-right trio: daily login boost, friend boost, spin wheel
 		TutorialCaption  the current onboarding objective
 
 	Isolated rather than reviewed inside the full HUD because each has states that are awkward to
@@ -28,23 +27,18 @@ return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
 	name = "HUD Widgets",
-	summary = "Bottom-left status cluster, playtime track and the tutorial caption.",
+	summary = "Bottom-right status cluster and the tutorial caption.",
 	controls = {
 		Friends = UILabs.Slider(2, 0, 10, 1),
 		Spins = UILabs.Slider(2, 0, 9, 1),
 		--- Forces the hover popup open, since a story cannot hold a mouse still.
 		ShowTooltip = UILabs.Boolean(false),
-		PlaytimeSeconds = UILabs.Slider(1100, 0, 7200, 10),
-		ClaimedMilestones = UILabs.Slider(2, 0, #RewardsConfig.Playtime.Milestones, 1),
+		DailyStreak = UILabs.Slider(3, 0, 30, 1),
+		DailyClaimable = UILabs.Boolean(true),
 		TutorialStep = UILabs.Slider(1, 0, #TutorialConfig.Steps, 1),
 	},
 }, function(props)
 	local controls = props.controls
-
-	local claimed = {}
-	for index = 1, controls.ClaimedMilestones do
-		claimed[index] = true
-	end
 
 	--[[
 		Zero means "finished", which is the state that renders nothing -- worth being able to select,
@@ -85,12 +79,17 @@ return UILabs.CreateReactStory({
 				items = {
 					e(Parts.StatusCluster, {
 						key = "Cluster",
+						dailyStreak = controls.DailyStreak,
+						dailyBoostPercent = math.floor(
+							math.min(math.max(0, controls.DailyStreak - 1) * 5, 100)
+						),
+						dailyClaimable = controls.DailyClaimable,
 						friendCount = controls.Friends,
 						friendBoost = controls.Friends * RewardsConfig.Friends.BoostPerFriend,
 						spinsAvailable = controls.Spins,
 					}),
 				},
-				itemSize = UDim2.fromOffset(130, 90),
+				itemSize = UDim2.fromOffset(190, 90),
 			},
 			{
 				title = "Friend boost — 0, 1, 3 and 10 friends",
@@ -101,18 +100,6 @@ return UILabs.CreateReactStory({
 				title = "Spin wheel — 0, 1 and 5 spins",
 				items = spinStates,
 				itemSize = UDim2.fromOffset(80, 110),
-			},
-			{
-				title = "Playtime track (playground)",
-				items = {
-					e(Parts.PlaytimeTrack, {
-						key = "Playtime",
-						milestones = RewardsConfig.Playtime.Milestones,
-						claimed = claimed,
-						seconds = controls.PlaytimeSeconds,
-					}),
-				},
-				itemSize = UDim2.fromOffset(262, 56),
 			},
 			{
 				title = "Tutorial caption (playground — step 0 hides it)",

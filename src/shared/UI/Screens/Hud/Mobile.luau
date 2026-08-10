@@ -133,39 +133,33 @@ local function HudMobile(props)
 			else nil,
 
 		--[[
-			BOTTOM LEFT status cluster, matching desktop. On a 750x361 landscape phone the left edge
-			below the currencies is the only corner with room for two icons -- the right edge at thumb
-			height belongs to the menu toggle.
+			BOTTOM RIGHT status cluster, matching desktop -- but stacked ABOVE the menu toggle rather
+			than beside it. The right edge at thumb height belongs to the toggle, and a 750x361 landscape
+			phone has no room for four things in one corner. Hidden while the drawer is open, like the
+			boosts.
 		]]
-		e(Parts.StatusCluster, {
-			key = "StatusCluster",
-			friendCount = state.friendCount,
-			friendBoost = state.friendBoost,
-			spinsAvailable = state.spinsAvailable,
-			extent = 40,
-			gap = 8,
-			position = UDim2.new(0, MARGIN, 1, -Theme.Safe.BottomBand),
-			anchorPoint = Vector2.new(0, 1),
-			zIndex = 11,
-			onOpenSpin = function()
-				actions.openScreen("spin")
-			end,
-		}),
-
-		--[[
-			Playtime sits just above the storage meter. Narrow on purpose: at 750px wide there is not
-			room for the desktop strip, and the countdown is the part worth keeping.
-		]]
-		e(Parts.PlaytimeTrack, {
-			key = "PlaytimeTrack",
-			milestones = state.playtimeMilestones,
-			claimed = state.playtimeClaimed,
-			seconds = state.playtimeSeconds,
-			width = 196,
-			position = UDim2.new(0.5, 0, 1, -(Theme.Safe.BottomBand + STORAGE_HEIGHT + 8)),
-			anchorPoint = Vector2.new(0.5, 1),
-			onClaim = actions.claimPlaytime,
-		}),
+		if not open
+			then e(Parts.StatusCluster, {
+				key = "StatusCluster",
+				dailyStreak = state.dailyStreak,
+				dailyBoostPercent = state.dailyBoostPercent,
+				dailyClaimable = state.dailyClaimable,
+				friendCount = state.friendCount,
+				friendBoost = state.friendBoost,
+				spinsAvailable = state.spinsAvailable,
+				extent = 38,
+				gap = 6,
+				position = UDim2.new(1, -MARGIN, 1, -(TOGGLE_BOTTOM + TOGGLE_HEIGHT + 8)),
+				anchorPoint = Vector2.new(1, 1),
+				zIndex = 11,
+				onOpenDaily = function()
+					actions.openScreen("daily")
+				end,
+				onOpenSpin = function()
+					actions.openScreen("spin")
+				end,
+			})
+			else nil,
 
 		--- Under the event banner, the one horizontal band with room for it.
 		e(Parts.TutorialCaption, {

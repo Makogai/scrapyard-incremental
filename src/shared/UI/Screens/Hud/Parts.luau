@@ -10,8 +10,7 @@
 		BoostTimers     active potion timers
 		EventBanner     temporary event strip
 		ContextActions  teleport home / sell / auto-collect status
-		FriendBoost     bottom-right friend icon: +10% money per friend in the server
-		PlaytimeTrack   progress to the next playtime reward, with an inline claim
+		StatusCluster   bottom-right trio: daily login boost, friend boost, spin wheel
 		TutorialCaption the current onboarding objective, with a bouncing arrow
 ]]
 
@@ -880,7 +879,7 @@ end
 --------------------------------------------------------------------------------
 
 --[[
-	The bottom-left status cluster: a plain OUTLINED GLYPH with a small value under it, and a popup
+	The bottom-right status cluster: a plain OUTLINED GLYPH with a small value under it, and a popup
 	on hover. No button slab behind it -- the reference has bare icons sitting on the world, and a
 	panel around them makes the corner look like a toolbar.
 
@@ -962,9 +961,9 @@ local function StatusIcon(props)
 				})
 				else nil,
 			--[[
-				Opens UP and to the RIGHT: this cluster is in the bottom-left corner, so a tooltip
-				growing down or left runs off the screen. The mirror of what `BoostTile` does in the
-				bottom-right.
+				Opens UP and to the LEFT. The cluster lives in the bottom-right corner, so a tooltip
+				growing down or right runs off the screen -- the same reasoning `BoostTile` uses, which
+				shares that corner.
 			]]
 			if press.hovered or props.tooltipVisible
 				then e(Overlays.Tooltip, {
@@ -972,8 +971,8 @@ local function StatusIcon(props)
 					title = props.tipTitle,
 					body = props.tipBody,
 					width = 260,
-					position = UDim2.fromOffset(-6, -10),
-					anchorPoint = Vector2.new(0, 1),
+					position = UDim2.new(1, 6, 0, -10),
+					anchorPoint = Vector2.new(1, 1),
 					zIndex = Theme.Layer.Tooltip,
 				})
 				else nil
@@ -1047,8 +1046,48 @@ function Parts.SpinWheel(props)
 end
 
 --[[
-	The two of them as one bottom-left cluster, laid out rather than hand-positioned so adding a third
-	status icon later costs one entry instead of three offsets.
+	Daily login reward, and the LOGIN BOOST it is worth.
+
+	The streak's cash bonus is the value under the glyph, which is the point: the calendar is not just
+	a free gift, it is a standing multiplier you keep by turning up. Showing "+15%" states that where a
+	calendar icon on its own says nothing about why you should care.
+
+	The badge is a "!" rather than a number, because the interesting fact is binary -- there is
+	something to claim, or there is not.
+]]
+function Parts.DailyBoost(props)
+	local streak = props.streak or 0
+	local percent = props.boostPercent or 0
+	local claimable = props.claimable == true
+
+	return e(StatusIcon, {
+		key = props.key or "DailyBoost",
+		glyph = props.glyph or "calendar",
+		extent = props.extent,
+		value = `+{percent}%`,
+		valueColor = if percent > 0 then Theme.Color.Gold else Theme.Color.GrayDark,
+		badge = if claimable then "!" else nil,
+		badgeGradient = Theme.Gradient.Red,
+		tipTitle = "DAILY LOGIN",
+		tipBody = if claimable
+			then `Reward ready to claim. Streak {streak} day{if streak == 1 then "" else "s"}, worth +{percent}% cash -- keep it going and it climbs.`
+			else `Streak {streak} day{if streak == 1 then "" else "s"}, worth +{percent}% cash. Come back tomorrow to keep it.`,
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		layoutOrder = props.layoutOrder,
+		zIndex = props.zIndex,
+		tooltipVisible = props.tooltipVisible,
+		onClick = props.onClick,
+	})
+end
+
+--[[
+	The three of them as one cluster, laid out rather than hand-positioned so a fourth status icon
+	costs one entry instead of four offsets.
+
+	Order is deliberate: DAILY first because it is the one with something to claim, then the friend
+	boost, then the wheel. Reading left to right that is "what can I collect, what am I earning, what
+	can I gamble".
 ]]
 function Parts.StatusCluster(props)
 	local extent = props.extent or 46
@@ -1056,7 +1095,7 @@ function Parts.StatusCluster(props)
 
 	return e(P.Group, {
 		key = props.key or "StatusCluster",
-		size = UDim2.fromOffset(extent * 2 + gap, extent + 16),
+		size = UDim2.fromOffset(extent * 3 + gap * 2, extent + 16),
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
@@ -1067,6 +1106,15 @@ function Parts.StatusCluster(props)
 			vAlign = Enum.VerticalAlignment.Bottom,
 		}),
 		children = {
+			e(Parts.DailyBoost, {
+				key = "DailyBoost",
+				streak = props.dailyStreak,
+				boostPercent = props.dailyBoostPercent,
+				claimable = props.dailyClaimable,
+				extent = extent,
+				layoutOrder = 1,
+				onClick = props.onOpenDaily,
+			}),
 			--[[
 				NO `onClick`. The friend boost is a status readout whose interaction is the hover popup --
 				wiring it to open some other window would be a lie about what the icon is.
@@ -1080,110 +1128,15 @@ function Parts.StatusCluster(props)
 				count = props.friendCount,
 				boost = props.friendBoost,
 				extent = extent,
-				layoutOrder = 1,
+				layoutOrder = 2,
 			}),
 			e(Parts.SpinWheel, {
 				key = "SpinWheel",
 				spins = props.spinsAvailable,
 				extent = extent,
-				layoutOrder = 2,
+				layoutOrder = 3,
 				onClick = props.onOpenSpin,
 			}),
-		},
-	})
-end
-
---------------------------------------------------------------------------------
--- PlaytimeTrack
---------------------------------------------------------------------------------
-
---[[
-	Progress toward the next playtime reward, with the claim button on the strip itself.
-
-	ON THE HUD RATHER THAN IN A MENU, because playtime rewards are earned by doing nothing in
-	particular: a milestone the player has to go looking for is one they never claim. The bar
-	filling while they play IS the mechanic.
-
-	Renders nothing once every milestone is claimed, rather than sitting there full forever.
-]]
-function Parts.PlaytimeTrack(props)
-	local milestones = props.milestones or {}
-	local claimed = props.claimed or {}
-	local seconds = props.seconds or 0
-
-	--- Only the first unclaimed milestone is worth showing.
-	local target = nil
-	for _, milestone in ipairs(milestones) do
-		if claimed[milestone.Index] ~= true then
-			target = milestone
-			break
-		end
-	end
-	if target == nil then
-		return nil
-	end
-
-	local ready = seconds >= target.Seconds
-	local progress = math.clamp(seconds / math.max(1, target.Seconds), 0, 1)
-	local width = props.width or 250
-
-	return e(P.Panel, {
-		key = props.key or "PlaytimeTrack",
-		size = UDim2.fromOffset(width, 46),
-		position = props.position,
-		anchorPoint = props.anchorPoint,
-		zIndex = props.zIndex,
-		gradient = Theme.Gradient.PanelDeep,
-		radius = Theme.Radius.Card,
-		strokeThickness = Theme.Stroke.Card,
-		studs = false,
-		children = {
-			e(P.Label, {
-				key = "Title",
-				text = `PLAYTIME {target.Label}`,
-				textSize = Theme.TextSize.Tiny,
-				color = Theme.Color.Gray,
-				align = Enum.TextXAlignment.Left,
-				position = UDim2.fromOffset(10, 6),
-				size = UDim2.fromOffset(140, 14),
-			}),
-			e(Indicators.ProgressBar, {
-				key = "Bar",
-				value = progress,
-				max = 1,
-				gradient = if ready then Theme.Gradient.Green else Theme.Gradient.Cyan,
-				size = UDim2.new(1, -96, 0, 14),
-				position = UDim2.fromOffset(10, 24),
-			}),
-			--[[
-				Claim and countdown occupy the same reserved space, so the strip never changes width.
-				A HUD element that resizes itself every few minutes is worse than one with a small gap.
-			]]
-			if ready
-				then e(Buttons.Button, {
-					key = "Claim",
-					text = "CLAIM",
-					variant = "Primary",
-					textSize = Theme.TextSize.Tiny,
-					size = UDim2.fromOffset(72, 30),
-					position = UDim2.new(1, -8, 0.5, 0),
-					anchorPoint = Vector2.new(1, 0.5),
-					onClick = function()
-						if props.onClaim then
-							props.onClaim(target.Index)
-						end
-					end,
-				})
-				else e(P.Label, {
-					key = "Remaining",
-					text = Format.timer(target.Seconds - seconds),
-					textSize = Theme.TextSize.Small,
-					color = Theme.Color.Gray,
-					align = Enum.TextXAlignment.Right,
-					position = UDim2.new(1, -10, 0.5, 0),
-					anchorPoint = Vector2.new(1, 0.5),
-					size = UDim2.fromOffset(74, 20),
-				}),
 		},
 	})
 end

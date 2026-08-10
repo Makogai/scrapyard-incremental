@@ -733,6 +733,19 @@ function Store.use()
 		]]
 		claimedDays = math.max(0, dailyCalendarDay - 1),
 		dailyStreak = dailyStreak,
+		--[[
+			The login boost the streak is currently worth, computed ONCE here rather than in each place
+			that shows it. The HUD icon and the rewards footer both display it, and two copies of this
+			arithmetic is two chances for them to disagree by a percent.
+		]]
+		dailyBoostPercent = math.floor(
+			math.min(
+				math.max(0, dailyStreak - 1) * RewardsConfig.Daily.StreakBonusPerDay,
+				RewardsConfig.Daily.MaximumStreakBonus
+			)
+					* 100
+				+ 0.5
+		),
 		dailyDays = RewardsConfig.Daily.Days,
 		--- Seconds until the reset, so the screen can show a live countdown.
 		dailyResetSeconds = DayClock.secondsUntilNextDay(os.time()),
