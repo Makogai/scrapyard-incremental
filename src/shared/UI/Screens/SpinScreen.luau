@@ -33,7 +33,6 @@ local Hooks = require(UI.Hooks)
 local Motion = require(UI.Motion)
 local P = require(UI.Primitives)
 local Buttons = require(UI.Components.Buttons)
-local Indicators = require(UI.Components.Indicators)
 local Overlays = require(UI.Components.Overlays)
 local Wheel = require(UI.Components.Wheel)
 local RewardToast = require(UI.Components.RewardToast)
@@ -100,15 +99,6 @@ local function SpinScreen(props)
 	local landed = Motion.useSpring(if active then landing else 0, SPIN_SPRING)
 	local rotation = if active then landed else idle
 
-	local buttonText
-	if spinning then
-		buttonText = "SPINNING..."
-	elseif spins > 0 then
-		buttonText = `SPIN  ({spins})`
-	else
-		buttonText = "NO SPINS LEFT"
-	end
-
 	--- The prize banner, built from the segment the server actually landed on.
 	local won = nil
 	if revealed then
@@ -172,32 +162,36 @@ local function SpinScreen(props)
 					zIndex = 9,
 				})
 				else nil,
+			--[[
+				The control block, lifted well clear of the bottom edge so it sits under the wheel rather
+				than in the corner of the screen.
+
+				The SPIN button carries the spin count as its SUBTEXT rather than in brackets in the label,
+				and there is no separate badge -- one chunky button that says how many you have beats a
+				plain button plus a chip explaining it.
+			]]
 			e(P.Group, {
 				key = "Controls",
-				size = UDim2.fromOffset(340, 96),
-				position = UDim2.new(0.5, 0, 1, -28),
+				size = UDim2.fromOffset(360, 86),
+				position = UDim2.new(0.5, 0, 1, -96),
 				anchorPoint = Vector2.new(0.5, 1),
 				zIndex = 6,
-				layout = P.list({ padding = 10, hAlign = Enum.HorizontalAlignment.Center }),
 				children = {
 					e(Buttons.Button, {
 						key = "SpinButton",
-						text = buttonText,
-						variant = if spinning or spins <= 0 then "Neutral" else "Premium",
+						text = if spinning then "SPINNING" else "SPIN",
+						subtext = if spinning
+							then nil
+							elseif spins > 0 then `{spins} LEFT TODAY`
+							else "COME BACK TOMORROW",
+						glyph = if spinning then nil else "wheel",
+						variant = if spinning or spins <= 0 then "Neutral" else "Primary",
 						disabled = spinning or spins <= 0,
-						textSize = Theme.TextSize.Heading,
-						size = UDim2.fromOffset(300, 62),
-						layoutOrder = 1,
+						textSize = Theme.TextSize.Title,
+						size = UDim2.fromOffset(340, 86),
+						position = UDim2.fromScale(0.5, 0.5),
+						anchorPoint = Vector2.new(0.5, 0.5),
 						onClick = actions.spinWheel,
-					}),
-					e(Indicators.Badge, {
-						key = "Spins",
-						text = `SPINS: {spins}`,
-						gradient = if spins > 0
-							then Theme.Gradient.Cyan
-							else Theme.Gradient.PanelDeep,
-						textSize = Theme.TextSize.Small,
-						layoutOrder = 2,
 					}),
 				},
 			})

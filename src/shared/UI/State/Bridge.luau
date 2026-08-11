@@ -229,6 +229,22 @@ function Bridge.skipTutorial()
 	fire("TutorialAction", "Skip")
 end
 
+--[[
+	The one action that is NOT purely an intent, and the exception is deliberate: an admin grant is
+	defined by its amount, so the number has to travel. `AdminService` checks `IsAdmin`, validates the
+	command against a fixed list and clamps the amount before applying any of it, which is why this is
+	safe where the same shape would be an exploit anywhere else in this file.
+]]
+function Bridge.adminCommand(
+	command: string,
+	amount: number?,
+	targetMode: string,
+	targetUserId: number?,
+	itemId: string?
+)
+	fire("AdminCommand", command, amount, targetMode, targetUserId, itemId)
+end
+
 --------------------------------------------------------------------------------
 -- Inbound
 --------------------------------------------------------------------------------

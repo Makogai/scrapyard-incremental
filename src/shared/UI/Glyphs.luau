@@ -760,6 +760,7 @@ Glyphs.byName = {
 	trophy = Glyphs.Trophy,
 	note = Glyphs.Note,
 	sliders = Glyphs.Sliders,
+	admin = Glyphs.Sliders,
 	ground = Glyphs.Ground,
 	fence = Glyphs.Fence,
 	sign = Glyphs.Sign,

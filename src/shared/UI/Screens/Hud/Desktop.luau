@@ -52,6 +52,7 @@ local UI = script.Parent.Parent.Parent
 local Theme = require(UI.Theme)
 local Hooks = require(UI.Hooks)
 local P = require(UI.Primitives)
+local Buttons = require(UI.Components.Buttons)
 local Parts = require(script.Parent.Parts)
 
 local e = React.createElement
@@ -127,6 +128,29 @@ local function HudDesktop(props)
 				shopHeight = if touch then 58 else nil,
 				onOpen = actions.openScreen,
 			}),
+			--[[
+				ADMIN ENTRY POINT. Deliberately quiet: an unlabelled icon tucked under the topbar strip on the
+				right, no ADMIN text, at 34px against the 46px utility buttons, and only drawn for admins. It
+				is a tool, not a feature, and a loud button for it in a kids' game invites everyone else to
+				ask what it is.
+
+				Hiding it is a courtesy, not a lock -- `AdminService` checks `IsAdmin` on every command.
+			]]
+			if state.isAdmin
+				then e(Buttons.IconButton, {
+					key = "Admin",
+					glyph = "admin",
+					variant = "Neutral",
+					extent = 34,
+					glyphScale = 0.62,
+					position = UDim2.new(1, -MARGIN, 0, safe.top + 6),
+					anchorPoint = Vector2.new(1, 0),
+					zIndex = 12,
+					onClick = function()
+						actions.openScreen("admin")
+					end,
+				})
+				else nil,
 			e(Parts.TeleportBar, {
 				key = "Travel",
 				height = travelHeight,

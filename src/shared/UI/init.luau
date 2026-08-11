@@ -74,6 +74,7 @@ return {
 		Settings = require(Screens.SettingsScreen),
 		DailyRewards = require(Screens.DailyRewardsScreen),
 		Spin = require(Screens.SpinScreen),
+		Admin = require(Screens.AdminScreen),
 		Collection = require(Screens.CollectionScreen),
 		Changelog = require(Screens.ChangelogScreen),
 		Splash = require(Screens.SplashScreen),

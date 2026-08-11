@@ -5,7 +5,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local ScrapController = require(script.Controllers.ScrapController)
 local AreaPromptController = require(script.Controllers.AreaPromptController)
-local AdminController = require(script.Controllers.AdminController)
 local AudioController = require(script.Controllers.AudioController)
 local MagnetRangeController = require(script.Controllers.MagnetRangeController)
 local ReactUIController = require(script.Controllers.ReactUIController)
@@ -25,7 +24,12 @@ SplashController.Start()
 
 ScrapController.Start()
 AreaPromptController.Start()
-AdminController.Start()
+--[[
+	`AdminController` is no longer required or started. The authored `AdminUI` it drove has been
+	replaced by `Screens/AdminScreen`, reached from a quiet unlabelled icon in the HUD. The file is
+	still in the tree rather than deleted, so restoring the old panel is two lines if the new one turns
+	out to be missing something.
+]]
 AudioController.Start()
 MagnetRangeController.Start()
 

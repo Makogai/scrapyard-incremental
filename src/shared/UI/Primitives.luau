@@ -214,6 +214,8 @@ function P.Label(props)
 		LayoutOrder = props.layoutOrder,
 		ZIndex = props.zIndex,
 		Visible = props.visible,
+		--- Same warning as `P.Panel.rotation`: see AGENTS.md rule 11.
+		Rotation = props.rotation,
 
 		Text = props.text,
 		FontFace = props.font or Theme.Font.Display,

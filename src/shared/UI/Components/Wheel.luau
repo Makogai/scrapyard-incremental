@@ -41,6 +41,20 @@ local Wheel = {}
 local SLICE_DEGREES = 5
 
 --[[
+	Rim and pointer, pulled out because they are the two things that make it read as a wheel rather
+	than a pie chart: a thick warm rim with bolts, and a red pointer biting into the top of it.
+]]
+local RIM_COLOR = Color3.fromHex("E2A24B")
+local RIM_INNER = Color3.fromHex("C98436")
+local POINTER_COLOR = Color3.fromHex("E33B3B")
+
+--- Vertical room above the wheel for the pointer to sit in.
+local POINTER_LANE = 30
+
+--- Bolt studs around the rim.
+local BOLT_COUNT = 12
+
+--[[
 	One wedge, as a fan of bars plus its label.
 
 	`from` and `to` are degrees clockwise from straight up, which is where the pointer sits.
@@ -78,45 +92,47 @@ local function Wedge(props)
 	end
 
 	--[[
-		The label rides the wedge's own mid-radius, rotated to run OUTWARD along it -- which is how the
-		reference wheel reads, and how a physical prize wheel is painted. Text on the left half comes
-		out upside-down; real wheels do that too, and fixing it would mean flipping half the labels,
-		which reads worse than leaving it consistent.
+		Layout inside the wedge, matching how a painted prize wheel reads: the NAME hugs the outer edge
+		where there is room for it, and the icon sits big in the middle of the wedge.
+
+		Both are rotated to the wedge's own mid-angle so they sit square within it. Text on the left half
+		comes out upside-down; physical wheels do that too, and flipping half the labels reads worse than
+		one consistent rule.
 	]]
 	local mid = from + span / 2
 	local labelRadians = math.rad(mid)
-	local labelRadius = radius * 0.60
-	local labelX = math.sin(labelRadians) * labelRadius
-	local labelY = -math.cos(labelRadians) * labelRadius
 
-	parts[#parts + 1] = e(P.Group, {
-		key = "Content",
-		size = UDim2.fromOffset(radius * 0.82, 74),
+	local function radial(distance: number): (number, number)
+		return math.sin(labelRadians) * distance, -math.cos(labelRadians) * distance
+	end
+
+	--- Out near the rim, where the wedge is widest.
+	local labelX, labelY = radial(radius * 0.78)
+	parts[#parts + 1] = e(P.Label, {
+		key = "Name",
+		text = props.label,
+		textSize = if props.best then Theme.TextSize.Body else Theme.TextSize.Small,
+		color = Theme.Color.White,
+		wrapped = true,
 		position = UDim2.new(0.5, labelX, 0.5, labelY),
 		anchorPoint = Vector2.new(0.5, 0.5),
-		rotation = mid + 90,
+		rotation = mid,
+		size = UDim2.fromOffset(math.floor(radius * 0.62), 40),
 		zIndex = 6,
-		children = P.compact(
-			e(Icon, {
-				key = "Glyph",
-				glyph = props.glyph or "star",
-				plain = true,
-				size = UDim2.fromOffset(40, 40),
-				position = UDim2.new(0, 2, 0.5, 0),
-				anchorPoint = Vector2.new(0, 0.5),
-			}),
-			e(P.Label, {
-				key = "Label",
-				text = props.label,
-				textSize = if props.best then Theme.TextSize.Body else Theme.TextSize.Small,
-				color = Theme.Color.White,
-				align = Enum.TextXAlignment.Left,
-				wrapped = true,
-				position = UDim2.new(0, 46, 0.5, 0),
-				anchorPoint = Vector2.new(0, 0.5),
-				size = UDim2.new(1, -52, 0, 60),
-			})
-		),
+	})
+
+	--- Big, in the body of the wedge. This is what the eye actually lands on.
+	local iconExtent = math.floor(radius * 0.30)
+	local iconX, iconY = radial(radius * 0.46)
+	parts[#parts + 1] = e(Icon, {
+		key = "Glyph",
+		glyph = props.glyph or "star",
+		plain = true,
+		size = UDim2.fromOffset(iconExtent, iconExtent),
+		position = UDim2.new(0.5, iconX, 0.5, iconY),
+		anchorPoint = Vector2.new(0.5, 0.5),
+		rotation = mid,
+		zIndex = 6,
 	})
 
 	--[[
@@ -126,8 +142,8 @@ local function Wedge(props)
 	if props.best then
 		parts[#parts + 1] = e(P.Group, {
 			key = "Shine",
-			size = UDim2.fromOffset(radius * 0.9, radius * 0.9),
-			position = UDim2.new(0.5, labelX, 0.5, labelY),
+			size = UDim2.fromOffset(radius * 0.7, radius * 0.7),
+			position = UDim2.new(0.5, iconX, 0.5, iconY),
 			anchorPoint = Vector2.new(0.5, 0.5),
 			zIndex = 5,
 			children = {
@@ -166,6 +182,34 @@ function Wheel.Wheel(props)
 	local count = math.max(#segments, 1)
 	local step = 360 / count
 
+	local rimWidth = math.max(18, math.floor(extent * 0.055))
+
+	--[[
+		Bolt studs, laid out by angle like the wedges but on the OUTER frame, so they do not turn with
+		the wheel.
+	]]
+	local bolts = {}
+	for index = 1, BOLT_COUNT do
+		local angle = math.rad((index - 1) * (360 / BOLT_COUNT) + 15)
+		local boltRadius = radius + rimWidth * 0.1
+		bolts[#bolts + 1] = e("Frame", {
+			key = `Bolt{index}`,
+			BackgroundColor3 = RIM_INNER,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(9, 9),
+			Position = UDim2.new(
+				0.5,
+				math.sin(angle) * boltRadius,
+				0.5,
+				-math.cos(angle) * boltRadius
+			),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			ZIndex = 9,
+		}, {
+			e("UICorner", { key = "Round", CornerRadius = UDim.new(0.5, 0) }),
+		})
+	end
+
 	local wedges = {}
 	for index, segment in ipairs(segments) do
 		--[[
@@ -189,7 +233,7 @@ function Wheel.Wheel(props)
 
 	return e(P.Group, {
 		key = props.key or "Wheel",
-		size = UDim2.fromOffset(extent, extent + 26),
+		size = UDim2.fromOffset(extent + rimWidth * 2 + 8, extent + POINTER_LANE + rimWidth + 8),
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
@@ -201,39 +245,41 @@ function Wheel.Wheel(props)
 			e(P.Group, {
 				key = "Turntable",
 				size = UDim2.fromOffset(extent, extent),
-				position = UDim2.new(0.5, 0, 0, 26),
+				position = UDim2.new(0.5, 0, 0, POINTER_LANE),
 				anchorPoint = Vector2.new(0.5, 0),
 				rotation = props.rotation,
 				zIndex = 2,
 				children = wedges,
 			}),
 			--[[
-				The rim, drawn OVER the wedges. It is a ring rather than a disc -- a transparent middle
-				with a thick stroke -- so it hides the bars' overshooting corners and gives the wheel a
-				hard edge without covering anything.
+				THE RIM. A thick warm ring over the wedges with bolt studs around it -- which is what makes a
+				drawn wheel read as a physical object rather than a pie chart. Rings are
+				background-transparent frames with a fat `UIStroke`, so they cover the fill bars'
+				overshooting corners without covering the wedges themselves.
 			]]
 			e("Frame", {
 				key = "Rim",
 				BackgroundTransparency = 1,
-				Size = UDim2.fromOffset(extent, extent),
-				Position = UDim2.new(0.5, 0, 0, 26),
-				AnchorPoint = Vector2.new(0.5, 0),
+				Size = UDim2.fromOffset(extent + rimWidth, extent + rimWidth),
+				Position = UDim2.new(0.5, 0, 0, POINTER_LANE + extent / 2),
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				ZIndex = 7,
 			}, {
 				e("UICorner", { key = "Round", CornerRadius = UDim.new(0.5, 0) }),
 				e("UIStroke", {
 					key = "Ring",
-					Thickness = 10,
-					Color = Theme.Color.GrayDark,
+					Thickness = rimWidth,
+					Color = RIM_COLOR,
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 				}),
 			}),
+			--- Ink outline outside the rim: the same heavy edge every other surface in the kit carries.
 			e("Frame", {
 				key = "RimInk",
 				BackgroundTransparency = 1,
-				Size = UDim2.fromOffset(extent + 18, extent + 18),
-				Position = UDim2.new(0.5, 0, 0, 26 - 9),
-				AnchorPoint = Vector2.new(0.5, 0),
+				Size = UDim2.fromOffset(extent + rimWidth * 2 + 6, extent + rimWidth * 2 + 6),
+				Position = UDim2.new(0.5, 0, 0, POINTER_LANE + extent / 2),
+				AnchorPoint = Vector2.new(0.5, 0.5),
 				ZIndex = 6,
 			}, {
 				e("UICorner", { key = "Round", CornerRadius = UDim.new(0.5, 0) }),
@@ -244,46 +290,70 @@ function Wheel.Wheel(props)
 					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 				}),
 			}),
-			--- Hub, outside the turntable so its glyph stays upright while the wheel spins.
+			--[[
+				Bolt studs. Outside the turntable so they stay still while the wheel turns -- bolts that
+				spun with the wedges would read as part of the prize art rather than as hardware.
+			]]
+			e(P.Group, {
+				key = "Bolts",
+				size = UDim2.fromOffset(extent, extent),
+				position = UDim2.new(0.5, 0, 0, POINTER_LANE),
+				anchorPoint = Vector2.new(0.5, 0),
+				zIndex = 8,
+				children = bolts,
+			}),
+			--- Hub, outside the turntable so its star stays upright while the wheel spins.
 			e(P.Panel, {
 				key = "Hub",
 				size = UDim2.fromOffset(hub, hub),
-				position = UDim2.new(0.5, 0, 0, 26 + radius),
+				position = UDim2.new(0.5, 0, 0, POINTER_LANE + radius),
 				anchorPoint = Vector2.new(0.5, 0.5),
-				gradient = Theme.Gradient.Panel,
+				gradient = Theme.Gradient.Gold,
 				radius = hub / 2,
 				strokeThickness = 5,
 				studs = false,
 				zIndex = 9,
 				children = {
-					e(Icon, {
-						key = "HubGlyph",
-						glyph = "wheel",
-						plain = true,
-						size = UDim2.fromOffset(hub - 30, hub - 30),
+					e(P.Panel, {
+						key = "HubInner",
+						size = UDim2.fromOffset(hub - 18, hub - 18),
 						position = UDim2.fromScale(0.5, 0.5),
 						anchorPoint = Vector2.new(0.5, 0.5),
+						gradient = Theme.Gradient.Orange,
+						radius = (hub - 18) / 2,
+						strokeThickness = 3,
+						studs = false,
+						children = {
+							e(Icon, {
+								key = "Star",
+								glyph = "star",
+								plain = true,
+								size = UDim2.fromOffset(hub - 42, hub - 42),
+								position = UDim2.fromScale(0.5, 0.5),
+								anchorPoint = Vector2.new(0.5, 0.5),
+							}),
+						},
 					}),
 				},
 			}),
 			--[[
-				The pointer: a downward triangle at the top, outside the turntable so it stays put.
+				THE POINTER: a red triangle at the top pointing DOWN into the wheel, sitting above the rim
+				rather than beside it, as in the reference.
 
-				A real triangle needs a rotated square, and rotation here is safe because nothing is being
-				clipped -- but a rotated square's bounding box is bigger than the square, so it is sized
-				and positioned to keep its lower corner exactly on the rim.
+				A triangle needs a rotated square, and rotation is safe here because nothing is being
+				clipped. Positioned so its lower corner meets the rim.
 			]]
 			e("Frame", {
 				key = "Pointer",
-				BackgroundColor3 = Theme.Color.White,
+				BackgroundColor3 = POINTER_COLOR,
 				BorderSizePixel = 0,
-				Size = UDim2.fromOffset(26, 26),
-				Position = UDim2.new(0.5, 0, 0, 16),
+				Size = UDim2.fromOffset(30, 30),
+				Position = UDim2.new(0.5, 0, 0, POINTER_LANE - 2),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Rotation = 45,
-				ZIndex = 10,
+				ZIndex = 11,
 			}, {
-				e("UICorner", { key = "Corner", CornerRadius = UDim.new(0, 5) }),
+				e("UICorner", { key = "Corner", CornerRadius = UDim.new(0, 6) }),
 				e("UIStroke", {
 					key = "Ink",
 					Thickness = 3,

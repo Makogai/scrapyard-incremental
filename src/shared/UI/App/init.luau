@@ -35,6 +35,7 @@ local MagnetShopScreen = require(UI.Screens.MagnetShopScreen)
 local ChangelogScreen = require(UI.Screens.ChangelogScreen)
 local DailyRewardsScreen = require(UI.Screens.DailyRewardsScreen)
 local SpinScreen = require(UI.Screens.SpinScreen)
+local AdminScreen = require(UI.Screens.AdminScreen)
 local EggSummonScreen = require(UI.Screens.EggSummonScreen)
 local EggRollOverlay = require(UI.Screens.EggRollOverlay)
 local Announcement = require(UI.Components.Announcement)
@@ -43,6 +44,16 @@ local NotificationStack = require(UI.Screens.NotificationStack)
 local Details = require(UI.Screens.DetailsModal)
 
 local e = React.createElement
+
+--[[
+	Screens that own the whole display. Keyed by the same id as `SCREENS`.
+
+	`spin` is here because the wheel is something you watch rather than something you read: it blurs
+	the world, fills the middle of the screen, and has nothing else to compete with.
+]]
+local TAKEOVER_SCREENS = {
+	spin = true,
+}
 
 local SCREENS = {
 	upgrades = UpgradesScreen,
@@ -64,6 +75,8 @@ local SCREENS = {
 	]]
 	daily = DailyRewardsScreen,
 	spin = SpinScreen,
+	--- Offered only to admins by the HUD; `AdminService` re-checks every command regardless.
+	admin = AdminScreen,
 }
 
 --[[
@@ -117,6 +130,17 @@ local function App(props)
 	]]
 	local rolling = state.eggRoll ~= nil
 
+	--[[
+		Screens that take over the whole display rather than opening a window on top of it.
+
+		A takeover hides the HUD and skips the shared dim wash, because it brings its own backdrop --
+		the spin wheel blurs the world, and stacking App's flat wash on top of that just muddies it.
+		The rule is the same one the egg hatch follows: nothing should compete with the thing the
+		player is watching, and there is nothing to misclick.
+	]]
+	local takeoverScreen = TAKEOVER_SCREENS[state.screen or ""] == true
+	local hudHidden = rolling or takeoverScreen
+
 	--- The pet being revealed, resolved from the id the server sent.
 	local revealPet = nil
 	if rolling and state.eggRoll.PetId then
@@ -141,7 +165,7 @@ local function App(props)
 			is the portrait layout; it is still in the tree for its story but is no
 			longer required here.
 		]]
-		if rolling
+		if hudHidden
 			then nil
 			else e(HudDesktop, {
 				key = "Hud",
@@ -151,8 +175,13 @@ local function App(props)
 				zIndex = Theme.Layer.Hud,
 			}),
 
-		-- Dim wash behind an open window; tapping it closes the window.
-		if ScreenComponent and not rolling
+		--[[
+			Dim wash behind an open window; tapping it closes the window. Skipped for a takeover, which
+			supplies its own -- see `TAKEOVER_SCREENS`.
+		]]
+		if ScreenComponent
+				and not rolling
+				and not takeoverScreen
 			then e(Overlays.Backdrop, {
 				key = "Backdrop",
 				transparency = 0.42,

@@ -27,6 +27,15 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local PlayersService = game:GetService("Players")
+
+--[[
+	Zero when there is no LocalPlayer, which is the case on the server and in some story harnesses.
+	`AdminConfig.IsAdmin(0)` is false, so the admin entry point simply never offers itself there.
+]]
+local localUserId = if PlayersService.LocalPlayer then PlayersService.LocalPlayer.UserId else 0
+
+local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
 local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
 local TutorialConfig = require(ReplicatedStorage.Shared.Config.TutorialConfig)
@@ -37,6 +46,7 @@ local UI = script.Parent.Parent
 local Atoms = require(UI.State.Atoms)
 local Bridge = require(UI.State.Bridge)
 local GameData = require(UI.GameData)
+local Hooks = require(UI.Hooks)
 local Mock = require(UI.Mock)
 local Sound = require(UI.Sound)
 
@@ -360,6 +370,16 @@ local function liveActions()
 		Bridge.skipTutorial()
 	end
 
+	function self.adminCommand(
+		command: string,
+		amount: number?,
+		targetMode: string,
+		targetUserId: number?,
+		itemId: string?
+	)
+		Bridge.adminCommand(command, amount, targetMode, targetUserId, itemId)
+	end
+
 	function self.redeemCode(code: string)
 		Bridge.redeemCode(code)
 	end
@@ -546,6 +566,7 @@ local function mockActions()
 		"redeemCode",
 		"claimPlaytime",
 		"skipTutorial",
+		"adminCommand",
 		"setCosmetic",
 		"toggleAutoCollect",
 	}) do
@@ -672,6 +693,25 @@ function Store.use()
 	local eggRoll = useAtom(Atoms.eggRoll)
 	local announce = useAtom(Atoms.announce)
 
+	--[[
+		The player list for the admin panel, refreshed on a ticker.
+
+		Read straight from `Players` rather than mirrored into an atom: it is not server state, it is the
+		room the client is already in, and a snapshot that goes stale as people join is worse than no
+		list. Two seconds is often enough for a panel nobody is watching continuously.
+	]]
+	local roster = Hooks.useTicker(2)
+	local players = React.useMemo(function()
+		local list = {}
+		for _, player in PlayersService:GetPlayers() do
+			table.insert(list, { userId = player.UserId, name = player.Name })
+		end
+		table.sort(list, function(a, b)
+			return a.name < b.name
+		end)
+		return list
+	end, { roster })
+
 	local dailyStreak = useAtom(Atoms.dailyStreak)
 	local dailyCalendarDay = useAtom(Atoms.dailyCalendarDay)
 	local dailyClaimable = useAtom(Atoms.dailyClaimable)
@@ -749,6 +789,14 @@ function Store.use()
 			but it now means what it says: how many days of the current calendar are behind you.
 		]]
 		claimedDays = math.max(0, dailyCalendarDay - 1),
+
+		players = players,
+		--[[
+			Whether to OFFER the admin entry point. Not a permission check -- the server re-checks on every
+			command -- just a reason not to show a button that would refuse everyone who pressed it.
+		]]
+		isAdmin = AdminConfig.IsAdmin(localUserId),
+
 		dailyStreak = dailyStreak,
 		--[[
 			The login boost the streak is currently worth, computed ONCE here rather than in each place

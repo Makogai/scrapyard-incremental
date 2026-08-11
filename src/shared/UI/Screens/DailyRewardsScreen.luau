@@ -42,6 +42,7 @@ local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
 local Rows = require(UI.Components.Rows)
 local Icon = require(UI.Icon)
+local Shine = require(UI.Components.Shine)
 local Overlays = require(UI.Components.Overlays)
 
 local e = React.createElement
@@ -77,89 +78,149 @@ end
 --[[
 	One playtime milestone, as a card in the grid.
 
-	Three states, and they have to be distinguishable at a glance: claimed (ticked, dimmed), ready
-	(accent fill and a CLAIM button), and locked (a countdown to it).
+	THREE STATES, and they have to resolve at a glance without reading anything:
+
+		claimed       ticked and washed out
+		ready         accent fill, a thick gold ring, a CLAIM button and a SHINE layer
+		not yet       greyed right down with a countdown
+
+	The shine is the point. This is a kids' game and a grid of nine identical dim squares is the
+	dullest thing in the UI -- so the one card you can act on glows, sparkles and sweeps, and the eight
+	you cannot recede. Only the actionable card animates, which is what makes it read as the answer to
+	"what do I press" rather than as decoration.
 ]]
 local function PlaytimeCard(props)
 	local claimed = props.claimed
 	local ready = not claimed and props.seconds >= props.milestone.Seconds
-	local accent = Theme.Gradient[props.milestone.Accent or "Green"] or Theme.Gradient.Green
+	local locked = not claimed and not ready
+	local accentName = props.milestone.Accent or "Green"
+	local accent = Theme.Gradient[accentName] or Theme.Gradient.Green
 	local remaining = math.max(0, props.milestone.Seconds - props.seconds)
+
+	--[[
+		Greyed rather than merely dimmed. `Theme.Gradient.Dead` is the kit's own "this is not available"
+		fill, the same one a disabled button uses, so a locked milestone matches every other
+		unavailable thing in the game instead of inventing a fourth shade of blue.
+	]]
+	local fill
+	if claimed then
+		fill = Theme.Gradient.PanelDeep
+	elseif ready then
+		fill = accent
+	else
+		fill = Theme.Gradient.Dead
+	end
 
 	return e(P.Panel, {
 		key = props.key,
 		size = UDim2.fromOffset(CARD.X, CARD.Y),
-		gradient = if claimed
-			then Theme.Gradient.PanelDeep
-			elseif ready then accent
-			else Theme.Gradient.Slot,
+		gradient = fill,
 		radius = Theme.Radius.Card,
 		strokeThickness = if ready then 5 else Theme.Stroke.Card,
+		strokeColor = if ready then Theme.Color.Gold else Theme.Color.Outline,
+		gloss = 0.84,
 		studs = false,
 		layoutOrder = props.milestone.Index,
 		children = P.compact(
+			--- Only on the card you can act on. See the note above.
+			if ready
+				then e(Shine.Layer, {
+					key = "Shine",
+					glow = true,
+					sparkles = true,
+					sweep = true,
+					color = Theme.Color.Gold,
+					zIndex = 7,
+				})
+				else nil,
 			e(P.Label, {
 				key = "Time",
 				text = props.milestone.Label,
 				textSize = Theme.TextSize.Body,
-				color = if claimed then Theme.Color.GrayDark else Theme.Color.White,
+				color = if locked then Theme.Color.GrayDark else Theme.Color.White,
 				position = UDim2.fromOffset(0, 10),
 				size = UDim2.new(1, 0, 0, 22),
+				zIndex = 4,
 			}),
-			e(Icon, {
-				key = "Glyph",
-				glyph = if props.milestone.Spins
-					then "wheel"
-					elseif props.milestone.Items then "potion"
-					else "coin",
-				plain = true,
-				size = UDim2.fromOffset(52, 52),
-				position = UDim2.new(0.5, 0, 0, 36),
-				anchorPoint = Vector2.new(0.5, 0),
+			--- Big art in a well, matching the calendar cards so the two tabs share a rhythm.
+			e(P.Slot, {
+				key = "Well",
+				size = UDim2.new(1, -22, 0, 60),
+				position = UDim2.fromOffset(11, 34),
+				zIndex = 3,
+				children = {
+					e(Icon, {
+						key = "Glyph",
+						glyph = if props.milestone.Spins
+							then "wheel"
+							elseif props.milestone.Items then "potion"
+							else "coin",
+						plain = true,
+						size = UDim2.fromScale(0.82, 0.82),
+						position = UDim2.fromScale(0.5, 0.5),
+						anchorPoint = Vector2.new(0.5, 0.5),
+						zIndex = 5,
+					}),
+				},
 			}),
 			e(P.Label, {
 				key = "Reward",
 				text = props.reward,
 				textSize = Theme.TextSize.Tiny,
 				font = Theme.Font.Bold,
-				color = if claimed then Theme.Color.GrayDark else Theme.Color.White,
+				color = if locked then Theme.Color.GrayDark else Theme.Color.White,
 				wrapped = true,
-				position = UDim2.fromOffset(0, 92),
-				size = UDim2.new(1, -12, 0, 28),
+				position = UDim2.fromOffset(6, 98),
+				size = UDim2.new(1, -12, 0, 24),
+				zIndex = 4,
 			}),
-			--- Claimed shows a tick; ready shows the button; locked shows how long is left.
-			if claimed
-				then e(Icon, {
-					key = "Tick",
-					glyph = "check",
-					plain = true,
-					size = UDim2.fromOffset(34, 34),
-					position = UDim2.new(0.5, 0, 1, -10),
-					anchorPoint = Vector2.new(0.5, 1),
-				})
-				elseif ready then e(Buttons.Button, {
+			if ready
+				then e(Buttons.Button, {
 					key = "Claim",
 					text = "CLAIM",
 					variant = "Primary",
 					textSize = Theme.TextSize.Tiny,
-					size = UDim2.fromOffset(CARD.X - 24, 32),
-					position = UDim2.new(0.5, 0, 1, -10),
+					size = UDim2.fromOffset(CARD.X - 24, 30),
+					position = UDim2.new(0.5, 0, 1, -8),
 					anchorPoint = Vector2.new(0.5, 1),
+					zIndex = 8,
 					onClick = function()
 						if props.onClaim then
 							props.onClaim(props.milestone.Index)
 						end
 					end,
 				})
-				else e(P.Label, {
+				elseif locked then e(P.Label, {
 					key = "Remaining",
 					text = Format.timer(remaining),
 					textSize = Theme.TextSize.Small,
-					color = Theme.Color.Gray,
-					position = UDim2.new(0, 0, 1, -14),
+					color = Theme.Color.GrayDark,
+					position = UDim2.new(0, 0, 1, -10),
 					anchorPoint = Vector2.new(0, 1),
 					size = UDim2.new(1, 0, 0, 22),
+					zIndex = 4,
 				})
+				else nil,
+			--- Claimed: centred tick over a heavy ink wash, exactly as the calendar cards do it.
+			if claimed
+				then e(Indicators.Checkmark, {
+					key = "Claimed",
+					extent = 54,
+					position = UDim2.fromScale(0.5, 0.5),
+					anchorPoint = Vector2.new(0.5, 0.5),
+					zIndex = 9,
+				})
+				else nil,
+			if claimed
+				then e("Frame", {
+					key = "ClaimedWash",
+					BackgroundColor3 = Theme.Color.Ink,
+					BackgroundTransparency = 0.22,
+					BorderSizePixel = 0,
+					Size = UDim2.fromScale(1, 1),
+					ZIndex = 8,
+				}, { P.corner(Theme.Radius.Card) })
+				else nil
 		),
 	})
 end
@@ -257,9 +318,14 @@ local function DailyRewardsScreen(props)
 			grid is three. Sized to the taller so switching tabs does not resize the window under the
 			player's cursor.
 		]]
-		contentHeight = math.max(HERO.Y, CARD.Y * 3 + GAP * 2) + TAB_LANE + 8,
+		--[[
+			The taller of the two tabs plus the tab bar, and nothing beyond. The trailing slack is what left
+			a dead band under the calendar; it is still sized to the taller tab so switching cannot resize
+			the window under the cursor.
+		]]
+		contentHeight = math.max(HERO.Y, CARD.Y * 3 + GAP * 2) + TAB_LANE,
 		onClose = actions.closeScreen,
-		footerHeight = 70,
+		footerHeight = 64,
 		--[[
 			The footer belongs to the daily tab: a streak line and a CLAIM button mean nothing next to a
 			playtime grid whose cards each carry their own button. On the playtime tab it is replaced with
@@ -270,22 +336,13 @@ local function DailyRewardsScreen(props)
 				key = "PlaytimeFooter",
 				size = UDim2.fromScale(1, 1),
 				children = {
-					e(P.Label, {
-						key = "Played",
-						text = `PLAYED TODAY: {Format.timer(state.playtimeSeconds or 0)}`,
-						textSize = Theme.TextSize.Body,
-						font = Theme.Font.Bold,
-						color = Theme.Color.Gold,
-						align = Enum.TextXAlignment.Left,
-						size = UDim2.new(0, 340, 1, 0),
-					}),
 					e(Indicators.Badge, {
-						key = "Reset",
-						text = `RESETS IN {Format.timer(state.dailyResetSeconds or 0)}`,
-						gradient = Theme.Gradient.PanelDeep,
+						key = "Played",
+						text = `PLAYED TODAY  {Format.timer(state.playtimeSeconds or 0)}`,
+						gradient = Theme.Gradient.Gold,
 						textSize = Theme.TextSize.Small,
-						position = UDim2.fromScale(1, 0.5),
-						anchorPoint = Vector2.new(1, 0.5),
+						position = UDim2.fromScale(0.5, 0.5),
+						anchorPoint = Vector2.new(0.5, 0.5),
 					}),
 				},
 			})
@@ -293,16 +350,22 @@ local function DailyRewardsScreen(props)
 				key = "Claim",
 				size = UDim2.fromScale(1, 1),
 				children = {
-					e(P.Label, {
+					--[[
+						The streak as a chip, and no prose. The old footer had a sentence on the left and a
+						RESETS IN badge on the right, both saying what the cards already show -- two redundant
+						strings flanking the button is what made this read as filler.
+					]]
+					e(Indicators.Badge, {
 						key = "Streak",
 						text = if bonusPercent > 0
-							then `STREAK {streak} DAYS  ·  +{bonusPercent}% CASH`
-							else `STREAK {streak} DAYS`,
-						textSize = Theme.TextSize.Body,
-						font = Theme.Font.Bold,
-						color = if streak > 0 then Theme.Color.Gold else Theme.Color.Gray,
-						align = Enum.TextXAlignment.Left,
-						size = UDim2.new(0, 300, 1, 0),
+							then `STREAK {streak}  ·  +{bonusPercent}% CASH`
+							else `STREAK {streak}`,
+						gradient = if streak > 0
+							then Theme.Gradient.Gold
+							else Theme.Gradient.PanelDeep,
+						textSize = Theme.TextSize.Small,
+						position = UDim2.fromScale(0, 0.5),
+						anchorPoint = Vector2.new(0, 0.5),
 					}),
 					e(Buttons.Button, {
 						key = "ClaimButton",
@@ -318,14 +381,6 @@ local function DailyRewardsScreen(props)
 						anchorPoint = Vector2.new(0.5, 0.5),
 						-- No argument: the server decides what is claimable.
 						onClick = actions.claimDaily,
-					}),
-					e(Indicators.Badge, {
-						key = "Next",
-						text = `RESETS IN {Format.timer(state.dailyResetSeconds or 0)}`,
-						gradient = Theme.Gradient.PanelDeep,
-						textSize = Theme.TextSize.Small,
-						position = UDim2.fromScale(1, 0.5),
-						anchorPoint = Vector2.new(1, 0.5),
 					}),
 				},
 			}),

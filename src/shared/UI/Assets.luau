@@ -109,6 +109,8 @@ Assets.Icons = {
 	-- label-only until an id lands here.
 	note = "",
 	sliders = "rbxassetid://9405931578", -- flat cog, used by the topbar button
+	-- Admin entry point. Deliberately unlabelled art rather than the word ADMIN.
+	admin = "rbxassetid://11322093465",
 }
 
 --------------------------------------------------------------------------------

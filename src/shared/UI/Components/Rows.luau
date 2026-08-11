@@ -469,11 +469,16 @@ function Rows.RewardCard(props)
 			position = UDim2.fromOffset(8, 42),
 			zIndex = 3,
 			children = {
+				--[[
+					Filling most of the well rather than a bit over half. The reward art is the only thing on
+					the card a player actually reads at a glance, and at 0.56 the potions were small enough
+					to be unidentifiable.
+				]]
 				e(Icon, {
 					key = "Icon",
 					glyph = props.glyph,
 					plain = true,
-					size = UDim2.fromScale(0.56, 0.56),
+					size = UDim2.fromScale(0.86, 0.86),
 					position = UDim2.fromScale(0.5, 0.5),
 					anchorPoint = Vector2.new(0.5, 0.5),
 					zIndex = 6,
@@ -499,20 +504,28 @@ function Rows.RewardCard(props)
 			position = UDim2.fromOffset(5, 150),
 			zIndex = 4,
 		}),
+		--[[
+			CENTRED on the card, not tucked in a corner, and big. A claimed day is a state the eye should
+			resolve without reading anything, and the tick is the whole message.
+		]]
 		if isClaimed
 			then e(Indicators.Checkmark, {
 				key = "Claimed",
-				extent = 34,
-				position = UDim2.new(1, -6, 0, 40),
-				anchorPoint = Vector2.new(1, 0),
+				extent = 58,
+				position = UDim2.fromScale(0.5, 0.5),
+				anchorPoint = Vector2.new(0.5, 0.5),
 				zIndex = 9,
 			})
 			else nil,
+		--[[
+			Ink at 0.22, not PanelDark at 0.5. The old wash barely dimmed the card, so a claimed day and a
+			live one read almost the same -- which is exactly the confusion the tick is there to prevent.
+		]]
 		if isClaimed
 			then e("Frame", {
 				key = "ClaimedWash",
-				BackgroundColor3 = Theme.Color.PanelDark,
-				BackgroundTransparency = 0.5,
+				BackgroundColor3 = Theme.Color.Ink,
+				BackgroundTransparency = 0.22,
 				BorderSizePixel = 0,
 				Size = UDim2.fromScale(1, 1),
 				ZIndex = 8,

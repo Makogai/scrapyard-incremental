@@ -85,6 +85,8 @@ local function Icon(props)
 			AnchorPoint = props.anchorPoint,
 			LayoutOrder = props.layoutOrder,
 			ZIndex = props.zIndex,
+			--- Rotation is safe only where nothing needs clipping: AGENTS.md rule 11.
+			Rotation = props.rotation,
 		}, {
 			e("Frame", {
 				key = "Content",
@@ -108,6 +110,7 @@ local function Icon(props)
 		AnchorPoint = props.anchorPoint,
 		LayoutOrder = props.layoutOrder,
 		ZIndex = props.zIndex,
+		Rotation = props.rotation,
 	}, {
 		P.corner(radius),
 		P.stroke(props.strokeColor, props.strokeThickness or Theme.Stroke.Chip),
