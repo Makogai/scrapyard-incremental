@@ -9,8 +9,10 @@
 
 	TWO VARIANTS, because a price does two different jobs:
 
-		"corner"  a rotated tag pinned to a surface's lower-right, wiggling and pulsing so it catches
-		          the eye on an otherwise static card. This is the attention-getter.
+		"corner"  a rotated price pinned to a surface's lower-right, wiggling and pulsing so it catches
+		          the eye on an otherwise static card. NO BACKGROUND: the glyphs carry their own ink
+		          outline, and a slab behind them just makes a second button on top of a button. This is
+		          the attention-getter.
 		"inline"  a flat pill that sits in a row with other content and stays still. This is the one
 		          for lists, where six wiggling tags would be noise rather than emphasis.
 
@@ -47,8 +49,8 @@ local GOLD = Theme.Gradient.Gold
 function RobuxPrice.Tag(props)
 	local amount = props.amount or 0
 	local corner = (props.variant or "inline") == "corner"
-	local height = props.height or (if corner then 30 else 26)
-	local iconExtent = height - 8
+	local height = props.height or (if corner then 46 else 26)
+	local iconExtent = if corner then height - 6 else height - 8
 
 	--[[
 		The corner tag pulses and wiggles; the inline pill does neither.
@@ -73,7 +75,7 @@ function RobuxPrice.Tag(props)
 		e(P.Label, {
 			key = "Amount",
 			text = Format.comma(amount),
-			textSize = if corner then Theme.TextSize.Body else Theme.TextSize.Small,
+			textSize = if corner then Theme.TextSize.Title else Theme.TextSize.Small,
 			--- Gold gradient over the glyphs, with the kit's ink outline underneath.
 			gradient = GOLD,
 			color = Theme.Color.White,
@@ -86,7 +88,7 @@ function RobuxPrice.Tag(props)
 	)
 
 	--- Width tracks the digits, so 59 and 1,200 both sit snugly rather than in a fixed box.
-	local width = iconExtent + 18 + #Format.comma(amount) * (if corner then 13 else 11)
+	local width = iconExtent + 16 + #Format.comma(amount) * (if corner then 19 else 11)
 
 	if not corner then
 		return e(P.Panel, {
@@ -105,8 +107,11 @@ function RobuxPrice.Tag(props)
 	end
 
 	--[[
-		The corner tag. Rotation, wiggle and a slow scale breath, hung off the lower-right of whatever
-		it is placed on -- so it reads as a sticker slapped on the card rather than part of its layout.
+		The corner price. Rotation, wiggle and a slow scale breath, hung off the lower-right of whatever
+		it is placed on -- so it reads as something stuck to the card rather than part of its layout.
+
+		Bare: icon plus gold-gradient glyphs on their own ink outline, no plate. Rotation is what makes
+		it read as applied to the surface, and rule 11 is why it may only go on unclipped cards.
 	]]
 	return e(P.Group, {
 		key = props.key or "RobuxPrice",
@@ -116,7 +121,7 @@ function RobuxPrice.Tag(props)
 		layoutOrder = props.layoutOrder,
 		zIndex = props.zIndex or 6,
 		rotation = wiggle:map(function(offset: number)
-			return -8 + offset
+			return -10 + offset
 		end),
 		children = {
 			--[[
@@ -129,13 +134,9 @@ function RobuxPrice.Tag(props)
 					return 1 + math.sin(math.rad(angle)) * 0.06
 				end),
 			}),
-			e(P.Panel, {
-				key = "Slab",
+			e(P.Group, {
+				key = "Bare",
 				size = UDim2.fromScale(1, 1),
-				gradient = Theme.Gradient.Purple,
-				radius = Theme.Radius.Chip,
-				strokeThickness = Theme.Stroke.Card,
-				studs = false,
 				children = children,
 			}),
 		},

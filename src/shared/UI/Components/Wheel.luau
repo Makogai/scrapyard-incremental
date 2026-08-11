@@ -147,25 +147,52 @@ local function Wedge(props)
 	end
 
 	--[[
-		THE ICON IS THE PRIZE; THE TEXT IS THE CAPTION.
+		THE NAME, AND ITS ODDS UNDER IT.
 
-		Pushed right out to the rim and kept small, so it labels the wedge without competing with the art.
-		Previously the two were nearly the same weight at nearly the same radius, which is why neither
-		read at a glance.
+		The chance used to live in a separate ODDS panel behind a button, which is one click and one
+		window for a number that belongs to the wedge it describes. Printed under the name it needs no
+		chrome at all, and a player can read the whole prize table by looking at the wheel.
+
+		The odds line is deliberately small and grey: it is reference, not a headline. The name is not --
+		it is the thing being read at a glance, so it sits a step up in size from before.
 	]]
-	local labelX, labelY = radial(radius * 0.84)
+	local labelX, labelY = radial(radius * 0.87)
 	parts[#parts + 1] = e(P.Label, {
 		key = "Name",
 		text = props.label,
-		textSize = if props.best then Theme.TextSize.Body else Theme.TextSize.Small,
+		--[[
+			ONE SIZE FOR EVERY NAME, including the jackpot's.
+
+			At title size "GOD POTION" wrapped to two lines and the second one clipped, so the best prize
+			on the wheel read as "GOD". The jackpot is already marked by its gold wedge and its sparkles --
+			it does not need a bigger typeface, and it cannot have one that breaks its own name.
+		]]
+		textSize = Theme.TextSize.Body,
 		color = Theme.Color.White,
 		wrapped = true,
 		position = UDim2.new(0.5, labelX, 0.5, labelY),
 		anchorPoint = Vector2.new(0.5, 0.5),
 		rotation = mid,
-		size = UDim2.fromOffset(math.floor(radius * 0.54), 34),
+		size = UDim2.fromOffset(math.floor(radius * 0.62), 44),
 		zIndex = 6,
 	})
+
+	if props.chance then
+		--- Just inside the name, so name and odds read as one block turning with the wedge.
+		local oddsX, oddsY = radial(radius * 0.72)
+		parts[#parts + 1] = e(P.Label, {
+			key = "Odds",
+			text = props.chance,
+			textSize = Theme.TextSize.Small,
+			color = Theme.Color.White,
+			textTransparency = 0.25,
+			position = UDim2.new(0.5, oddsX, 0.5, oddsY),
+			anchorPoint = Vector2.new(0.5, 0.5),
+			rotation = mid,
+			size = UDim2.fromOffset(math.floor(radius * 0.42), 18),
+			zIndex = 6,
+		})
+	end
 
 	--[[
 		AS BIG AS THE WEDGE CAN ACTUALLY HOLD.
@@ -175,9 +202,9 @@ local function Wedge(props)
 		exactly what a flat `radius * 0.46` did on an eight-segment wheel. Taking the smaller of the two
 		means the art grows on a four-segment wheel and shrinks on a twelve without any per-count tuning.
 	]]
-	local iconDistance = radius * 0.52
+	local iconDistance = radius * 0.44
 	local chord = 2 * iconDistance * math.sin(math.rad(span / 2))
-	local iconExtent = math.floor(math.min(radius * 0.40, chord * 0.82))
+	local iconExtent = math.floor(math.min(radius * 0.36, chord * 0.88))
 	local iconX, iconY = radial(iconDistance)
 	parts[#parts + 1] = e(Icon, {
 		key = "Glyph",
@@ -373,6 +400,16 @@ function Wheel.Wheel(props)
 		})
 	end
 
+	--[[
+		Chances, from the segments' own `Weight` values -- the same numbers `SpinService` sums to pick a
+		winner. Computed here rather than authored anywhere, so a weight change in config moves the
+		printed odds with it and the wheel cannot advertise a rate the server does not roll.
+	]]
+	local totalWeight = 0
+	for _, segment in ipairs(segments) do
+		totalWeight += segment.Weight or 0
+	end
+
 	local wedges = {}
 	for index, segment in ipairs(segments) do
 		--[[
@@ -389,6 +426,12 @@ function Wheel.Wheel(props)
 			radius = radius,
 			color = if segment.Best then Theme.Color.Gold else accent,
 			label = segment.Label,
+			--- Two decimals at the rare end: a 1-in-100 jackpot printed as "0%" reads as impossible.
+			chance = if totalWeight > 0 and segment.Weight
+				then (if segment.Weight / totalWeight * 100 < 1
+					then string.format("%.2f%%", segment.Weight / totalWeight * 100)
+					else string.format("%.0f%%", segment.Weight / totalWeight * 100))
+				else nil,
 			glyph = segment.Glyph,
 			image = RewardToast.imageFor(segment),
 			best = segment.Best == true,

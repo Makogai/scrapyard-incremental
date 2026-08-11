@@ -58,6 +58,9 @@ local IDLE_DEGREES_PER_SECOND = 7
 --- cos(45 degrees): the factor that turns a radius into an on-the-circle diagonal offset.
 local DIAGONAL = math.sqrt(2) / 2
 
+--- The spin-pack column.
+local PACK_WIDTH = 210
+
 --[[
 	A buyable pack of spins.
 
@@ -88,7 +91,7 @@ local function SpinPack(props)
 		Text = "",
 		BackgroundTransparency = 1,
 		AutoButtonColor = false,
-		Size = UDim2.new(1, 0, 0, 62),
+		Size = UDim2.new(1, 0, 0, 76),
 		LayoutOrder = props.layoutOrder,
 	}
 	for event, handler in pairs(press.events) do
@@ -100,10 +103,12 @@ local function SpinPack(props)
 		e(P.Panel, {
 			key = "Slab",
 			size = UDim2.fromScale(1, 1),
-			--- Only the better-value pack gets the bright gradient. If both shouted, neither would.
-			gradient = if props.best
-				then Theme.Gradient[props.accent]
-				else Theme.Gradient.PanelDeep,
+			--[[
+				The same green as the SPIN button below. These two and that button are the only things on
+				this screen a player is meant to press, so they should read as the same class of object -- a
+				navy card and a purple card beside a green button read as three unrelated systems.
+			]]
+			gradient = if locked then Theme.Gradient.Slot else Theme.Gradient.Green,
 			radius = Theme.Radius.Card,
 			strokeThickness = Theme.Stroke.Card,
 			studs = false,
@@ -118,11 +123,11 @@ local function SpinPack(props)
 				e(P.Label, {
 					key = "Label",
 					text = props.label,
-					textSize = Theme.TextSize.Small,
+					textSize = Theme.TextSize.Body,
 					color = Theme.Color.White,
 					align = Enum.TextXAlignment.Left,
-					position = UDim2.fromOffset(42, 7),
-					size = UDim2.new(1, -50, 0, 26),
+					position = UDim2.fromOffset(44, 8),
+					size = UDim2.new(1, -52, 0, 26),
 				}),
 				--[[
 					The price treatment lives in `RobuxPrice`, not here, so it matches every other price -- and
@@ -146,50 +151,13 @@ local function SpinPack(props)
 					else e(RobuxPrice.Tag, {
 						key = "Price",
 						amount = props.robux,
-						variant = "inline",
-						position = UDim2.new(0, 10, 1, -7),
-						anchorPoint = Vector2.new(0, 1),
+						variant = "corner",
+						position = UDim2.new(1, -8, 1, -4),
+						anchorPoint = Vector2.new(1, 1),
+						zIndex = 6,
 					}),
 			},
 		}),
-	})
-end
-
---- One line of the odds list: a wedge's label against its real chance, straight off the same weights.
-local function OddsRow(props)
-	return e(P.Group, {
-		key = props.key or "OddsRow",
-		size = UDim2.new(1, 0, 0, 26),
-		layoutOrder = props.layoutOrder,
-		children = {
-			e(Icon, {
-				key = "Glyph",
-				glyph = props.glyph,
-				plain = true,
-				size = UDim2.fromOffset(20, 20),
-				position = UDim2.fromScale(0, 0.5),
-				anchorPoint = Vector2.new(0, 0.5),
-			}),
-			e(P.Label, {
-				key = "Label",
-				text = props.label,
-				textSize = Theme.TextSize.Small,
-				color = if props.best then Theme.Color.Gold else Theme.Color.White,
-				align = Enum.TextXAlignment.Left,
-				position = UDim2.fromOffset(28, 0),
-				size = UDim2.new(1, -96, 1, 0),
-			}),
-			e(P.Label, {
-				key = "Chance",
-				text = props.chance,
-				textSize = Theme.TextSize.Small,
-				color = Theme.Color.Gray,
-				align = Enum.TextXAlignment.Right,
-				size = UDim2.new(0, 64, 1, 0),
-				position = UDim2.fromScale(1, 0),
-				anchorPoint = Vector2.new(1, 0),
-			}),
-		},
 	})
 end
 
@@ -215,6 +183,12 @@ local function SpinScreen(props)
 	local scale = Hooks.useScale()
 	local available = math.min(viewport.X, viewport.Y) / math.max(scale, 0.01)
 	local extent = math.clamp(math.floor(available - 190), 240, 560)
+
+	--[[
+		How much room the wheel takes BEYOND `extent`: the rim ring, its ink outline and the bolts.
+		Mirrors `Components/Wheel`'s own `rimWidth`, which is the number those are drawn from.
+	]]
+	local rimAllowance = math.max(18, math.floor(extent * 0.055)) + 10
 
 	local count = math.max(#segments, 1)
 	local step = 360 / count
@@ -252,38 +226,6 @@ local function SpinScreen(props)
 		end
 	end
 
-	--[[
-		The odds list is built from the same `Weight` values the server draws from, so it cannot drift out
-		of step with the real chances the way a hand-written table would.
-	]]
-	local oddsOpen, setOddsOpen = React.useState(false)
-	local oddsRows = React.useMemo(function()
-		local total = 0
-		for _, segment in ipairs(segments) do
-			total += segment.Weight or 0
-		end
-
-		local rows = {}
-		for index, segment in ipairs(segments) do
-			local chance = if total > 0 then (segment.Weight or 0) / total * 100 else 0
-			table.insert(
-				rows,
-				e(OddsRow, {
-					key = segment.Id,
-					label = segment.Label,
-					glyph = RewardToast.glyphFor(segment),
-					--- Two decimals for the rare end: a 1-in-100 jackpot shown as "0%" reads as impossible.
-					chance = if chance < 1
-						then string.format("%.2f%%", chance)
-						else string.format("%.1f%%", chance),
-					best = segment.Best == true,
-					layoutOrder = index,
-				})
-			)
-		end
-		return rows
-	end, { segments })
-
 	return e(P.Group, {
 		key = props.key or "SpinScreen",
 		size = UDim2.fromScale(1, 1),
@@ -308,17 +250,19 @@ local function SpinScreen(props)
 				In a takeover there is no window frame for a corner button to belong to, so a close in the
 				screen corner reads as unrelated to the thing it closes. Squaring the offsets -- centre plus
 				half the extent in each axis -- put it diagonally off the rim, floating in empty space; the
-				corner of a circle's bounding box is not on the circle. Placing it at `radius / sqrt(2)` in
-				each axis puts it exactly ON the rim, where it reads as attached.
+				corner of a circle's bounding box is not on the circle.
+
+				So it is placed along the 45-degree diagonal, at the rim's outer radius plus a clearance --
+				close enough to belong to the wheel, far enough not to sit on top of a prize.
 			]]
 			e(Buttons.CloseButton, {
 				key = "Close",
 				extent = 46,
 				position = UDim2.new(
 					0.5,
-					(extent / 2 + 14) * DIAGONAL,
+					(extent / 2 + rimAllowance + 30) * DIAGONAL,
 					0.5,
-					-30 - (extent / 2 + 14) * DIAGONAL
+					-30 - (extent / 2 + rimAllowance + 30) * DIAGONAL
 				),
 				anchorPoint = Vector2.new(0.5, 0.5),
 				zIndex = 12,
@@ -360,10 +304,22 @@ local function SpinScreen(props)
 				wheel floating alone; this puts the two things a player wants next to it -- more spins, and
 				what the odds actually are.
 			]]
+			--[[
+				RIGHT OF THE RIM, not right of `extent`.
+
+				`extent` is the wedge disc; the rim, its ink outline and the bolts all live OUTSIDE that, so
+				an offset measured from `extent / 2` put this column on top of the wheel. `PACK_WIDTH / 2`
+				plus the rim's own thickness plus a gutter is the first position that clears it.
+			]]
 			e(P.Group, {
 				key = "Packs",
-				size = UDim2.fromOffset(210, 260),
-				position = UDim2.new(0.5, extent / 2 + 110, 0.5, -30),
+				size = UDim2.fromOffset(PACK_WIDTH, 260),
+				position = UDim2.new(
+					0.5,
+					extent / 2 + rimAllowance + PACK_WIDTH / 2 + 26,
+					0.5,
+					-30
+				),
 				anchorPoint = Vector2.new(0.5, 0.5),
 				zIndex = 7,
 				layout = P.list({ padding = 12 }),
@@ -381,7 +337,6 @@ local function SpinScreen(props)
 						label = "+1 SPIN",
 						productId = "SpinOne",
 						robux = 59,
-						accent = "Purple",
 						locked = spins + 1 > RewardsConfig.Spin.MaximumStored,
 						layoutOrder = 2,
 						onBuy = actions.purchase,
@@ -391,61 +346,13 @@ local function SpinScreen(props)
 						label = "+3 SPINS",
 						productId = "SpinThree",
 						robux = 120,
-						accent = "Pink",
 						locked = spins + 3 > RewardsConfig.Spin.MaximumStored,
 						best = true,
 						layoutOrder = 3,
 						onBuy = actions.purchase,
 					}),
-					e(Buttons.Button, {
-						key = "Odds",
-						text = "ODDS",
-						glyph = "book",
-						variant = "Neutral",
-						textSize = Theme.TextSize.Small,
-						size = UDim2.new(1, 0, 0, 42),
-						layoutOrder = 4,
-						onClick = function()
-							setOddsOpen(not oddsOpen)
-						end,
-					}),
 				},
 			}),
-			--[[
-				The odds list, opened from that button rather than printed on the wheel. A percentage on every
-				wedge is what makes a prize wheel look like a spreadsheet; this keeps the wheel clean and
-				still tells anyone who asks.
-			]]
-			if oddsOpen
-				then e(P.Panel, {
-					key = "Odds",
-					size = UDim2.fromOffset(280, math.min(360, 56 + #segments * 30)),
-					position = UDim2.new(0.5, -(extent / 2) - 160, 0.5, -30),
-					anchorPoint = Vector2.new(0.5, 0.5),
-					gradient = Theme.Gradient.PanelDeep,
-					radius = Theme.Radius.Panel,
-					strokeThickness = Theme.Stroke.Panel,
-					studs = false,
-					zIndex = 9,
-					children = {
-						e(P.Label, {
-							key = "Title",
-							text = "ODDS",
-							textSize = Theme.TextSize.Body,
-							color = Theme.Color.White,
-							position = UDim2.fromOffset(0, 10),
-							size = UDim2.new(1, 0, 0, 24),
-						}),
-						e(P.Group, {
-							key = "Rows",
-							size = UDim2.new(1, -24, 1, -46),
-							position = UDim2.fromOffset(12, 40),
-							layout = P.list({ padding = 2 }),
-							children = oddsRows,
-						}),
-					},
-				})
-				else nil,
 			e(P.Group, {
 				key = "Controls",
 				size = UDim2.fromOffset(360, 86),
