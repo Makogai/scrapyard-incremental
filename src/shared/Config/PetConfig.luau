@@ -349,7 +349,19 @@ local eggs = {
 	}),
 }
 
+--[[
+	How many eggs one press may open, and which entitlement unlocks each count.
+
+	Ordered largest-first so a player who owns both passes gets the bigger one offered. The count is
+	also the COST multiplier -- see `TryOpenEgg` -- so nothing here is a discount.
+]]
+local hatchBatches = {
+	table.freeze({ Count = 5, Entitlement = "PentaHatch" }),
+	table.freeze({ Count = 3, Entitlement = "TripleHatch" }),
+}
+
 return table.freeze({
+	HatchBatches = table.freeze(hatchBatches),
 	Pets = table.freeze(pets),
 	Eggs = table.freeze(eggs),
 	EggOrder = table.freeze({ "JunkyardEgg", "WorkshopEgg", "QuantumEgg" }),

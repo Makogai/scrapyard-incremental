@@ -141,15 +141,33 @@ local function App(props)
 	local takeoverScreen = TAKEOVER_SCREENS[state.screen or ""] == true
 	local hudHidden = rolling or takeoverScreen
 
-	--- The pet being revealed, resolved from the id the server sent.
+	--[[
+		The pets being revealed, resolved from the ids the server sent.
+
+		`PetIds` is the list a multi-hatch produced; `PetId` is the first of it and is what a single hatch
+		has always used. Both are resolved here rather than in the overlay, because the lookup needs the
+		egg's contents and `GameData.eggRoll` is a screen-level concern.
+
+		A DUPLICATE IN THE BATCH IS ITS OWN ENTRY -- three of the same pet is three cards, because that is
+		what happened. Deduplicating would hide the outcome the player is looking at.
+	]]
 	local revealPet = nil
-	if rolling and state.eggRoll.PetId then
+	local revealPets = nil
+	if rolling and (state.eggRoll.PetId or state.eggRoll.PetIds) then
 		local egg = GameData.eggRoll(state.eggRoll.EggId, state.ownedPets)
 		if egg then
+			local byId = {}
 			for _, pet in ipairs(egg.pets) do
-				if pet.id == state.eggRoll.PetId then
-					revealPet = pet
-					break
+				byId[pet.id] = pet
+			end
+			revealPet = byId[state.eggRoll.PetId]
+			if type(state.eggRoll.PetIds) == "table" then
+				revealPets = {}
+				for _, petId in ipairs(state.eggRoll.PetIds) do
+					local pet = byId[petId]
+					if pet then
+						table.insert(revealPets, pet)
+					end
 				end
 			end
 		end
@@ -227,6 +245,7 @@ local function App(props)
 				key = "EggRoll",
 				roll = state.eggRoll,
 				pet = revealPet,
+				pets = revealPets,
 				onDismiss = actions.dismissEggRoll,
 			})
 			else nil,

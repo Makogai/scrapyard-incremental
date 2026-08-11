@@ -279,26 +279,51 @@ function Progression.AchievementCard(props)
 					zIndex = 4,
 				})
 				else nil,
-			--- Done marker, right-hand side, replacing nothing: the space is empty while incomplete.
+			--[[
+				DONE, AND IT MUST NOT LOOK PRESSABLE.
+
+				This was `Indicators.Checkmark` -- a green disc with a tick -- and on a card with a real button
+				elsewhere in the game that reads as "click to claim". Nothing here is clickable: the reward is
+				already paid.
+
+				So the marker is a word, not a control. A quiet EARNED in the accent colour, with the tick as a
+				plain glyph beside it and no plate behind either: nothing to press, and it says what happened
+				rather than leaving the player to infer it from a symbol.
+			]]
 			if complete
 				then e(P.Group, {
 					key = "Done",
-					size = UDim2.fromOffset(92, 92),
-					position = UDim2.new(1, -14, 0.5, 0),
+					size = UDim2.fromOffset(96, 64),
+					position = UDim2.new(1, -12, 0.5, 0),
 					anchorPoint = Vector2.new(1, 0.5),
 					zIndex = 5,
 					children = {
 						e("UIScale", {
 							key = "Breathe",
 							Scale = pulse:map(function(angle: number)
-								return 1 + math.sin(math.rad(angle)) * 0.04
+								return 1 + math.sin(math.rad(angle)) * 0.02
 							end),
 						}),
-						e(Indicators.Checkmark, {
+						e(Icon, {
 							key = "Tick",
-							extent = 52,
-							position = UDim2.fromScale(0.5, 0.5),
+							glyph = "check",
+							plain = true,
+							glyphColor = accent,
+							size = UDim2.fromOffset(30, 30),
+							position = UDim2.fromScale(0.5, 0.3),
 							anchorPoint = Vector2.new(0.5, 0.5),
+							zIndex = 2,
+						}),
+						e(P.Label, {
+							key = "Word",
+							text = "EARNED",
+							textSize = Theme.TextSize.Tiny,
+							font = Theme.Font.Bold,
+							color = accent,
+							size = UDim2.new(1, 0, 0, 18),
+							position = UDim2.fromScale(0.5, 0.72),
+							anchorPoint = Vector2.new(0.5, 0.5),
+							zIndex = 2,
 						}),
 					},
 				})

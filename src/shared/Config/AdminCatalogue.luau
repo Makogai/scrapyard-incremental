@@ -24,6 +24,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
@@ -245,6 +246,36 @@ function AdminCatalogue.build(): { AdminSection }
 		asks twice before sending it -- the server also refuses it outside Studio and for any target
 		other than yourself.
 	]]
+	--[[
+		Game passes, as entitlements.
+
+		The panel could already hand out every consumable, magnet, pet, spin and title but not the one
+		category that costs real money -- which made testing anything gated behind a pass impossible
+		without buying it. Granting here writes the same `Entitlements` flag a receipt does, so what is
+		being tested is the real unlocked state rather than a lookalike.
+	]]
+	local entitlements: { AdminEntry } = {}
+	for _, passId in MonetizationConfig.PassOrder do
+		local definition = MonetizationConfig.Passes[passId]
+		if definition then
+			table.insert(entitlements, {
+				Id = passId,
+				Label = definition.DisplayName,
+				Command = "GrantEntitlement",
+				ItemId = passId,
+				Glyph = "robux",
+				Accent = "Pink",
+			})
+		end
+	end
+	table.insert(sections, {
+		Id = "passes",
+		Label = "PASSES",
+		Glyph = "robux",
+		Accent = "Pink",
+		Entries = entitlements,
+	})
+
 	--[[
 		Titles, in rarity order so the list reads the way the inventory tab does.
 

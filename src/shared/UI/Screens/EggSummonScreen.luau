@@ -37,6 +37,7 @@ local P = require(UI.Primitives)
 local Buttons = require(UI.Components.Buttons)
 local Overlays = require(UI.Components.Overlays)
 local ModelView = require(UI.Components.ModelView)
+local RobuxPrice = require(UI.Components.RobuxPrice)
 local SecretVFX = require(UI.Components.SecretVFX)
 
 local e = React.createElement
@@ -46,8 +47,8 @@ local e = React.createElement
 	row sit unevenly and read as a mistake rather than as emphasis. Extra width plus
 	its VFX layer is enough to carry the importance.
 ]]
-local CARD_HEIGHT = 200
-local CARD = Vector2.new(172, CARD_HEIGHT)
+local CARD_HEIGHT = 228
+local CARD = Vector2.new(196, CARD_HEIGHT)
 local SECRET_CARD = Vector2.new(268, CARD_HEIGHT)
 local GAP = 12
 --- Breathing room between the cards and the window edge.
@@ -191,6 +192,75 @@ local function EggSummonScreen(props)
 		end
 	end
 
+	--[[
+		THE MULTI-HATCH ROW: one button per tier, and the tier decides what the button IS.
+
+			owned      "x3" over the cash it costs -- pressing it opens three
+			not owned  the same button carrying a Robux price, which buys the pass
+
+		One control in two states rather than two controls, because they occupy the same place in the
+		player's head: "open more at once". A separate shop row for the passes would make buying them a
+		different errand from using them.
+
+		Smallest count first so the row reads x3 then x5 left to right, even though the config lists them
+		largest-first (which is the order the SERVER wants when picking the best a player owns).
+	]]
+	local batches = table.clone(state.hatchBatches or {})
+	table.sort(batches, function(a, b)
+		return a.count < b.count
+	end)
+
+	local batchButtons = {}
+	for index, batch in ipairs(batches) do
+		local batchCost = egg.price * batch.count
+		--- `state.cash`, the same field the single-summon affordability check above reads.
+		local canAfford = (state.cash or 0) >= batchCost
+		batchButtons[index] = e(P.Group, {
+			key = `Batch{batch.count}`,
+			size = UDim2.fromOffset(150, 88),
+			layoutOrder = 1 + index,
+			children = P.compact(
+				e(Buttons.Button, {
+					key = "Button",
+					text = `x{batch.count}`,
+					--- Owned: what it costs in cash. Not owned: nothing, the Robux tag says it.
+					subtext = if batch.owned then Format.money(batchCost) else "UNLOCK",
+					variant = if not unlocked
+						then "Disabled"
+						elseif batch.owned then "Purchase"
+						else "Premium",
+					disabled = not unlocked or (batch.owned and not canAfford),
+					textSize = Theme.TextSize.Heading,
+					subtextSize = Theme.TextSize.Small,
+					size = UDim2.fromScale(1, 1),
+					lip = 7,
+					onClick = function()
+						if batch.owned then
+							actions.summonEgg(egg.id, batch.count)
+						else
+							--- Passes go through the same prompt path as every other pass.
+							actions.purchase(batch.passId, "Pass")
+						end
+					end,
+				}),
+				--[[
+					The price tag, only while the tier is locked. `RobuxPrice`'s corner variant is safe here:
+					the footer does not clip, which is the condition rule 11 puts on anything rotated.
+				]]
+				if batch.owned
+					then nil
+					else e(RobuxPrice.Tag, {
+						key = "Price",
+						amount = batch.price,
+						variant = "corner",
+						position = UDim2.new(1, 8, 1, 6),
+						anchorPoint = Vector2.new(1, 1),
+						zIndex = 8,
+					})
+			),
+		})
+	end
+
 	return e(Overlays.Modal, {
 		key = props.key or "EggSummonScreen",
 		title = egg.name,
@@ -203,24 +273,23 @@ local function EggSummonScreen(props)
 		width = CARD.X * 2 + SECRET_CARD.X + GAP * 2 + INSET * 2 + 44,
 		contentHeight = CARD_HEIGHT * 2 + GAP + INSET * 2,
 		onClose = actions.closeEggSummon,
-		footerHeight = 96,
+		--[[
+			Taller footer than the single button needed, because the multi-hatch row lives here: either the
+			x3/x5 buttons a player owns, or the Robux tags to buy them.
+		]]
+		footerHeight = 118,
 		footer = e(P.Group, {
 			key = "Footer",
 			size = UDim2.fromScale(1, 1),
 			children = {
 				--[[
-					The egg, small, beside the button: it ties the price to the thing being
-					opened without taking room from the cards.
+					THE LITTLE SPINNING EGG USED TO SIT HERE and it is gone, because the footer now holds three
+					buttons instead of one: SUMMON plus the two multi-hatch tiers. With them in place the egg
+					was overlapped by the row and read as a rendering fault.
+
+					Nothing is lost. The window's header names the egg and every card below is its contents --
+					the preview was decoration on a screen that is already entirely about this one egg.
 				]]
-				e(ModelView.View, {
-					key = "Egg",
-					kind = "egg",
-					model = egg.model,
-					spin = 30,
-					size = UDim2.fromOffset(88, 88),
-					position = UDim2.new(0, 10, 0.5, 0),
-					anchorPoint = Vector2.new(0, 0.5),
-				}),
 				--[[
 					The primary action, and it should look like one. `subtextSize` puts the
 					price at heading weight directly under the label -- it used to inherit
@@ -234,7 +303,7 @@ local function EggSummonScreen(props)
 				]]
 				e(P.Group, {
 					key = "Actions",
-					size = UDim2.new(1, -200, 1, 0),
+					size = UDim2.new(1, -36, 1, 0),
 					position = UDim2.fromScale(0.5, 0.5),
 					anchorPoint = Vector2.new(0.5, 0.5),
 					layout = P.list({
@@ -243,7 +312,7 @@ local function EggSummonScreen(props)
 						hAlign = Enum.HorizontalAlignment.Center,
 						vAlign = Enum.VerticalAlignment.Center,
 					}),
-					children = {
+					children = P.append({
 						e(Buttons.Button, {
 							key = "Summon",
 							text = if unlocked then "SUMMON" else "AREA LOCKED",
@@ -253,14 +322,14 @@ local function EggSummonScreen(props)
 							textSize = Theme.TextSize.Title,
 							subtextSize = Theme.TextSize.Heading,
 							subtextFont = Theme.Font.Display,
-							size = UDim2.fromOffset(300, 82),
+							size = UDim2.fromOffset(276, 88),
 							layoutOrder = 1,
 							lip = 7,
 							onClick = function()
 								actions.summonEgg(egg.id)
 							end,
 						}),
-					},
+					}, batchButtons),
 				}),
 			},
 		}),

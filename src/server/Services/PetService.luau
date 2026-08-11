@@ -170,7 +170,7 @@ function PetService.Start()
 	publishPetModels()
 	local actionRemote = RemoteService.GetEvent("PetAction")
 	local resultRemote = RemoteService.GetEvent("PetResult")
-	actionRemote.OnServerEvent:Connect(function(player, action, targetId)
+	actionRemote.OnServerEvent:Connect(function(player, action, targetId, count)
 		if
 			typeof(action) ~= "string"
 			or typeof(targetId) ~= "string"
@@ -178,9 +178,15 @@ function PetService.Start()
 		then
 			return
 		end
-		local success, message, petId
+		local success, message, petIds
 		if action == "OpenEgg" then
-			success, message, petId = PlayerStateService.TryOpenEgg(player, targetId)
+			--[[
+				`count` is the batch size and arrives from the client, so it is validated as a number here
+				and validated as an ENTITLEMENT in `TryOpenEgg`. Anything unexpected falls back to one --
+				the safe direction, since one is what every player is allowed.
+			]]
+			local batch = if typeof(count) == "number" then math.floor(count) else 1
+			success, message, petIds = PlayerStateService.TryOpenEgg(player, targetId, batch)
 		elseif action == "EquipPet" then
 			success, message = PlayerStateService.TryEquipPet(player, targetId)
 		elseif action == "UnequipPet" then
@@ -197,15 +203,26 @@ function PetService.Start()
 			which put every pet message on screen twice -- two identical warnings for
 			one failed equip. The client turns this single result into one toast.
 		]]
-		resultRemote:FireClient(player, success, message, petId)
+		--- The list, not one id: the reveal draws every pet the batch produced.
+		resultRemote:FireClient(player, success, message, petIds)
 
 		--[[
 			A Secret hatch is the one pet event worth interrupting everyone for, so
 			it goes out on `Announce` as well. The client decides how to draw it; the
 			server only says what happened and to whom.
 		]]
-		if success and action == "OpenEgg" and petId then
-			local definition = PetConfig.Pets[petId]
+		if success and action == "OpenEgg" and petIds then
+			--- Any Secret in the batch is worth the announcement, so the whole list is checked.
+			local secretId = nil
+			for _, candidate in petIds do
+				local candidateDefinition = PetConfig.Pets[candidate]
+				if candidateDefinition and candidateDefinition.Rarity == "Secret" then
+					secretId = candidate
+					break
+				end
+			end
+			local petId = secretId
+			local definition = if petId then PetConfig.Pets[petId] else nil
 			if definition and definition.Rarity == "Secret" then
 				RemoteService.GetEvent("Announce"):FireAllClients({
 					Kind = "SecretPet",

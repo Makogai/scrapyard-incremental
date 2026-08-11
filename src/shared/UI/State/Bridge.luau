@@ -191,8 +191,9 @@ function Bridge.petAction(action: string, petId: string?)
 	fire("PetAction", action, petId)
 end
 
-function Bridge.openEgg(eggId: string)
-	fire("PetAction", "OpenEgg", eggId)
+--- `count` is the hatch batch size; the server checks the entitlement behind it and clamps.
+function Bridge.openEgg(eggId: string, count: number?)
+	fire("PetAction", "OpenEgg", eggId, count or 1)
 end
 
 function Bridge.redeemCode(code: string)
@@ -333,7 +334,16 @@ function Bridge.start(): boolean
 	]]
 	local petResult = folder:FindFirstChild("PetResult")
 	if petResult and petResult:IsA("RemoteEvent") then
-		petResult.OnClientEvent:Connect(function(success: boolean, message: string, petId: string?)
+		petResult.OnClientEvent:Connect(function(success: boolean, message: string, petIds: any)
+			--[[
+				A LIST now, because a hatch can open three or five at once. A single id is still accepted so
+				an older server -- or any other caller of `PetResult` -- keeps working.
+			]]
+			local ids = if typeof(petIds) == "table"
+				then petIds
+				elseif typeof(petIds) == "string" then { petIds }
+				else nil
+			local petId = if ids then ids[1] else nil
 			local roll = Atoms.eggRoll()
 			if roll ~= nil then
 				if success and petId then
@@ -348,6 +358,7 @@ function Bridge.start(): boolean
 								EggId = current.EggId,
 								Phase = "revealed",
 								PetId = petId,
+								PetIds = ids,
 							})
 						end
 					end)

@@ -74,17 +74,21 @@ local function ShakingEgg(props)
 		end
 	end, {})
 
+	local batch = props.count or 1
+
 	return e(P.Group, {
 		key = props.key or "ShakingEgg",
-		size = UDim2.fromOffset(280, 280),
+		size = UDim2.fromOffset(280, 340),
 		position = UDim2.fromScale(0.5, 0.46),
 		anchorPoint = Vector2.new(0.5, 0.5),
 		zIndex = 6,
-		children = {
+		children = P.compact(
 			e("Frame", {
 				key = "Pivot",
 				BackgroundTransparency = 1,
-				Size = UDim2.fromScale(1, 1),
+				Size = UDim2.fromOffset(280, 280),
+				Position = UDim2.fromScale(0.5, 0),
+				AnchorPoint = Vector2.new(0.5, 0),
 				Rotation = rotation,
 			}, {
 				e(ModelView.View, {
@@ -95,7 +99,24 @@ local function ShakingEgg(props)
 					glyph = "crate",
 				}),
 			}),
-		},
+			--[[
+				Only for a multi-hatch. A single egg needs no caption -- the player pressed SUMMON and an egg
+				is shaking -- but a batch should say so before the reveal, or three pets arriving looks like a
+				bug rather than the thing that was bought.
+			]]
+			if batch > 1
+				then e(P.Label, {
+					key = "Batch",
+					text = `OPENING {batch} EGGS`,
+					textSize = Theme.TextSize.Heading,
+					color = Theme.Color.White,
+					size = UDim2.new(1, 0, 0, 38),
+					position = UDim2.fromScale(0.5, 1),
+					anchorPoint = Vector2.new(0.5, 1),
+					zIndex = 7,
+				})
+				else nil
+		),
 	})
 end
 
@@ -180,8 +201,175 @@ local function Reveal(props)
 end
 
 --[[
+	ONE PET OF MANY.
+
+	A cut-down `Reveal`: the model, the name and the rarity, with no burst ring and no dismiss line --
+	three or five bursts firing at once is noise, and one dismiss hint belongs to the screen rather than
+	to every card on it.
+
+	Sized from the batch. Three pets get room to be looked at; five have to give some of it back, and the
+	alternative -- a fixed card that fits five -- would waste half the screen on three.
+]]
+local function PetInBatch(props)
+	local pet = props.pet
+	local style = Theme.rarity(pet.rarity)
+	local extent = props.extent
+
+	return e(P.Group, {
+		key = props.key,
+		size = UDim2.fromOffset(extent, extent + 84),
+		layoutOrder = props.layoutOrder,
+		children = {
+			--- A soft disc in the rarity colour, so a Legendary still reads as one at this size.
+			e("Frame", {
+				key = "Halo",
+				BackgroundColor3 = style.color,
+				BackgroundTransparency = 0.72,
+				BorderSizePixel = 0,
+				Size = UDim2.fromOffset(extent * 0.86, extent * 0.86),
+				Position = UDim2.fromScale(0.5, 0.44),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				ZIndex = 2,
+			}, { P.corner(999) }),
+			e(ModelView.View, {
+				key = "Pet",
+				kind = "pet",
+				model = pet.model,
+				spin = 55,
+				glyph = "paw",
+				size = UDim2.fromOffset(extent, extent),
+				position = UDim2.fromScale(0.5, 0),
+				anchorPoint = Vector2.new(0.5, 0),
+				zIndex = 5,
+			}),
+			e(P.Label, {
+				key = "Name",
+				text = pet.name,
+				textSize = Theme.TextSize.Body,
+				gradient = style.gradient,
+				truncate = Enum.TextTruncate.AtEnd,
+				size = UDim2.new(1, 0, 0, 28),
+				position = UDim2.new(0.5, 0, 0, extent + 6),
+				anchorPoint = Vector2.new(0.5, 0),
+				zIndex = 7,
+			}),
+			e(Indicators.RarityBadge, {
+				key = "Rarity",
+				rarity = pet.rarity,
+				textSize = Theme.TextSize.Tiny,
+				size = UDim2.fromOffset(math.min(150, extent), 26),
+				position = UDim2.new(0.5, 0, 0, extent + 40),
+				anchorPoint = Vector2.new(0.5, 0),
+				zIndex = 7,
+			}),
+		},
+	})
+end
+
+--[[
+	The whole batch, in one row.
+
+	One burst behind the lot rather than one each: the moment is "look what came out of these", and five
+	competing rings turn it into a strobe. The rarest pet in the batch picks the burst colour, so a Secret
+	among five commons still announces itself.
+]]
+local function BatchReveal(props)
+	local pets = props.pets
+	local burst = Motion.useEntrance(Motion.Spring.Slow)
+
+	--- Card size falls as the batch grows; five across still has to fit a phone in landscape.
+	local extent = if #pets >= 5 then 168 else 220
+	--- `PetRarityOrder` is the ranking; an unknown rarity sorts lowest rather than erroring.
+	local function rank(rarity: string): number
+		local index = table.find(Theme.PetRarityOrder, rarity)
+		return if index then index else 0
+	end
+
+	local best = pets[1]
+	for _, pet in ipairs(pets) do
+		if rank(pet.rarity) > rank(best.rarity) then
+			best = pet
+		end
+	end
+	local style = Theme.rarity(best.rarity)
+
+	React.useEffect(function()
+		Sound.play(if best.rarity == "Secret" then "secret" else "poof")
+	end, {})
+
+	local cards = {}
+	for index, pet in ipairs(pets) do
+		cards[index] = e(PetInBatch, {
+			key = `Pet{index}`,
+			pet = pet,
+			extent = extent,
+			layoutOrder = index,
+		})
+	end
+
+	return e(P.Group, {
+		key = props.key or "BatchReveal",
+		size = UDim2.fromOffset(#pets * (extent + 16) + 40, extent + 190),
+		position = UDim2.fromScale(0.5, 0.46),
+		anchorPoint = Vector2.new(0.5, 0.5),
+		zIndex = 6,
+		children = {
+			e("Frame", {
+				key = "Burst",
+				BackgroundColor3 = style.color,
+				BackgroundTransparency = burst:map(function(value: number)
+					return 0.45 + value * 0.55
+				end),
+				BorderSizePixel = 0,
+				Size = burst:map(function(value: number)
+					local size = 160 + value * 620
+					return UDim2.fromOffset(size, size)
+				end),
+				Position = UDim2.fromScale(0.5, 0.45),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				ZIndex = 1,
+			}, { P.corner(999) }),
+			e(P.Label, {
+				key = "Heading",
+				text = `{#pets} PETS HATCHED`,
+				textSize = Theme.TextSize.Heading,
+				color = Theme.Color.White,
+				size = UDim2.new(1, 0, 0, 34),
+				position = UDim2.fromScale(0.5, 0.02),
+				anchorPoint = Vector2.new(0.5, 0),
+				zIndex = 7,
+			}),
+			e(P.Group, {
+				key = "Row",
+				size = UDim2.new(1, 0, 0, extent + 84),
+				position = UDim2.fromScale(0.5, 0.5),
+				anchorPoint = Vector2.new(0.5, 0.5),
+				layout = P.list({
+					direction = Enum.FillDirection.Horizontal,
+					padding = 16,
+					hAlign = Enum.HorizontalAlignment.Center,
+					vAlign = Enum.VerticalAlignment.Center,
+				}),
+				children = cards,
+				zIndex = 6,
+			}),
+			e(P.Label, {
+				key = "Dismiss",
+				text = "click anywhere to continue",
+				textSize = Theme.TextSize.Small,
+				color = Theme.Color.GrayDark,
+				size = UDim2.new(1, 0, 0, 22),
+				position = UDim2.fromScale(0.5, 0.98),
+				anchorPoint = Vector2.new(0.5, 1),
+				zIndex = 7,
+			}),
+		},
+	})
+end
+
+--[[
 	props:
-		roll     { EggId, Phase, PetId? } from the `eggRoll` atom
+		roll     { EggId, Phase, PetId?, PetIds? } from the `eggRoll` atom
 		pet      resolved pet record for `PetId`, when revealed
 		onDismiss
 ]]
@@ -191,7 +379,14 @@ local function EggRollOverlay(props)
 		return nil
 	end
 
-	local revealed = roll.Phase == "revealed" and props.pet ~= nil
+	--[[
+		One pet or several. `props.pets` is resolved by the caller from `roll.PetIds`; a single hatch keeps
+		the original full-size `Reveal`, because shrinking it to fit a row it does not need would make every
+		normal hatch worse to look at.
+	]]
+	local pets = props.pets
+	local batched = pets ~= nil and #pets > 1
+	local revealed = roll.Phase == "revealed" and (props.pet ~= nil or batched)
 
 	return e(P.Group, {
 		key = props.key or "EggRoll",
@@ -209,9 +404,10 @@ local function EggRollOverlay(props)
 				zIndex = 1,
 				onClick = if revealed then props.onDismiss else nil,
 			}),
-			if revealed
-				then e(Reveal, { key = "Reveal", pet = props.pet })
-				else e(ShakingEgg, { key = "Egg", eggId = roll.EggId })
+			if revealed and batched
+				then e(BatchReveal, { key = "Batch", pets = pets })
+				elseif revealed then e(Reveal, { key = "Reveal", pet = props.pet })
+				else e(ShakingEgg, { key = "Egg", eggId = roll.EggId, count = roll.Count })
 		),
 	})
 end

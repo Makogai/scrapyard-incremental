@@ -1176,6 +1176,17 @@ function PlayerStateService.AdminMutate(
 		end
 		data.OwnedPets[itemId] =
 			math.min(PetConfig.MaximumOwnedPerPet, (data.OwnedPets[itemId] or 0) + grant)
+	elseif command == "GrantEntitlement" then
+		local definition = if itemId then MonetizationConfig.Passes[itemId] else nil
+		if definition == nil then
+			return false, "Unknown pass ID"
+		end
+		--[[
+			The same flag a receipt sets. Deliberately NOT routed through `GrantEntitlement`, which also
+			records a receipt id -- an admin grant is not a purchase, and writing a fake receipt would make
+			the player's purchase history a lie.
+		]]
+		data.Entitlements[definition.Id] = true
 	elseif command == "GrantTitle" then
 		local definition = if itemId then TitleConfig.resolve(itemId) else nil
 		if definition == nil then
@@ -1217,50 +1228,105 @@ function PlayerStateService.AdminMutate(
 	return true, `{command} applied to {player.DisplayName}`
 end
 
-function PlayerStateService.TryOpenEgg(player: Player, eggId: string): (boolean, string, string?)
+--[[
+	How many eggs this player may open at once, and whether a requested count is allowed.
+
+	The entitlement is checked here rather than trusted from the client, because the count arrives over
+	a remote and "open five" is worth lying about.
+]]
+local function batchAllowed(data: { [string]: any }, count: number): boolean
+	if count == 1 then
+		return true
+	end
+	for _, batch in PetConfig.HatchBatches do
+		if batch.Count == count then
+			return data.Entitlements[batch.Entitlement] == true
+		end
+	end
+	return false
+end
+
+function PlayerStateService.TryOpenEgg(
+	player: Player,
+	eggId: string,
+	count: number?
+): (boolean, string, { string }?)
 	local session = sessions[player]
 	local egg = PetConfig.Eggs[eggId]
 	if session == nil or egg == nil then
 		return false, "Egg unavailable", nil
 	end
 	local data = session.Data
+	local batch = math.floor(count or 1)
+	if not batchAllowed(data, batch) then
+		return false, "You do not own that multi-hatch", nil
+	end
+
 	local ownedCount = 0
 	for _, amount in data.OwnedPets do
 		ownedCount += amount
 	end
-	if ownedCount >= PetConfig.BaseStorageCapacity then
-		return false, "Pet storage is full", nil
+
+	--[[
+		EVERY CHECK IS FOR THE WHOLE BATCH, and it is all-or-nothing.
+
+		Opening three when there is room for two, or cash for two, would leave the player having paid for
+		something they did not get. So the batch is rejected outright and the message says which limit
+		bit -- a partial hatch is a support ticket.
+	]]
+	local space = PetConfig.BaseStorageCapacity - ownedCount
+	if space < batch then
+		return false,
+			if space <= 0
+				then "Pet storage is full"
+				else `Only room for {space} more pet{if space == 1 then "" else "s"}`,
+			nil
 	end
 	if data.UnlockedAreas[egg.RequiredArea] ~= true then
 		return false, "Unlock this egg's area first", nil
 	end
-	if data.Money < egg.Price then
+	local totalPrice = egg.Price * batch
+	if data.Money < totalPrice then
 		return false, "Not enough Scrap Cash", nil
 	end
-	data.Money -= egg.Price
-	local nextOpenCount = (data.EggOpenCounts[eggId] or 0) + 1
-	local wonPetId
-	if nextOpenCount % PetConfig.SecretPityRolls == 0 then
-		wonPetId = egg.PetIds[6]
-	elseif nextOpenCount % PetConfig.LegendaryPityRolls == 0 then
-		wonPetId = if math.random(1, 10) == 1 then egg.PetIds[6] else egg.PetIds[5]
-	else
-		local roll = math.random(1, PetConfig.RollTotal)
-		local cursor = 0
-		wonPetId = egg.PetIds[1]
-		for _, petId in egg.PetIds do
-			cursor += PetConfig.Pets[petId].RollWeight
-			if roll <= cursor then
-				wonPetId = petId
-				break
+
+	--[[
+		Rolled one at a time so the PITY COUNTERS advance across the batch exactly as they would across
+		that many single presses. A batch that rolled once and multiplied the result would hand out three
+		identical pets and quietly break both pity rules.
+	]]
+	data.Money -= totalPrice
+	local wonPetIds = {}
+	for _ = 1, batch do
+		local nextOpenCount = (data.EggOpenCounts[eggId] or 0) + 1
+		local wonPetId
+		if nextOpenCount % PetConfig.SecretPityRolls == 0 then
+			wonPetId = egg.PetIds[6]
+		elseif nextOpenCount % PetConfig.LegendaryPityRolls == 0 then
+			wonPetId = if math.random(1, 10) == 1 then egg.PetIds[6] else egg.PetIds[5]
+		else
+			local roll = math.random(1, PetConfig.RollTotal)
+			local cursor = 0
+			wonPetId = egg.PetIds[1]
+			for _, petId in egg.PetIds do
+				cursor += PetConfig.Pets[petId].RollWeight
+				if roll <= cursor then
+					wonPetId = petId
+					break
+				end
 			end
 		end
+		data.OwnedPets[wonPetId] =
+			math.min(PetConfig.MaximumOwnedPerPet, (data.OwnedPets[wonPetId] or 0) + 1)
+		data.EggOpenCounts[eggId] = nextOpenCount
+		table.insert(wonPetIds, wonPetId)
 	end
-	data.OwnedPets[wonPetId] =
-		math.min(PetConfig.MaximumOwnedPerPet, (data.OwnedPets[wonPetId] or 0) + 1)
-	data.EggOpenCounts[eggId] = nextOpenCount
+
 	pushState(player, data)
-	return true, `{PetConfig.Pets[wonPetId].DisplayName} hatched!`, wonPetId
+	local message = if batch == 1
+		then `{PetConfig.Pets[wonPetIds[1]].DisplayName} hatched!`
+		else `{batch} pets hatched!`
+	return true, message, wonPetIds
 end
 
 function PlayerStateService.TryEquipPet(player: Player, petId: string): (boolean, string)

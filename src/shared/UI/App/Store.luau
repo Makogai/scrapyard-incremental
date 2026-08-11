@@ -41,6 +41,8 @@ local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
 local AchievementConfig = require(ReplicatedStorage.Shared.Config.AchievementConfig)
 local AchievementRules = require(ReplicatedStorage.Shared.Utility.AchievementRules)
+local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
 local TutorialConfig = require(ReplicatedStorage.Shared.Config.TutorialConfig)
 local React = require(ReplicatedStorage.Packages.React)
@@ -178,12 +180,14 @@ local function localActions()
 		purpose: the shake is the round trip, so it has to begin before the request
 		rather than after the answer.
 	]]
-	function self.summonEgg(eggId: string)
+	--- `count` is the batch size; 1 when the caller does not ask for a multi-hatch.
+	function self.summonEgg(eggId: string, count: number?)
 		if Atoms.eggRoll() ~= nil then
 			return
 		end
-		Atoms.eggRoll({ EggId = eggId, Phase = "shaking" })
-		Bridge.openEgg(eggId)
+		--- The batch is recorded on the roll so the reveal knows how many pets to expect.
+		Atoms.eggRoll({ EggId = eggId, Phase = "shaking", Count = count or 1 })
+		Bridge.openEgg(eggId, count)
 	end
 
 	function self.dismissEggRoll()
@@ -293,8 +297,12 @@ local function liveActions()
 		Bridge.petAction("BuyPetSlot", "slot")
 	end
 
-	function self.hatchEgg(eggId: string)
-		Bridge.openEgg(eggId)
+	--[[
+		`count` is the batch: 1, or 3/5 with the matching pass. The server re-checks the entitlement, so
+		this passes the number straight through rather than gating it here.
+	]]
+	function self.hatchEgg(eggId: string, count: number?)
+		Bridge.openEgg(eggId, count)
 	end
 
 	--[[
@@ -401,43 +409,23 @@ local function liveActions()
 		Bridge.requestTeleport("MyCrusher")
 	end
 
-	-- Present in the kit but meaningless against a live server.
 	--[[
-		Stories have no server, so mock mode plays the server's half of the roll
-		itself: pick from the egg's real weights and reveal after the same beat.
+		A MOCK `summonEgg` USED TO SIT HERE, INSIDE THE LIVE ACTIONS, and it shadowed the real one in
+		`localActions`. Its own comment said "mock mode plays the server's half of the roll itself", which
+		is exactly what it did -- in the live game:
+
+			- it rolled the pet ON THE CLIENT from the egg's weights
+			- it wrote the win straight into the `ownedPets` atom
+			- it never sent `OpenEgg`, so the server granted nothing and charged nothing
+
+		A player hatched, saw a pet, saw it in their inventory, and lost it on rejoin. Cash was never
+		deducted either. It was found while wiring the multi-hatch: the x3 button reached this instead of
+		the real action, so the server never heard about the batch.
+
+		Moved rather than fixed in place. `localActions.summonEgg` is the real one -- it fires the remote and
+		lets `PetResult` drive the reveal -- and the rolling version now sits in `mockActions`, which is the
+		only place that should ever pretend to be a server.
 	]]
-	function self.summonEgg(eggId: string)
-		if Atoms.eggRoll() ~= nil then
-			return
-		end
-		Atoms.eggRoll({ EggId = eggId, Phase = "shaking" })
-
-		local egg = GameData.eggRoll(eggId)
-		if egg == nil then
-			return
-		end
-		local roll = math.random()
-		local cursor = 0
-		local won = egg.pets[1]
-		for _, pet in ipairs(egg.pets) do
-			cursor += pet.chance
-			if roll <= cursor then
-				won = pet
-				break
-			end
-		end
-
-		task.delay(1.4, function()
-			local current = Atoms.eggRoll()
-			if current ~= nil and current.Phase == "shaking" then
-				local owned = table.clone(Atoms.ownedPets())
-				owned[won.id] = (owned[won.id] or 0) + 1
-				Atoms.ownedPets(owned)
-				Atoms.eggRoll({ EggId = eggId, Phase = "revealed", PetId = won.id })
-			end
-		end)
-	end
-
 	function self.collect() end
 	function self.grant() end
 	function self.reset() end
@@ -454,6 +442,63 @@ end
 ]]
 local function mockActions()
 	local self = localActions()
+
+	--[[
+		Stories have no server, so mock mode plays the server's half of the roll itself: pick from the
+		egg's real weights and reveal after the same beat.
+
+		This is where that code belongs, and where it now lives -- it used to sit in `liveActions`, where it
+		shadowed the real one and quietly made hatching a client-side fiction. See the note there.
+
+		Batch aware, so the multi-hatch reveal can be reviewed in a story: `count` rolls that many pets and
+		hands the overlay a list, exactly as `PetResult` does in game.
+	]]
+	function self.summonEgg(eggId: string, count: number?)
+		if Atoms.eggRoll() ~= nil then
+			return
+		end
+		local batch = math.max(1, count or 1)
+		Atoms.eggRoll({ EggId = eggId, Phase = "shaking", Count = batch })
+
+		local egg = GameData.eggRoll(eggId)
+		if egg == nil then
+			return
+		end
+
+		local won = {}
+		for _ = 1, batch do
+			local roll = math.random()
+			local cursor = 0
+			local pick = egg.pets[1]
+			for _, pet in ipairs(egg.pets) do
+				cursor += pet.chance
+				if roll <= cursor then
+					pick = pet
+					break
+				end
+			end
+			table.insert(won, pick)
+		end
+
+		task.delay(1.4, function()
+			local current = Atoms.eggRoll()
+			if current ~= nil and current.Phase == "shaking" then
+				local owned = table.clone(Atoms.ownedPets())
+				local ids = {}
+				for _, pet in ipairs(won) do
+					owned[pet.id] = (owned[pet.id] or 0) + 1
+					table.insert(ids, pet.id)
+				end
+				Atoms.ownedPets(owned)
+				Atoms.eggRoll({
+					EggId = eggId,
+					Phase = "revealed",
+					PetId = ids[1],
+					PetIds = ids,
+				})
+			end
+		end)
+	end
 
 	function self.buyUpgrade(upgradeId: string)
 		local levels = table.clone(Atoms.upgradeLevels())
@@ -862,6 +907,23 @@ function Store.use()
 		end
 	end
 
+	--[[
+		Which multi-hatch tiers are unlocked, and what each one costs to buy if not.
+
+		Largest first, matching the config, so the window offers the biggest the player owns and the
+		cheapest they do not.
+	]]
+	local hatchBatches = {}
+	for index, batch in ipairs(PetConfig.HatchBatches) do
+		local pass = MonetizationConfig.Passes[batch.Entitlement]
+		hatchBatches[index] = {
+			count = batch.Count,
+			passId = batch.Entitlement,
+			owned = entitlements[batch.Entitlement] == true,
+			price = if pass then pass.DisplayPrice else 0,
+		}
+	end
+
 	local event = nil
 	local nextEvent = nil
 	if activeEvent and activeEvent.Id then
@@ -933,6 +995,12 @@ function Store.use()
 		petSlots = maximumEquippedPets,
 		discoveredScrap = discoveredScrap,
 		settings = settings,
+
+		--[[
+			Hatch batches this player may use. Built from `PetConfig.HatchBatches`, so a new tier is a config
+			entry and a pass -- not an edit to the egg window.
+		]]
+		hatchBatches = hatchBatches,
 
 		achievements = achievements,
 		achievementsUnlocked = AchievementRules.unlockedCount(

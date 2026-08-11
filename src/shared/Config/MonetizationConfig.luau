@@ -43,6 +43,31 @@ local passes = {
 		DisplayPrice = 249,
 		Color = Color3.fromRGB(91, 214, 246),
 	}),
+	--[[
+		MULTI-HATCH. Sold as passes rather than products because the value is permanent convenience --
+		a consumable "open three times" would be a worse deal for the player AND a worse business: this
+		is bought once and then used on every egg for the life of the account.
+
+		Priced under the pet passes on purpose. These buy TIME, not power: three hatches cost three
+		times the cash either way, so a player who buys this still pays full price for every pet. That
+		is what makes it fair to sell at all.
+	]]
+	TripleHatch = table.freeze({
+		Id = "TripleHatch",
+		MarketplaceId = 0,
+		DisplayName = "Triple Hatch",
+		Description = "Open three eggs at once, forever. Costs three eggs' cash.",
+		DisplayPrice = 199,
+		Color = Color3.fromRGB(91, 214, 246),
+	}),
+	PentaHatch = table.freeze({
+		Id = "PentaHatch",
+		MarketplaceId = 0,
+		DisplayName = "Penta Hatch",
+		Description = "Open five eggs at once, forever. Costs five eggs' cash.",
+		DisplayPrice = 349,
+		Color = Color3.fromRGB(139, 84, 246),
+	}),
 	SingularityPet = table.freeze({
 		Id = "SingularityPet",
 		MarketplaceId = 0,
@@ -171,6 +196,8 @@ return table.freeze({
 		"FastCollector",
 		"QuantumMagnet",
 		"ExtraPetSlots",
+		"TripleHatch",
+		"PentaHatch",
 		"SingularityPet",
 		"DemonicGhostPet",
 		"SinisterLordPet",
