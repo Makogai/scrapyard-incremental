@@ -454,17 +454,36 @@ end
 	is asserted in BOTH directions here, which is the only place it can be checked cheaply.
 ]]
 for _, title in ipairs(TitleConfig.Titles) do
-	expectEqual(
-		AchievementConfig.ById[title.Source] ~= nil,
-		true,
-		`title {title.Id} names a real achievement`
-	)
+	--[[
+		EARNED OR STAFF, never neither.
+
+		A title with no achievement and no staff flag is unreachable: it would sit in the list forever with
+		nothing that grants it, and nothing at runtime would complain. Staff titles are the one legitimate
+		exception -- they come from `AdminConfig`, not from play.
+	]]
+	if title.Staff == true then
+		expectEqual(title.Source, nil, `staff title {title.Id} names no achievement`)
+	else
+		expectEqual(
+			AchievementConfig.ById[title.Source] ~= nil,
+			true,
+			`title {title.Id} names a real achievement`
+		)
+	end
 	expectEqual(
 		TitleConfig.rarityRank(title.Rarity) > 0,
 		true,
 		`title {title.Id} has a known rarity`
 	)
-	expectEqual(#title.Text <= 20, true, `title {title.Id} is short enough to wear`)
+	--- Long enough for the decorated staff titles, short enough to sit over a head.
+	expectEqual(#title.Text <= 24, true, `title {title.Id} is short enough to wear`)
+	--- Whatever the accent resolves to must be a name the UI can turn into a colour.
+	local accent = TitleConfig.accent(title)
+	expectEqual(
+		typeof(accent) == "string" and #accent > 0,
+		true,
+		`title {title.Id} resolves an accent`
+	)
 end
 
 --- Every title is awarded by exactly one achievement, so none is unreachable or double-sourced.
@@ -482,7 +501,25 @@ for _, definition in ipairs(AchievementConfig.Definitions) do
 	end
 end
 for _, title in ipairs(TitleConfig.Titles) do
-	expectEqual(awardedBy[title.Id], title.Source, `title {title.Id} agrees with its source`)
+	if title.Staff == true then
+		--- Nothing in the achievement list may hand out a staff title.
+		expectEqual(awardedBy[title.Id], nil, `staff title {title.Id} is not an achievement reward`)
+	else
+		expectEqual(awardedBy[title.Id], title.Source, `title {title.Id} agrees with its source`)
+	end
+end
+
+--[[
+	The staff titles exist and are spelled the way the granting code expects.
+
+	`PlayerStateService.grantStaffTitles` looks them up by the literal ids "Admin" and "Owner". Renaming
+	one in the config without renaming it there would silently grant nothing -- the kind of break that
+	only shows up when an admin joins and has no title.
+]]
+for _, staffId in { "Admin", "Owner" } do
+	local definition = TitleConfig.ById[staffId]
+	expectEqual(definition ~= nil, true, `staff title {staffId} exists`)
+	expectEqual(definition.Staff, true, `staff title {staffId} is flagged staff`)
 end
 
 --[[

@@ -270,7 +270,7 @@ function AdminCatalogue.build(): { AdminSection }
 			Command = "GrantTitle",
 			ItemId = definition.Id,
 			Glyph = "trophy",
-			Accent = TitleConfig.RarityAccent[definition.Rarity] or "Gray",
+			Accent = TitleConfig.accent(definition),
 		})
 	end
 	table.insert(sections, {

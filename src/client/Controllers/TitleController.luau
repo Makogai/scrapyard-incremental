@@ -17,6 +17,16 @@
 	event board: it is attached to a character that does not exist until someone spawns, and respawning
 	rebuilds it. There is nothing for a designer to position -- the head decides where it goes.
 
+	SIZED IN STUDS, NOT PIXELS, so it behaves like a world object -- small when the camera is pulled back,
+	large up close. `BillboardGui.Size` reads its SCALE component as studs and its OFFSET component as
+	pixels, and an offset-sized plate is screen-locked: measured at 10 and 38 studs it came back the exact
+	same size on screen both times, which is what made a zoomed-out yard look like it was covered in
+	full-size labels.
+
+	Everything inside is therefore in scale units too, and the text uses `TextScaled` so it follows the
+	canvas rather than staying at a fixed pixel height inside a shrinking box. The TIER sizes are
+	fractions of the plate rather than TextSize values for the same reason.
+
 	TWO FORMS OF THE SAME TITLE. Chat gets `[SCRAP BARON]`, because a tag in a line of prose has to be
 	told apart from the message. Over a head it is just SCRAP BARON, dressed according to its rarity --
 	there is nothing to disambiguate from up there, and brackets make a title look like a placeholder.
@@ -53,12 +63,29 @@ local started = false
 	of the top tier has to stay in the region of a handful of tweens.
 ]]
 local TIERS = {
-	Common = { textSize = 14, gradient = false, scroll = false, glow = false, sparkles = 0 },
-	Rare = { textSize = 15, gradient = false, scroll = false, glow = false, sparkles = 0 },
-	Epic = { textSize = 16, gradient = true, scroll = false, glow = false, sparkles = 0 },
-	Legendary = { textSize = 18, gradient = true, scroll = false, glow = true, sparkles = 0 },
-	Mythic = { textSize = 19, gradient = true, scroll = true, glow = true, sparkles = 3 },
+	Common = { height = 0.62, gradient = false, scroll = false, glow = false, sparkles = 0 },
+	Rare = { height = 0.7, gradient = false, scroll = false, glow = false, sparkles = 0 },
+	Epic = { height = 0.78, gradient = true, scroll = false, glow = false, sparkles = 0 },
+	Legendary = { height = 0.88, gradient = true, scroll = false, glow = true, sparkles = 0 },
+	Mythic = { height = 0.95, gradient = true, scroll = true, glow = true, sparkles = 3 },
+	--[[
+		Staff. The one tier that cannot be earned, so it is allowed to be the loudest thing on screen: the
+		full treatment, faster sheen, and every sparkle slot filled.
+	]]
+	Staff = { height = 1, gradient = true, scroll = true, glow = true, sparkles = 3, fast = true },
 }
+
+--[[
+	The plate, in studs.
+
+	4.6 x 1.15 is what reproduced the old pixel size at about ten studs -- close enough that the change
+	reads as "it now shrinks", not "it changed size". The name takes the upper 45% and the title the lower
+	40%, and each tier fills a FRACTION of its lane, which is how "bigger is better" survives the move
+	away from pixel text sizes.
+]]
+local PLATE_STUDS = Vector2.new(4.6, 1.15)
+local NAME_LANE = 0.45
+local TITLE_LANE = 0.4
 
 local function tierFor(rarity: string?)
 	return TIERS[rarity or ""] or TIERS.Common
@@ -70,8 +97,7 @@ local function rarityColor(titleId: string?): Color3
 	if definition == nil then
 		return Theme.Color.Gray
 	end
-	local accentName = TitleConfig.RarityAccent[definition.Rarity] or "Gray"
-	return Theme.Color[accentName] or Theme.Color.Gray
+	return Theme.Color[TitleConfig.accent(definition)] or Theme.Color.Gray
 end
 
 --[[
@@ -173,7 +199,8 @@ local function buildSparkles(host: Frame, colour: Color3, count: number)
 		star.Name = `Sparkle{index}`
 		star.AnchorPoint = Vector2.new(0.5, 0.5)
 		star.Position = UDim2.fromScale(spot.x, spot.y)
-		star.Size = UDim2.fromOffset(3, 3)
+		--- Scale units, so a sparkle shrinks with the plate instead of becoming a dot the size of the text.
+		star.Size = UDim2.fromScale(0.02, 0.09)
 		star.BackgroundColor3 = colour
 		star.BackgroundTransparency = 1
 		star.BorderSizePixel = 0
@@ -196,7 +223,7 @@ local function buildSparkles(host: Frame, colour: Color3, count: number)
 					true,
 					index * 0.45
 				),
-				{ Size = UDim2.fromOffset(7, 7), BackgroundTransparency = 0.05 }
+				{ Size = UDim2.fromScale(0.045, 0.2), BackgroundTransparency = 0.05 }
 			)
 		)
 	end
@@ -236,16 +263,31 @@ local function paintTitle(block: Frame, titleId: string?)
 	local label = Instance.new("TextLabel")
 	label.Name = "Text"
 	label.BackgroundTransparency = 1
-	label.Size = UDim2.fromScale(1, 1)
+	--- The tier decides how much of the lane the text fills; `TextScaled` does the rest.
+	label.Size = UDim2.fromScale(1, tier.height)
+	label.Position = UDim2.fromScale(0.5, 0.5)
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
 	label.Font = Enum.Font.FredokaOne
-	label.TextSize = tier.textSize
+	label.TextScaled = true
 	label.TextColor3 = colour
 	label.Text = definition.Text
 	label.ZIndex = 3
 	label.Parent = block
 
+	--[[
+		The outline is a FRACTION of the rendered text, not a fixed pixel count.
+
+		`UIStroke.Thickness` is in pixels and does not follow `TextScaled`, so a fixed 3px outline turns a
+		distant title into a solid blob. `UITextSizeConstraint` is what makes the rendered size knowable
+		here: the cap is also the number the stroke is derived from.
+	]]
+	local constraint = Instance.new("UITextSizeConstraint")
+	constraint.MaxTextSize = 22
+	constraint.MinTextSize = 1
+	constraint.Parent = label
+
 	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = math.max(2, tier.textSize * 0.16)
+	stroke.Thickness = 2
 	stroke.Color = Theme.Color.Outline
 	stroke.Parent = label
 
@@ -270,7 +312,12 @@ local function paintTitle(block: Frame, titleId: string?)
 				block,
 				TweenService:Create(
 					gradient,
-					TweenInfo.new(2.4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1),
+					TweenInfo.new(
+						if tier.fast then 1.5 else 2.4,
+						Enum.EasingStyle.Linear,
+						Enum.EasingDirection.InOut,
+						-1
+					),
 					{ Offset = Vector2.new(1, 0) }
 				)
 			)
@@ -300,7 +347,8 @@ local function buildNameplate(character: Model, player: Player): BillboardGui?
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = NAMEPLATE
-	billboard.Size = UDim2.fromOffset(240, 62)
+	--- Studs, so perspective applies. See the note in the header.
+	billboard.Size = UDim2.fromScale(PLATE_STUDS.X, PLATE_STUDS.Y)
 	billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.7, 0)
 	billboard.AlwaysOnTop = false
 	billboard.MaxDistance = 90
@@ -318,16 +366,22 @@ local function buildNameplate(character: Model, player: Player): BillboardGui?
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Name = "PlayerName"
 	nameLabel.BackgroundTransparency = 1
-	nameLabel.Size = UDim2.new(1, 0, 0, 26)
+	nameLabel.Size = UDim2.fromScale(1, NAME_LANE)
 	nameLabel.Font = Enum.Font.FredokaOne
-	nameLabel.TextSize = 20
+	nameLabel.TextScaled = true
 	nameLabel.TextColor3 = Theme.Color.White
 	nameLabel.Text = player.DisplayName
 	nameLabel.LayoutOrder = 1
 	nameLabel.Parent = billboard
 
+	--- Caps how large the name gets up close; without it a nose-to-nose camera fills the screen with it.
+	local nameConstraint = Instance.new("UITextSizeConstraint")
+	nameConstraint.MaxTextSize = 24
+	nameConstraint.MinTextSize = 1
+	nameConstraint.Parent = nameLabel
+
 	local nameStroke = Instance.new("UIStroke")
-	nameStroke.Thickness = 3
+	nameStroke.Thickness = 2
 	nameStroke.Color = Theme.Color.Outline
 	nameStroke.Parent = nameLabel
 
@@ -338,7 +392,7 @@ local function buildNameplate(character: Model, player: Player): BillboardGui?
 	local block = Instance.new("Frame")
 	block.Name = "Title"
 	block.BackgroundTransparency = 1
-	block.Size = UDim2.new(1, 0, 0, 24)
+	block.Size = UDim2.fromScale(1, TITLE_LANE)
 	block.LayoutOrder = 2
 	block.Parent = billboard
 

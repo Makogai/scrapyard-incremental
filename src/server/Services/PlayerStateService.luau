@@ -17,6 +17,7 @@ local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
 local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
+local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PlayerDataSchema = require(ReplicatedStorage.Shared.Utility.PlayerDataSchema)
@@ -39,6 +40,8 @@ local notifyRemote: RemoteEvent?
 local gameplayEffect: RemoteEvent?
 local initialStateLimiter = RateLimiter.new(4, Environment.RemoteRateLimitWindowSeconds)
 local pushState: (Player, { [string]: any }) -> ()
+--- Defined with the rest of the title code, called from the load path above it.
+local grantStaffTitles: (Player, { [string]: any }) -> ()
 local saveSession: (Player, boolean) -> boolean
 
 local VARIANT_RANK = { Normal = 1, Rare = 2, Epic = 3, Legendary = 4, Nebula = 5 }
@@ -729,6 +732,7 @@ local function onPlayerAdded(player: Player)
 		Released = false,
 	}
 	player:SetAttribute("EquippedPets", HttpService:JSONEncode(data.EquippedPets))
+	grantStaffTitles(player, data)
 	local character = player.Character
 	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
 	if humanoid then
@@ -810,6 +814,45 @@ local function publishTitle(player: Player, data: { [string]: any })
 	local definition = TitleConfig.resolve(data.EquippedTitle)
 	player:SetAttribute("TitleId", if definition then definition.Id else "")
 	player:SetAttribute("TitleTag", TitleConfig.tag(data.EquippedTitle))
+end
+
+--[[
+	Staff titles, granted from WHO SOMEONE IS rather than what they did.
+
+	Checked on every load rather than once, because the answer can change without the player doing
+	anything -- an id added to `AdminConfig` should take effect on their next join with no migration and
+	no grant script. Revoking works the same way in reverse: the title is dropped from the held set, and
+	taken off if they were wearing it.
+
+	NOT auto-worn on grant. Someone who has picked SCRAPYARD LEGEND should keep it; the staff title is
+	there to be chosen. The exception is the usual one -- if they are wearing nothing, the best thing they
+	hold goes on, and for staff that is the staff title.
+]]
+grantStaffTitles = function(player: Player, data: { [string]: any })
+	local entitled = {
+		Admin = AdminConfig.IsAdmin(player.UserId),
+		Owner = AdminConfig.IsOwner(player.UserId),
+	}
+	local changed = false
+	for titleId, allowed in entitled do
+		if allowed and data.UnlockedTitles[titleId] ~= true then
+			data.UnlockedTitles[titleId] = true
+			changed = true
+			if data.EquippedTitle == "" then
+				data.EquippedTitle = titleId
+			end
+		elseif not allowed and data.UnlockedTitles[titleId] == true then
+			--- No longer staff: the title goes, and comes off if it was being worn.
+			data.UnlockedTitles[titleId] = nil
+			changed = true
+			if data.EquippedTitle == titleId then
+				data.EquippedTitle = ""
+			end
+		end
+	end
+	if changed then
+		publishTitle(player, data)
+	end
 end
 
 --[[

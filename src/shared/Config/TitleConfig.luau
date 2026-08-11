@@ -23,11 +23,19 @@ local TitleConfig = {}
 
 export type TitleDefinition = {
 	Id: string,
-	--- What everyone else reads, in brackets. Kept SHORT: it sits in a chat line and over a head.
+	--- What everyone else reads. Kept SHORT: it sits in a chat line and over a head.
 	Text: string,
 	Rarity: string,
-	--- The achievement that awards it.
-	Source: string,
+	--[[
+		The achievement that awards it, or nil for a STAFF title.
+
+		Staff titles are granted by who you are rather than what you did, so they have no achievement --
+		which is why `tests/` requires either a real `Source` or `Staff = true`, never neither.
+	]]
+	Source: string?,
+	Staff: boolean?,
+	--- Overrides the rarity's colour. Only used where two titles share a rarity but not a look.
+	Accent: string?,
 }
 
 --[[
@@ -36,7 +44,7 @@ export type TitleDefinition = {
 	The keys are `Theme` accent names, resolved by the UI -- this file names a look, it does not import
 	one, so it stays usable from the server where `Theme` has no business being required.
 ]]
-local RARITY_ORDER = { "Common", "Rare", "Epic", "Legendary", "Mythic" }
+local RARITY_ORDER = { "Common", "Rare", "Epic", "Legendary", "Mythic", "Staff" }
 
 local RARITY_ACCENT = table.freeze({
 	Common = "Gray",
@@ -44,6 +52,8 @@ local RARITY_ACCENT = table.freeze({
 	Epic = "Purple",
 	Legendary = "Gold",
 	Mythic = "Pink",
+	--- Overridden per title: ADMIN is red and OWNER is gold, and they share this rarity.
+	Staff = "Gold",
 })
 
 TitleConfig.RarityOrder = table.freeze(RARITY_ORDER)
@@ -120,6 +130,33 @@ local titles: { TitleDefinition } = {
 		Rarity = "Mythic",
 		Source = "RebirthFifty",
 	}),
+
+	--[[
+		STAFF. Not earnable, not listed to anyone who does not hold one, and granted from identity on
+		load -- see `AdminConfig.IsAdmin` / `IsOwner`.
+
+		THE DECORATIONS WERE CHOSEN BY LOOKING AT THEM. Fredoka One is missing most of the decorative
+		Unicode block: the queens (U+265B, U+2655), four-point stars (U+2726/7), diamonds (U+2756, U+25C6,
+		U+2666) and florets (U+273F, U+2736) all draw as nothing at all. `★` U+2605 and `⚡` U+26A1 render,
+		and the bolt comes through as a colour emoji, which is why ADMIN gets it.
+
+		Anything added here needs the same check -- a missing glyph is invisible, so it will not look
+		broken in code review, only in game.
+	]]
+	table.freeze({
+		Id = "Admin",
+		Text = "⚡ ADMIN ⚡",
+		Rarity = "Staff",
+		Staff = true,
+		Accent = "Red",
+	}),
+	table.freeze({
+		Id = "Owner",
+		Text = "★ OWNER ★",
+		Rarity = "Staff",
+		Staff = true,
+		Accent = "Gold",
+	}),
 }
 
 TitleConfig.Titles = table.freeze(titles)
@@ -150,6 +187,19 @@ function TitleConfig.tag(titleId: string?): string
 		return ""
 	end
 	return `[{definition.Text}]`
+end
+
+--[[
+	The accent name a title is drawn in: its own override, else its rarity's.
+
+	One function because three surfaces need the answer -- the card, the nameplate and the admin
+	catalogue -- and a fourth would otherwise reimplement the fallback slightly differently.
+]]
+function TitleConfig.accent(definition: TitleDefinition?): string
+	if definition == nil then
+		return "Gray"
+	end
+	return definition.Accent or RARITY_ACCENT[definition.Rarity] or "Gray"
 end
 
 --- Sort index, so a title list reads worst-to-best rather than in table order.

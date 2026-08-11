@@ -48,7 +48,15 @@ local TICK_SECONDS = 1
 --- Model names that count as an event billboard. The place file spells it with one L.
 local BILLBOARD_NAMES = { EventBilboard = true, EventBillboard = true }
 
-local cards: { { [string]: TextLabel } } = {}
+--[[
+	Cards keyed by the billboard model they belong to, NOT a flat list.
+
+	`StreamingEnabled` is on, so a billboard far from spawn is not on the client at all when this starts
+	and its GUI arrives whenever the player wanders close -- or is removed again when they wander off. A
+	flat list would collect dead references; a per-model cache can be re-resolved.
+]]
+local billboards: { Instance } = {}
+local cards: { [Instance]: { [string]: TextLabel } } = {}
 local state: Folder? = nil
 local started = false
 
@@ -110,6 +118,25 @@ local function collect(model: Instance): { [string]: TextLabel }?
 	return if next(found) then found else nil
 end
 
+--[[
+	The labels for one billboard, resolving them again if the cache has gone stale.
+
+	Cheap enough to call on every tick: it only walks the model when the cached labels are missing or
+	have been unparented, which is exactly when streaming has changed something.
+]]
+local function ensureCard(model: Instance): { [string]: TextLabel }?
+	local cached = cards[model]
+	if cached then
+		local sample = cached.Title or cached.Heading or cached.Timer
+		if sample and sample.Parent ~= nil then
+			return cached
+		end
+	end
+	local found = collect(model)
+	cards[model] = found
+	return found
+end
+
 local function write(card: { [string]: TextLabel }, heading, title, detail, timer, footnote)
 	local values = {
 		Heading = heading,
@@ -127,7 +154,7 @@ local function write(card: { [string]: TextLabel }, heading, title, detail, time
 end
 
 local function refresh()
-	if #cards == 0 or state == nil then
+	if #billboards == 0 or state == nil then
 		return
 	end
 	local now = os.time()
@@ -148,8 +175,11 @@ local function refresh()
 		local upcoming = definitionById(if typeof(nextId) == "string" then nextId else nil)
 		if upcoming == nil then
 			--- No schedule at all. Say so rather than leaving last week's event on the sign.
-			for _, card in cards do
-				write(card, "EVENTS", "NONE SCHEDULED", "", "", "")
+			for _, model in billboards do
+				local card = ensureCard(model)
+				if card then
+					write(card, "EVENTS", "NONE SCHEDULED", "", "", "")
+				end
 			end
 			return
 		end
@@ -162,32 +192,31 @@ local function refresh()
 		footnote = scheduleText(upcoming)
 	end
 
-	for _, card in cards do
-		write(card, heading, title, detail, timer, footnote)
+	for _, model in billboards do
+		local card = ensureCard(model)
+		if card then
+			write(card, heading, title, detail, timer, footnote)
+		end
 	end
 end
 
 --[[
-	Find every billboard in the world and keep looking as the map streams in.
+	Register a billboard. Its card is resolved lazily, for as long as the session lasts.
 
-	A `Model`'s descendants arrive over several frames, so a one-shot `FindFirstChild` after `ChildAdded`
-	is a race -- the same one the plot signs hit. Polling for a few seconds is the fix that does not
-	need to know how the map is built.
+	THE FIRST VERSION GAVE UP AFTER TEN SECONDS and that was wrong, because `StreamingEnabled` is on:
+	this billboard sits across the map from the spawn, so at boot it is not on the client at all. The
+	poll expired, the controller warned, and the sign kept its authored placeholder for the rest of the
+	session -- reading "SCRAP RUSH / 00:00:00" no matter what was actually scheduled.
+
+	There is no deadline now. The one-second tick calls `ensureCard`, which walks the model only while
+	its labels are missing, so a billboard that streams in an hour later starts updating an hour later.
 ]]
 local function bind(model: Instance)
-	task.spawn(function()
-		local deadline = os.clock() + 10
-		while os.clock() < deadline do
-			local card = collect(model)
-			if card then
-				table.insert(cards, card)
-				refresh()
-				return
-			end
-			task.wait(0.5)
-		end
-		warn(`[EventBillboard] {model.Name} has no Card to fill -- see EventBillboardController`)
-	end)
+	if table.find(billboards, model) then
+		return
+	end
+	table.insert(billboards, model)
+	refresh()
 end
 
 function EventBillboardController.Start()

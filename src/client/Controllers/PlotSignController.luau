@@ -53,13 +53,19 @@ local WATCHED = { "Occupied", "OwnerUserId", "OwnerName", "Rebirths", "Money", "
 	"has no authored card" in the log, even though the card was there in the place file the whole
 	time. Deferring one frame was not enough -- this has to actually wait.
 ]]
+--- How long the FAST poll runs. Past it the search continues, just once a second -- see `waitForCard`.
 local CARD_WAIT_SECONDS = 10
 
 --- Signs already bound, so a re-bind cannot stack a second set of connections on one instance.
 local bound: { [Instance]: true } = {}
 
 --[[
-	Resolve `Card` under a sign, tolerating late replication. Yields, so call it from a task.
+	Resolve `Card` under a sign, tolerating late replication AND streaming. Yields, so call from a task.
+
+	`CARD_WAIT_SECONDS` used to be the whole story, and with `StreamingEnabled` on that made every sign
+	far from the spawn point fail permanently: the wait expired before the player had ever been near
+	enough for the board to exist on their client, and the card was never filled in. So the wait now
+	only ends when the SIGN ITSELF goes away -- which is the one case where giving up is correct.
 
 	The surface belongs on the board itself, which is flush by construction. An earlier version
 	hung it on a thin plate floating in front, because the post used to stick out past the board's
@@ -68,7 +74,7 @@ local bound: { [Instance]: true } = {}
 	rather than using `WaitForChild` on one fixed path.
 ]]
 local function waitForCard(sign: Instance): Instance?
-	local deadline = os.clock() + CARD_WAIT_SECONDS
+	local startedAt = os.clock()
 	repeat
 		local board = sign:FindFirstChild("Board")
 		if board then
@@ -82,8 +88,12 @@ local function waitForCard(sign: Instance): Instance?
 				return card
 			end
 		end
-		task.wait(0.1)
-	until os.clock() > deadline or sign.Parent == nil
+		--[[
+			A second between attempts once the fast window has passed. Late replication resolves in a few
+			frames; streaming can take minutes, and polling ten times a second for minutes is waste.
+		]]
+		task.wait(if os.clock() - startedAt < CARD_WAIT_SECONDS then 0.1 else 1)
+	until sign.Parent == nil
 	return nil
 end
 

@@ -819,19 +819,34 @@ function Store.use()
 		do not have.
 	]]
 	local titles = {}
-	for index, definition in ipairs(TitleConfig.Titles) do
-		local source = AchievementConfig.ById[definition.Source]
-		titles[index] = {
-			id = definition.Id,
-			text = definition.Text,
-			rarity = definition.Rarity,
-			accent = TitleConfig.RarityAccent[definition.Rarity] or "Gray",
-			rank = TitleConfig.rarityRank(definition.Rarity),
-			owned = unlockedTitles[definition.Id] == true,
-			equipped = equippedTitle == definition.Id,
-			sourceName = if source then source.Name else definition.Source,
-			sourceDetail = if source then source.Description else "",
-		}
+	for _, definition in ipairs(TitleConfig.Titles) do
+		local owned = unlockedTitles[definition.Id] == true
+		--[[
+			A staff title nobody holds is not shown at all.
+
+			Every other locked title is a GOAL -- its text is the point of the list. "ADMIN, locked, be an
+			admin" is not a goal, it is a tease, and listing it invites the question of how to get it. Held,
+			it appears like anything else.
+		]]
+		if owned or definition.Staff ~= true then
+			local source = if definition.Source
+				then AchievementConfig.ById[definition.Source]
+				else nil
+			table.insert(titles, {
+				id = definition.Id,
+				text = definition.Text,
+				rarity = definition.Rarity,
+				accent = TitleConfig.accent(definition),
+				rank = TitleConfig.rarityRank(definition.Rarity),
+				owned = owned,
+				equipped = equippedTitle == definition.Id,
+				sourceName = if source then source.Name elseif definition.Staff then "Staff" else "",
+				sourceDetail = if source
+					then source.Description
+					elseif definition.Staff then "Granted by the game, not earned"
+					else "",
+			})
+		end
 	end
 	table.sort(titles, function(a, b)
 		if a.rank ~= b.rank then
