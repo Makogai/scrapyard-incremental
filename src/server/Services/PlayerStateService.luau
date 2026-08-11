@@ -16,6 +16,7 @@ local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
 local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
+local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PlayerDataSchema = require(ReplicatedStorage.Shared.Utility.PlayerDataSchema)
@@ -227,6 +228,10 @@ local function publicSnapshot(data: { [string]: any })
 			countdown itself, the same way boost timers already work.
 		]]
 		ActiveEvent = activeEventPayload(),
+		--- Achievements and titles: which are paid, which are held, which is worn.
+		UnlockedAchievements = table.clone(data.UnlockedAchievements),
+		UnlockedTitles = table.clone(data.UnlockedTitles),
+		EquippedTitle = data.EquippedTitle,
 		MaximumEquippedPets = PetConfig.BaseEquipSlots
 			+ data.PetSlotUpgradeLevel
 			+ (if data.Entitlements.ExtraPetSlots == true then PetConfig.PassBonusSlots else 0),
@@ -417,6 +422,18 @@ function PlayerStateService.GrantRewards(player: Player, rewards: { [string]: an
 		return false
 	end
 	local data = session.Data
+
+	--[[
+		A title in the bundle. Recorded as HELD, never auto-worn -- except when the player has none, where
+		putting the first one on is obviously what they want. Silently replacing a title someone chose
+		would be the annoying version of this.
+	]]
+	if typeof(rewards.TitleId) == "string" and TitleConfig.ById[rewards.TitleId] ~= nil then
+		data.UnlockedTitles[rewards.TitleId] = true
+		if data.EquippedTitle == "" then
+			data.EquippedTitle = rewards.TitleId
+		end
+	end
 
 	for itemId, amount in rewards.Items or {} do
 		if InventoryConfig.Consumables[itemId] and typeof(amount) == "number" then
@@ -778,6 +795,62 @@ end
 	`EventService` owns the "when"; this is the only thing it needs from here, which keeps the two
 	services from knowing anything else about each other.
 ]]
+--[[
+	Publish the worn title as an attribute on the Player.
+
+	ATTRIBUTES, NOT A REMOTE, because the audience is every OTHER client: the nameplate over a head and
+	the prefix on a chat line are drawn by everyone in the server, not by the player who owns the title.
+	Attributes replicate to all clients and arrive with the Player instance, so a late joiner sees the
+	titles of people already here with no request and no cache to invalidate.
+
+	The TEXT is published rather than the id so the two readers need no config lookup, and the id is
+	published too so the UI can mark the equipped card without matching on display text.
+]]
+local function publishTitle(player: Player, data: { [string]: any })
+	local definition = TitleConfig.resolve(data.EquippedTitle)
+	player:SetAttribute("TitleId", if definition then definition.Id else "")
+	player:SetAttribute("TitleTag", TitleConfig.tag(data.EquippedTitle))
+end
+
+--[[
+	Wear a title, or take it off with "".
+
+	Refuses a title the player does not hold -- the client sends an id and ids are guessable, so this is
+	the check that stops anyone wearing the one title nobody has earned yet.
+]]
+function PlayerStateService.TryEquipTitle(player: Player, titleId: string): (boolean, string)
+	local session = sessions[player]
+	if session == nil then
+		return false, "Your data is still loading"
+	end
+	local data = session.Data
+	if titleId == "" then
+		data.EquippedTitle = ""
+		publishTitle(player, data)
+		pushState(player, data)
+		return true, "Title removed"
+	end
+	local definition = TitleConfig.resolve(titleId)
+	if definition == nil then
+		return false, "No such title"
+	end
+	if data.UnlockedTitles[titleId] ~= true then
+		return false, "You have not earned that title"
+	end
+	data.EquippedTitle = titleId
+	publishTitle(player, data)
+	pushState(player, data)
+	return true, `Now wearing {definition.Text}`
+end
+
+--- Re-publish the title attributes, for callers that changed the data behind our back.
+function PlayerStateService.RefreshTitle(player: Player)
+	local session = sessions[player]
+	if session then
+		publishTitle(player, session.Data)
+	end
+end
+
 function PlayerStateService.PushAll()
 	for player, session in sessions do
 		if not session.Released then
@@ -1304,6 +1377,18 @@ function PlayerStateService.TryPrestige(player: Player): (boolean, string)
 	completePrestige(player, data, reward)
 	pushState(player, data)
 	return true, `PRESTIGED FOR {reward} GEARS!`
+end
+
+--[[
+	The live save table for a loaded player, or nil.
+
+	MUTABLE ON PURPOSE, and the only caller is `AchievementService`, which marks an achievement paid in
+	the same table it read the progress from. Everything else goes through the Try* functions, which
+	validate and push -- a service reaching in here to change a number would skip both.
+]]
+function PlayerStateService.GetSaveData(player: Player): { [string]: any }?
+	local session = sessions[player]
+	return if session then session.Data else nil
 end
 
 function PlayerStateService.IsLoaded(player: Player): boolean

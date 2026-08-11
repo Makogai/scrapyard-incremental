@@ -13,7 +13,7 @@ I am estimating rather than measuring, it says so.
 > spin wheel, the friend boost, and the first-session objective chain.** Section 3.2 and 3.5 are
 > closed. Monetisation (3.1) is deliberately untouched and is documented separately in
 > **`docs/STORE_SETUP.md`** — the fifteen Marketplace assets to create and where each id goes.
-> The remaining open items are 3.4 (no trading) and 3.6.
+> The remaining open item is 3.4 (no trading).
 
 > **STATUS — second pass, presentation and admin.** The wheel was rebuilt for depth and legibility:
 > a three-ring bevelled rim, radially shaded wedges, alternating tone so two same-accent prizes cannot
@@ -41,6 +41,14 @@ I am estimating rather than measuring, it says so.
 > live event in its own accent or the next one in grey, and renders nothing at all when the schedule is
 > empty — it can no longer invent content. What is still missing from 3.7 is the *content* half:
 > events change numbers, not what there is to collect.
+
+> **STATUS — titles and achievements.** 3.6 is closed. 19 achievements across six tracks turn things
+> players already do into named milestones, and each notable one awards one of 15 titles worn under the
+> name in-world and in front of chat as `[TITLE]`. Achievements are MEASURED off the save rather than
+> flagged by events, so progress bars are free and correct, and an achievement added later is
+> immediately right for a player who passed its threshold months ago. Titles grant nothing on purpose.
+> Full design in `docs/TITLES_AND_ACHIEVEMENTS.md`. This also dents 3.4: a title is the first thing in
+> the game one player can see another has earned.
 
 ## The headline
 
@@ -252,7 +260,15 @@ that are indistinguishable from playing: *collect 10 scrap → sell at the crush
 reach $1,000*. Each one pays out. It teaches the loop by making the player do it, and it doubles as
 the quest system from 3.2.
 
-### 3.6 Progression has visible holes
+### 3.6 Progression has visible holes — PARTLY FIXED
+
+**Now:** 19 achievements across six tracks give every one of the numbers below a named milestone to aim
+at, and the rarer ones award titles worn in-world and in chat. Rebirth in particular has a ladder that
+is visible from outside the rebirth screen: REBORN at 1, ASCENDED at 10, SCRAPYARD LEGEND at 50. See
+`docs/TITLES_AND_ACHIEVEMENTS.md`.
+
+What remains below is the CURVE problems, which achievements do not fix: the magnet ladder still skips
+its own middle, and no magnet reaches the top of the scrap ladder.
 
 Measured from the configs:
 

@@ -98,6 +98,20 @@ Atoms.activeBoosts = Charm.atom({} :: { [string]: number })
 	title, glyph and accent are looked up from `EventConfig` by id at render time.
 ]]
 Atoms.activeEvent = Charm.atom(nil :: { [string]: any }?)
+
+--[[
+	Achievements and titles.
+
+	`unlockedAchievements` is the PAID set, not the earned set: progress is recomputed from the other
+	atoms by `AchievementRules`, exactly as the server recomputes it from the save. One rule
+	implementation, two readers.
+]]
+--- Eggs opened per egg id, which one achievement counts and nothing else reads yet.
+Atoms.eggOpenCounts = Charm.atom({} :: { [string]: number })
+
+Atoms.unlockedAchievements = Charm.atom({} :: { [string]: boolean })
+Atoms.unlockedTitles = Charm.atom({} :: { [string]: boolean })
+Atoms.equippedTitle = Charm.atom("")
 Atoms.entitlements = Charm.atom({} :: { [string]: boolean })
 Atoms.ownedPets = Charm.atom({} :: { [string]: number })
 Atoms.equippedPets = Charm.atom({} :: { string })
@@ -235,6 +249,18 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.Inventory) == "table" then
 		Atoms.inventory(snapshot.Inventory)
+	end
+	if type(snapshot.EggOpenCounts) == "table" then
+		Atoms.eggOpenCounts(snapshot.EggOpenCounts)
+	end
+	if type(snapshot.UnlockedAchievements) == "table" then
+		Atoms.unlockedAchievements(snapshot.UnlockedAchievements)
+	end
+	if type(snapshot.UnlockedTitles) == "table" then
+		Atoms.unlockedTitles(snapshot.UnlockedTitles)
+	end
+	if type(snapshot.EquippedTitle) == "string" then
+		Atoms.equippedTitle(snapshot.EquippedTitle)
 	end
 	if type(snapshot.ActiveEvent) == "table" then
 		Atoms.activeEvent(snapshot.ActiveEvent)

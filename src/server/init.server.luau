@@ -29,6 +29,7 @@ local SpinService = require(script.Services.SpinService)
 local FriendBoostService = require(script.Services.FriendBoostService)
 local TutorialService = require(script.Services.TutorialService)
 local EventService = require(script.Services.EventService)
+local AchievementService = require(script.Services.AchievementService)
 
 FoundationValidator.validate()
 RemoteService.Start()
@@ -68,4 +69,9 @@ TutorialService.Start()
 	`EventConfig` is a pure function of the clock, so a failure here costs a popup, not a payout.
 ]]
 EventService.Start()
+--[[
+	Achievements last: they read every other system's numbers, so nothing here has to be running yet --
+	the first poll is three seconds away and every service is up by then.
+]]
+AchievementService.Start()
 print(string.format("[%s] Server bootstrap ready", Environment.GameName))

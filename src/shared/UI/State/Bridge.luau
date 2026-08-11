@@ -225,6 +225,16 @@ function Bridge.requestSpin()
 	fire("RequestSpin")
 end
 
+--[[
+	Wear a title, or "" to take it off.
+
+	Sends an ID and nothing else. The server owns whether the player holds it -- see
+	`PlayerStateService.TryEquipTitle`, which refuses one they have not earned.
+]]
+function Bridge.equipTitle(titleId: string)
+	fire("EquipTitle", titleId)
+end
+
 function Bridge.skipTutorial()
 	fire("TutorialAction", "Skip")
 end

@@ -2,7 +2,7 @@
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.CurrentVersion = 14
+PlayerDataSchema.CurrentVersion = 15
 
 local PET_IDS = {
 	"Pup",
@@ -94,10 +94,42 @@ local DAILY_CALENDAR_LENGTH = 7
 local MAXIMUM_PLAYTIME_SECONDS = 86400
 local PLAYTIME_MILESTONE_COUNT = 9
 local MAXIMUM_STORED_SPINS = 25
+
+--- Bounds for config-keyed sets (achievements, titles) the schema cannot validate by name.
+local MAXIMUM_ID_LENGTH = 64
+local MAXIMUM_ID_SET_ENTRIES = 256
 local TUTORIAL_STEP_COUNT = 4
 
 local function finite(value: any): boolean
 	return typeof(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+--[[
+	An id-keyed set of `true`, bounded in both key length and count.
+
+	For sets whose valid keys live in a config this module cannot require. Anything that is not a
+	sensible id mapped to `true` is dropped, and the count cap is what stops an edited save from growing
+	without limit -- the reason to sanitise a set like this at all.
+]]
+local function boundedIdSet(value: any): { [string]: boolean }
+	local clean = {}
+	if typeof(value) ~= "table" then
+		return clean
+	end
+	local kept = 0
+	for id, flag in value do
+		if
+			typeof(id) == "string"
+			and #id > 0
+			and #id <= MAXIMUM_ID_LENGTH
+			and flag == true
+			and kept < MAXIMUM_ID_SET_ENTRIES
+		then
+			clean[id] = true
+			kept += 1
+		end
+	end
+	return clean
 end
 
 local function boundedNumber(value: any, fallback: number, minimum: number, maximum: number): number
@@ -238,6 +270,20 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 			lookup keyed by Player.
 		]]
 		FriendBoostCount = 0,
+
+		--[[
+			Achievements and titles.
+
+			`UnlockedAchievements` records only that a reward has been PAID, not that the goal was reached
+			-- progress itself is read live off the other fields by `AchievementRules`. That is what makes
+			an achievement added later immediately correct for a player who already did the thing.
+
+			`EquippedTitle` is an id, never the display text. Text belongs to `TitleConfig`, so rewording a
+			title updates every player who wears it instead of leaving stale strings in saves.
+		]]
+		UnlockedAchievements = {},
+		UnlockedTitles = {},
+		EquippedTitle = "",
 	}
 end
 
@@ -713,6 +759,32 @@ function PlayerDataSchema.validate(
 
 	--- Always zero on load: it describes the server the player is in, not the player.
 	clean.FriendBoostCount = 0
+
+	--[[
+		Achievements and titles.
+
+		VALIDATED STRUCTURALLY, NOT AGAINST THE CONFIG. This module deliberately requires nothing -- it is
+		the one piece of game logic that has to run under Lune with no Roblox and no DataModel, which is
+		why the pet and egg id lists above are hardcoded rather than read from `PetConfig`.
+
+		Copying that pattern here would mean every new achievement needed editing in two files, and the
+		one that got forgotten would silently refuse to save. So the sanitiser enforces what a sanitiser
+		is for -- right types, bounded size, no unbounded growth -- and the CONFIG stays the authority on
+		which ids mean anything: `AchievementConfig.ById` and `TitleConfig.resolve` both return nil for an
+		unknown id, so a stale key is inert everywhere it is read.
+	]]
+	clean.UnlockedAchievements = boundedIdSet(raw.UnlockedAchievements)
+	clean.UnlockedTitles = boundedIdSet(raw.UnlockedTitles)
+
+	--- Only a title the player actually holds can be worn; anything else falls back to none.
+	clean.EquippedTitle = ""
+	if
+		typeof(raw.EquippedTitle) == "string"
+		and #raw.EquippedTitle <= MAXIMUM_ID_LENGTH
+		and clean.UnlockedTitles[raw.EquippedTitle] == true
+	then
+		clean.EquippedTitle = raw.EquippedTitle
+	end
 
 	return true, clean, nil
 end

@@ -14,6 +14,7 @@ local PetFollowerController = require(script.Controllers.PetFollowerController)
 local PlotSignController = require(script.Controllers.PlotSignController)
 local TutorialArrowController = require(script.Controllers.TutorialArrowController)
 local EventBillboardController = require(script.Controllers.EventBillboardController)
+local TitleController = require(script.Controllers.TitleController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -55,5 +56,10 @@ TutorialArrowController.Start()
 	attributes the server publishes, so it needs neither the store nor the Bridge.
 ]]
 EventBillboardController.Start()
+--[[
+	Titles over heads and in chat. Reads Player attributes, so it needs neither the store nor the
+	Bridge -- and it draws OTHER players' titles, which is the whole point of them.
+]]
+TitleController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))

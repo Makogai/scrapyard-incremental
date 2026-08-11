@@ -38,6 +38,9 @@ local localUserId = if PlayersService.LocalPlayer then PlayersService.LocalPlaye
 local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
 local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
+local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
+local AchievementConfig = require(ReplicatedStorage.Shared.Config.AchievementConfig)
+local AchievementRules = require(ReplicatedStorage.Shared.Utility.AchievementRules)
 local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
 local TutorialConfig = require(ReplicatedStorage.Shared.Config.TutorialConfig)
 local React = require(ReplicatedStorage.Packages.React)
@@ -367,6 +370,11 @@ local function liveActions()
 		Atoms.spinRoll(nil)
 	end
 
+	function self.equipTitle(titleId: string)
+		Sound.play("equip")
+		Bridge.equipTitle(titleId)
+	end
+
 	function self.skipTutorial()
 		Bridge.skipTutorial()
 	end
@@ -678,6 +686,11 @@ function Store.use()
 	local inventory = useAtom(Atoms.inventory)
 	local activeBoosts = useAtom(Atoms.activeBoosts)
 	local activeEvent = useAtom(Atoms.activeEvent)
+	local totalScrapCollected = useAtom(Atoms.totalScrapCollected)
+	local eggOpenCounts = useAtom(Atoms.eggOpenCounts)
+	local unlockedAchievements = useAtom(Atoms.unlockedAchievements)
+	local unlockedTitles = useAtom(Atoms.unlockedTitles)
+	local equippedTitle = useAtom(Atoms.equippedTitle)
 	local entitlements = useAtom(Atoms.entitlements)
 	local ownedPets = useAtom(Atoms.ownedPets)
 	local equippedPets = useAtom(Atoms.equippedPets)
@@ -756,6 +769,84 @@ function Store.use()
 		schedule has nothing at all, which is the honest state for a HUD that used to permanently
 		advertise an event that did not exist.
 	]]
+	--[[
+		ACHIEVEMENT PROGRESS IS COMPUTED HERE, from the same `AchievementRules` the server pays from.
+
+		The snapshot already carries every field those rules read, so the client can draw an exact
+		progress bar without a single extra remote -- and because it is literally the same function, a bar
+		that says 999/1000 cannot belong to an achievement the server thinks is complete.
+
+		The shape below is the save's shape, not a new one: `AchievementRules` takes a save table, and
+		handing it a differently-named copy is how the two would drift.
+	]]
+	local achievementData = {
+		TotalScrapCollected = totalScrapCollected,
+		Money = money,
+		PrestigeCount = prestigeCount,
+		DailyStreak = dailyStreak,
+		UpgradeLevels = upgradeLevels,
+		OwnedPets = ownedPets,
+		EggOpenCounts = eggOpenCounts,
+		UnlockedAreas = unlockedAreas,
+		OwnedMagnets = ownedMagnets,
+		DiscoveredScrap = discoveredScrap,
+	}
+
+	local achievements = {}
+	for index, definition in ipairs(AchievementConfig.Definitions) do
+		local value, threshold, complete = AchievementRules.progress(achievementData, definition)
+		local title = TitleConfig.resolve(definition.Reward.TitleId)
+		achievements[index] = {
+			id = definition.Id,
+			name = definition.Name,
+			description = definition.Description,
+			glyph = definition.Glyph,
+			accent = definition.Accent,
+			track = definition.Track,
+			value = value,
+			threshold = threshold,
+			--- Earned, from the live numbers. `paid` is whether the reward has landed yet.
+			complete = complete,
+			paid = unlockedAchievements[definition.Id] == true,
+			reward = definition.Reward,
+			titleText = if title then title.Text else nil,
+		}
+	end
+
+	--[[
+		Titles, sorted by rarity then by name so the list reads worst-to-best rather than in config
+		order. Locked ones stay in the list with their source named: a title you cannot see is a goal you
+		do not have.
+	]]
+	local titles = {}
+	for index, definition in ipairs(TitleConfig.Titles) do
+		local source = AchievementConfig.ById[definition.Source]
+		titles[index] = {
+			id = definition.Id,
+			text = definition.Text,
+			rarity = definition.Rarity,
+			accent = TitleConfig.RarityAccent[definition.Rarity] or "Gray",
+			rank = TitleConfig.rarityRank(definition.Rarity),
+			owned = unlockedTitles[definition.Id] == true,
+			equipped = equippedTitle == definition.Id,
+			sourceName = if source then source.Name else definition.Source,
+			sourceDetail = if source then source.Description else "",
+		}
+	end
+	table.sort(titles, function(a, b)
+		if a.rank ~= b.rank then
+			return a.rank < b.rank
+		end
+		return a.text < b.text
+	end)
+
+	local ownedTitleCount = 0
+	for _, title in ipairs(titles) do
+		if title.owned then
+			ownedTitleCount += 1
+		end
+	end
+
 	local event = nil
 	local nextEvent = nil
 	if activeEvent and activeEvent.Id then
@@ -827,6 +918,16 @@ function Store.use()
 		petSlots = maximumEquippedPets,
 		discoveredScrap = discoveredScrap,
 		settings = settings,
+
+		achievements = achievements,
+		achievementsUnlocked = AchievementRules.unlockedCount(
+			AchievementConfig.Definitions,
+			unlockedAchievements
+		),
+		achievementTracks = AchievementConfig.Tracks,
+		titles = titles,
+		titlesOwned = ownedTitleCount,
+		equippedTitle = equippedTitle,
 
 		boosts = boosts,
 		event = event,

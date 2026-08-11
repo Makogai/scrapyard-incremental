@@ -58,6 +58,12 @@ local definitions: { Definition } = {
 	definition("SpinResult", "RemoteEvent"),
 	--- Client -> server: "Skip" only. Steps are advanced by the server from state.
 	definition("TutorialAction", "RemoteEvent"),
+	--[[
+		Client -> server: wear a title, or "" for none. Carries a title ID and nothing else -- the
+		server checks the player actually holds it, because a client that could name any title could
+		wear the one nobody has earned.
+	]]
+	definition("EquipTitle", "RemoteEvent"),
 }
 
 return table.freeze(definitions)

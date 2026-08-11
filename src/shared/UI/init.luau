@@ -60,6 +60,8 @@ return {
 	RewardToast = require(Components.RewardToast),
 	--- The look behind the reward banner, the event strip and the fade toasts.
 	FadeBanner = require(Components.FadeBanner),
+	--- Wide cards for titles and achievements.
+	Progression = require(Components.Progression),
 
 	-- screens
 	Screens = {

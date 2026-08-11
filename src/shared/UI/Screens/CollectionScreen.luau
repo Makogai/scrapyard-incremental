@@ -1,7 +1,11 @@
 --[[
 	CollectionScreen.luau
 
-	COLLECTION index with SCRAP / MAGNETS / PETS tabs.
+	COLLECTION index with SCRAP / MAGNETS / PETS / ACHIEVEMENTS tabs.
+
+	Achievements live here rather than in their own window because this is already the screen about
+	progress rather than about doing: what you have found, what you are missing. An achievement list is
+	the same question asked about your history instead of the catalogue.
 
 	Undiscovered entries keep their silhouette and footprint so the grid shows
 	the shape of what is missing -- that gap is the reason players keep digging.
@@ -20,6 +24,7 @@ local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
 local Cards = require(UI.Components.Cards)
 local Overlays = require(UI.Components.Overlays)
+local Progression = require(UI.Components.Progression)
 
 local e = React.createElement
 
@@ -27,7 +32,13 @@ local TABS = {
 	{ id = "SCRAP", text = "SCRAP", glyph = "scrap" },
 	{ id = "MAGNETS", text = "MAGNETS", glyph = "magnet" },
 	{ id = "PETS", text = "PETS", glyph = "paw" },
+	{ id = "ACHIEVEMENTS", text = "AWARDS", glyph = "trophy" },
 }
+
+--- Discovery tiles are square art; an achievement is a sentence and a bar. See the note in the header.
+local INDEX_CELL = UDim2.fromOffset(146, 168)
+local ACHIEVEMENT_CELL =
+	UDim2.fromOffset(Progression.ACHIEVEMENT_CARD.X, Progression.ACHIEVEMENT_CARD.Y)
 
 local function CollectionScreen(props)
 	local state = props.state
@@ -73,7 +84,11 @@ local function CollectionScreen(props)
 				layoutOrder = index,
 			})
 		end
-	else
+	--[[
+		`elseif`, not `else`. With AWARDS added, an open `else` built the pet list for that tab too --
+		twenty "???" cells beside the achievements and a footer reading 3/40 instead of 3/19.
+	]]
+	elseif tab == "PETS" then
 		for index, pet in ipairs(GameData.pets(state.ownedPets)) do
 			total += 1
 			if pet.owned then
@@ -89,6 +104,95 @@ local function CollectionScreen(props)
 				collected = pet.count,
 				layoutOrder = index,
 			})
+		end
+	end
+
+	local awards = tab == "ACHIEVEMENTS"
+
+	if awards then
+		--[[
+			SECTIONS IN A LIST, not cards in one grid.
+
+			The first version put a track heading in a grid cell, which cost a whole cell and shunted every
+			card after it -- one card on the first row, two on the next, ragged all the way down. A grid
+			cannot span a cell, so the fix is one `P.Group` per track: a full-width heading, then that
+			track's own two-column grid. The outer scroller becomes a vertical list of those.
+
+			Each section states its own height, because a `UIGridLayout` inside an auto-sized frame does not
+			report one -- rows are counted here instead.
+		]]
+		local byTrack: { [string]: { any } } = {}
+		for _, achievement in ipairs(state.achievements or {}) do
+			total += 1
+			if achievement.complete then
+				found += 1
+			end
+			local bucket = byTrack[achievement.track]
+			if bucket == nil then
+				bucket = {}
+				byTrack[achievement.track] = bucket
+			end
+			table.insert(bucket, achievement)
+		end
+
+		local HEADING = 30
+		local GAP = 10
+		local order = 0
+		for _, track in ipairs(state.achievementTracks or {}) do
+			local bucket = byTrack[track]
+			if bucket then
+				order += 1
+				local cards = {}
+				for index, achievement in ipairs(bucket) do
+					cards[index] = e(Progression.AchievementCard, {
+						key = achievement.id,
+						id = achievement.id,
+						name = achievement.name,
+						description = achievement.description,
+						glyph = achievement.glyph,
+						accent = achievement.accent,
+						value = achievement.value,
+						threshold = achievement.threshold,
+						complete = achievement.complete,
+						reward = achievement.reward,
+						titleText = achievement.titleText,
+						layoutOrder = index,
+					})
+				end
+
+				local rows = math.ceil(#bucket / 2)
+				local sectionHeight = HEADING
+					+ rows * Progression.ACHIEVEMENT_CARD.Y
+					+ (rows - 1) * GAP
+
+				cells[#cells + 1] = e(P.Group, {
+					key = `Track{track}`,
+					size = UDim2.new(1, 0, 0, sectionHeight),
+					layoutOrder = order,
+					children = {
+						e(P.Label, {
+							key = "Heading",
+							text = string.upper(track),
+							textSize = Theme.TextSize.Small,
+							font = Theme.Font.Bold,
+							color = Theme.Color.Gold,
+							align = Enum.TextXAlignment.Left,
+							size = UDim2.new(1, 0, 0, HEADING),
+							zIndex = 2,
+						}),
+						e(P.Group, {
+							key = "Cards",
+							size = UDim2.new(1, 0, 1, -HEADING),
+							position = UDim2.fromOffset(0, HEADING),
+							layout = P.grid({
+								cell = ACHIEVEMENT_CELL,
+								padding = UDim2.fromOffset(GAP, GAP),
+							}),
+							children = cards,
+						}),
+					},
+				})
+			end
 		end
 	end
 
@@ -115,7 +219,7 @@ local function CollectionScreen(props)
 			children = {
 				e(P.Label, {
 					key = "Label",
-					text = "COLLECTION",
+					text = if awards then "ACHIEVEMENTS" else "COLLECTION",
 					textSize = Theme.TextSize.Small,
 					font = Theme.Font.Bold,
 					color = Theme.Color.Gray,
@@ -126,7 +230,7 @@ local function CollectionScreen(props)
 					key = "Bar",
 					value = found,
 					max = total,
-					gradient = Theme.Gradient.Purple,
+					gradient = if awards then Theme.Gradient.Gold else Theme.Gradient.Purple,
 					height = 30,
 					size = UDim2.new(1, -180, 0, 30),
 					position = UDim2.fromScale(1, 0.5),
@@ -139,10 +243,16 @@ local function CollectionScreen(props)
 			e(P.Scroller, {
 				key = "IndexGrid",
 				padding = { right = 10, bottom = 6 },
-				layout = P.grid({
-					cell = UDim2.fromOffset(146, 168),
-					padding = UDim2.fromOffset(12, 12),
-				}),
+				--[[
+					Awards stack as SECTIONS -- see the note where they are built -- so that tab wants a vertical
+					list. Every other tab is a flat catalogue and wants the grid.
+				]]
+				layout = if awards
+					then P.list({ padding = 16 })
+					else P.grid({
+						cell = INDEX_CELL,
+						padding = UDim2.fromOffset(12, 12),
+					}),
 				children = cells,
 			}),
 		},

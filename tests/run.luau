@@ -9,6 +9,9 @@ local AreaRules = require("../src/shared/Utility/AreaRules")
 local AdminConfig = require("../src/shared/Config/AdminConfig")
 local DayClock = require("../src/shared/Utility/DayClock")
 local EventConfig = require("../src/shared/Config/EventConfig")
+local TitleConfig = require("../src/shared/Config/TitleConfig")
+local AchievementConfig = require("../src/shared/Config/AchievementConfig")
+local AchievementRules = require("../src/shared/Utility/AchievementRules")
 
 local passed = 0
 
@@ -96,7 +99,7 @@ expectEqual(limiter:Allow("player", 2), false, "rate limit rejection")
 expectEqual(limiter:Allow("player", 5), true, "rate limit window reset")
 
 local defaultData = PlayerDataSchema.createDefault(1000)
-expectEqual(defaultData.SchemaVersion, 14, "default schema version")
+expectEqual(defaultData.SchemaVersion, 15, "default schema version")
 expectEqual(defaultData.ActivePlotTheme, "FrontYard", "default plot theme")
 expectEqual(defaultData.PetSlotUpgradeLevel, 0, "default pet slot upgrade")
 expectEqual(#defaultData.EquippedPets, 0, "default equipped pets")
@@ -125,7 +128,7 @@ local migratedOk, migrated = PlayerDataSchema.validate({
 	LastLoginTimestamp = 800,
 }, 1000)
 expectEqual(migratedOk, true, "version one migration")
-expectEqual(migrated.SchemaVersion, 14, "migrated schema version")
+expectEqual(migrated.SchemaVersion, 15, "migrated schema version")
 expectEqual(migrated.ActivePlotTheme, "FrontYard", "migrated plot theme defaults to the scrapyard")
 expectEqual(migrated.Money, 125, "migrated money")
 expectEqual(migrated.UpgradeLevels.MagnetStrength, 3, "migrated upgrade")
@@ -298,7 +301,7 @@ local thirteenOk, thirteen = PlayerDataSchema.validate({
 	ActivePlotTheme = "WorkshopYard",
 }, 3000)
 expectEqual(thirteenOk, true, "version thirteen migration")
-expectEqual(thirteen.SchemaVersion, 14, "migrated to fourteen")
+expectEqual(thirteen.SchemaVersion, 15, "migrated to fifteen from thirteen")
 expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
@@ -441,5 +444,163 @@ for _, definition in ipairs(EventConfig.Events) do
 	end
 	expectEqual(seen, true, `{definition.Id} opens at some point in the week`)
 end
+
+--[[
+	Titles and achievements.
+
+	The two configs reference each other by id -- a title names the achievement that awards it, an
+	achievement names the title it grants -- and nothing at runtime would complain if one side were
+	misspelled: the player would simply never receive a title that appears in the list. So the agreement
+	is asserted in BOTH directions here, which is the only place it can be checked cheaply.
+]]
+for _, title in ipairs(TitleConfig.Titles) do
+	expectEqual(
+		AchievementConfig.ById[title.Source] ~= nil,
+		true,
+		`title {title.Id} names a real achievement`
+	)
+	expectEqual(
+		TitleConfig.rarityRank(title.Rarity) > 0,
+		true,
+		`title {title.Id} has a known rarity`
+	)
+	expectEqual(#title.Text <= 20, true, `title {title.Id} is short enough to wear`)
+end
+
+--- Every title is awarded by exactly one achievement, so none is unreachable or double-sourced.
+local awardedBy: { [string]: string } = {}
+for _, definition in ipairs(AchievementConfig.Definitions) do
+	local titleId = definition.Reward.TitleId
+	if titleId ~= nil then
+		expectEqual(
+			TitleConfig.ById[titleId] ~= nil,
+			true,
+			`achievement {definition.Id} grants a real title`
+		)
+		expectEqual(awardedBy[titleId], nil, `title {titleId} is granted by only one achievement`)
+		awardedBy[titleId] = definition.Id
+	end
+end
+for _, title in ipairs(TitleConfig.Titles) do
+	expectEqual(awardedBy[title.Id], title.Source, `title {title.Id} agrees with its source`)
+end
+
+--[[
+	Every achievement must name a metric `AchievementRules` can actually read. A typo here is an
+	achievement that can never complete, and nothing in game would ever say so.
+]]
+local knownMetrics: { [string]: boolean } = {}
+for _, name in ipairs(AchievementRules.metricNames()) do
+	knownMetrics[name] = true
+end
+for _, definition in ipairs(AchievementConfig.Definitions) do
+	expectEqual(
+		knownMetrics[definition.Metric],
+		true,
+		`achievement {definition.Id} uses a known metric`
+	)
+	expectEqual(definition.Threshold >= 1, true, `achievement {definition.Id} has a real threshold`)
+	expectEqual(
+		table.find(AchievementConfig.Tracks, definition.Track) ~= nil,
+		true,
+		`achievement {definition.Id} is on a known track`
+	)
+end
+
+--- Progress reading, against a hand-built save rather than a running game.
+local sample = {
+	TotalScrapCollected = 250,
+	Money = 4_000,
+	PrestigeCount = 0,
+	DailyStreak = 3,
+	UpgradeLevels = { MagnetStrength = 12, StorageCapacity = 8 },
+	OwnedPets = { Pup = 2, Zebra = 1 },
+	EggOpenCounts = { JunkyardEgg = 4 },
+	UnlockedAreas = { FrontYard = true, WorkshopYard = true },
+	OwnedMagnets = { MagnetBasic = true, MagnetIron = true },
+	DiscoveredScrap = { Can = {}, Tire = {}, LooseBolt = {} },
+}
+
+expectEqual(AchievementRules.metric(sample, "UpgradeLevelTotal"), 20, "upgrade levels sum")
+expectEqual(AchievementRules.metric(sample, "PetsOwned"), 3, "pets owned sum")
+expectEqual(AchievementRules.metric(sample, "EggsOpened"), 4, "eggs opened sum")
+expectEqual(AchievementRules.metric(sample, "AreasUnlocked"), 2, "areas unlocked count")
+expectEqual(AchievementRules.metric(sample, "MagnetsOwned"), 2, "magnets owned count")
+expectEqual(AchievementRules.metric(sample, "ScrapDiscovered"), 3, "scrap discovered count")
+expectEqual(AchievementRules.metric(sample, "NotAMetric"), nil, "unknown metric reads nil")
+
+--- Missing fields are zero, not an error: this runs against saves from older schema versions.
+expectEqual(AchievementRules.metric({}, "PetsOwned"), 0, "absent field reads zero")
+
+local hundredValue, hundredThreshold, hundredDone =
+	AchievementRules.progress(sample, AchievementConfig.ById.ScrapHundred)
+expectEqual(hundredDone, true, "250 scrap clears the 100 threshold")
+expectEqual(hundredValue, hundredThreshold, "progress is clamped to the threshold")
+
+local millionValue, _, millionDone =
+	AchievementRules.progress(sample, AchievementConfig.ById.ScrapMillion)
+expectEqual(millionDone, false, "250 scrap does not clear a million")
+expectEqual(millionValue, 250, "partial progress reports the real value")
+
+--[[
+	The paid-out set is what stops a reward repeating. `newlyEarned` must return an achievement exactly
+	once: the first call sees it, and once recorded the second call must not.
+]]
+local earned = AchievementRules.newlyEarned(sample, AchievementConfig.Definitions, {})
+expectEqual(table.find(earned, "FirstSteps") ~= nil, true, "first steps is earned")
+expectEqual(table.find(earned, "ScrapMillion"), nil, "unearned achievements are not returned")
+
+local alreadyPaid = {}
+for _, id in ipairs(earned) do
+	alreadyPaid[id] = true
+end
+expectEqual(
+	#AchievementRules.newlyEarned(sample, AchievementConfig.Definitions, alreadyPaid),
+	0,
+	"nothing is earned twice"
+)
+expectEqual(
+	AchievementRules.unlockedCount(AchievementConfig.Definitions, alreadyPaid),
+	#earned,
+	"unlocked count matches what was paid"
+)
+
+--- Tag formatting, which two different surfaces render and must not disagree about.
+expectEqual(TitleConfig.tag("Baron"), "[SCRAP BARON]", "title tag formatting")
+expectEqual(TitleConfig.tag("NotATitle"), "", "unknown title has no tag")
+expectEqual(TitleConfig.tag(nil), "", "no title has no tag")
+
+--- Schema round trip for the new fields.
+local titleOk, titleData = PlayerDataSchema.validate({
+	SchemaVersion = 15,
+	UnlockedTitles = { Baron = true, NotReal = true },
+	EquippedTitle = "Baron",
+	UnlockedAchievements = { ScrapMillion = true },
+}, 4000)
+expectEqual(titleOk, true, "version fifteen validates")
+expectEqual(titleData.UnlockedTitles.Baron, true, "a held title survives")
+expectEqual(titleData.EquippedTitle, "Baron", "a held title can be worn")
+expectEqual(titleData.UnlockedAchievements.ScrapMillion, true, "a paid achievement survives")
+
+--- A title the player does not hold cannot be worn, however the save was edited.
+local cheatOk, cheatData = PlayerDataSchema.validate({
+	SchemaVersion = 15,
+	UnlockedTitles = {},
+	EquippedTitle = "Legend",
+}, 4000)
+expectEqual(cheatOk, true, "unheld title validates")
+expectEqual(cheatData.EquippedTitle, "", "an unheld title is not worn")
+
+--- Migration from 14 keeps everything and adds the new fields empty.
+local fourteenOk, fourteen = PlayerDataSchema.validate({
+	SchemaVersion = 14,
+	Money = 5_000,
+	DailyStreak = 4,
+}, 4000)
+expectEqual(fourteenOk, true, "version fourteen migration")
+expectEqual(fourteen.SchemaVersion, 15, "migrated to fifteen")
+expectEqual(fourteen.DailyStreak, 4, "migration preserves the streak")
+expectEqual(fourteen.EquippedTitle, "", "migrated player wears no title")
+expectEqual(next(fourteen.UnlockedTitles), nil, "migrated player holds no titles")
 
 print(`Scrapyard foundation and data tests passed: {passed}`)
