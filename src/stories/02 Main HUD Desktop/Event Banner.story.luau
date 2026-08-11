@@ -52,6 +52,7 @@ local function Bounded(props)
 			glyph = props.glyph,
 			accent = props.accent,
 			live = props.live,
+			variant = props.variant,
 			seconds = props.seconds,
 			position = UDim2.fromScale(0.5, 0.5),
 			anchorPoint = Vector2.new(0.5, 0.5),
@@ -70,6 +71,12 @@ return UILabs.CreateReactStory({
 		Title = UILabs.String("SCRAP RUSH"),
 		Detail = UILabs.String("2x scrap value all weekend"),
 		Live = UILabs.Boolean(true),
+		--[[
+			Overrides `Theme.Variant.EventBanner` for this story. "fade" is what ships -- the spin-reward
+			treatment with no outline -- and "panel" is the outlined slab it replaced, kept switchable so
+			the choice stays a choice.
+		]]
+		Variant = UILabs.Choose({ "fade", "panel" }, 1),
 	},
 }, function(props)
 	local controls = props.controls
@@ -101,6 +108,7 @@ return UILabs.CreateReactStory({
 			glyph = definition.Glyph,
 			accent = definition.Accent,
 			live = true,
+			variant = controls.Variant,
 			seconds = 5_400,
 		})
 		upcomingStates[index] = e(Bounded, {
@@ -112,6 +120,7 @@ return UILabs.CreateReactStory({
 			glyph = definition.Glyph,
 			accent = definition.Accent,
 			live = false,
+			variant = controls.Variant,
 			seconds = 176_400,
 		})
 	end
@@ -132,6 +141,23 @@ return UILabs.CreateReactStory({
 					}),
 				},
 				itemSize = UDim2.fromOffset(controls.Width + 30, controls.Height + 30),
+			},
+			{
+				title = "No icon — the text closes the gap rather than leaving a hole",
+				items = {
+					e(Bounded, {
+						key = "NoIcon",
+						width = 520,
+						height = 56,
+						title = "SCRAP RUSH",
+						detail = "2x scrap value all weekend",
+						accent = "Gold",
+						live = true,
+						variant = controls.Variant,
+						seconds = 5_400,
+					}),
+				},
+				itemSize = UDim2.fromOffset(560, 92),
 			},
 			{
 				title = "Live — every event in the schedule",

@@ -24,6 +24,7 @@ local Motion = require(UI.Motion)
 local Sound = require(UI.Sound)
 local P = require(UI.Primitives)
 local Icon = require(UI.Icon)
+local FadeBanner = require(script.Parent.FadeBanner)
 local Buttons = require(script.Parent.Buttons)
 local Indicators = require(script.Parent.Indicators)
 
@@ -636,6 +637,50 @@ function Overlays.Toast(props)
 	local height = math.max(props.height or 74, math.ceil(contentHeight) + 22)
 
 	local entrance = Motion.useEntrance(Motion.Spring.Bouncy)
+
+	--[[
+		TWO LOOKS, ONE SWITCH -- the same pair the event banner offers, chosen from
+		`Theme.Variant.Toast` and overridable per call.
+
+			"fade"   the spin-reward treatment: accent dissolving to both edges, no outline
+			"card"   the outlined dark slab with the colour stripe down the left
+
+		The fade version drops the stripe. The stripe exists to carry the accent on a neutral card, and
+		on a card whose whole fill IS the accent it is a second copy of the same information.
+
+		The measuring below still runs and still sets the height, so a long notification grows in either
+		look -- the icon is optional in both, and `x3` collapsing works the same way.
+	]]
+	if (props.variant or Theme.Variant.Toast) == "fade" then
+		local title = if typeof(props.count) == "number" and props.count > 1
+			then `{asText(props.title)}  x{props.count}`
+			else asText(props.title)
+		--- The body carries the detail; a reward line wins it, because that is the part worth reading.
+		local detail = if props.reward then asText(props.reward) else asText(props.body)
+		return e(FadeBanner.Banner, {
+			key = props.key or "Toast",
+			title = title,
+			detail = if detail ~= "" then detail else nil,
+			glyph = props.glyph,
+			accent = props.accentName or "Green",
+			titleSize = Theme.TextSize.Small,
+			detailColor = if props.reward then Theme.Color.Positive else Theme.Color.Gray,
+			--[[
+				Wraps and grows, exactly as the card variant does. The server sends whole sentences as a
+				title -- "Magnet storage full, visit your crusher" -- and the fade banner's default is to
+				truncate, which would quietly drop the half that tells the player what to do.
+
+				`textRef` is the same ref the measuring above reads, so the height below is derived from the
+				labels this variant actually rendered rather than from the card variant's.
+			]]
+			wrap = true,
+			textRef = textRef,
+			width = width,
+			height = math.max(height - 12, 56),
+			layoutOrder = props.layoutOrder,
+			zIndex = props.zIndex,
+		})
+	end
 
 	local card = e(P.Panel, {
 		key = "Card",

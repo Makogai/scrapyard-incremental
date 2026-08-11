@@ -58,6 +58,8 @@ return {
 	Wheel = require(Components.Wheel).Wheel,
 	--- Reward announcement banner: symmetric gradient fade, icon well, item or money.
 	RewardToast = require(Components.RewardToast),
+	--- The look behind the reward banner, the event strip and the fade toasts.
+	FadeBanner = require(Components.FadeBanner),
 
 	-- screens
 	Screens = {

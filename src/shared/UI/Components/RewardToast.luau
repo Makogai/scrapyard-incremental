@@ -26,11 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage.Packages.React)
 
 local UI = script.Parent.Parent
-local Theme = require(UI.Theme)
-local Motion = require(UI.Motion)
-local P = require(UI.Primitives)
-local Icon = require(UI.Icon)
-local Shine = require(UI.Components.Shine)
+local FadeBanner = require(UI.Components.FadeBanner)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 
 local e = React.createElement
@@ -90,157 +86,36 @@ function RewardToast.glyphFor(reward: { [string]: any }): string
 end
 
 --[[
+	The prize banner.
+
+	Now a thin caller of `FadeBanner`, which is where the look lives. It was the first user of that
+	treatment and for a while the only one, so the implementation sat here -- once the event strip and
+	the notification feed wanted the same thing, keeping a second copy would have guaranteed they drift.
+
 	props:
 		title     "GOD POTION"        what you got
 		detail    "+ $250,000"        optional second line
 		glyph     icon name
-		accent    Theme.Gradient key, default Gold
-		best      boolean?            adds the shine layer
+		image     item art, which beats the glyph
+		accent    Theme key, default Gold
+		best      boolean?            adds the shine
 		width     number?
 ]]
 function RewardToast.Banner(props)
-	local accentName = props.accent or "Gold"
-	local accent = Theme.Gradient[accentName] or Theme.Gradient.Gold
-	local width = props.width or 460
-	local height = props.height or 92
-	local wellExtent = height - 22
-	--- Item art when the caller supplied it; `Icon` prefers `image` over `glyph`.
-	local image = props.image
-
-	--- Springs in from slightly small, so it lands rather than appears.
-	local entrance = Motion.useEntrance(Motion.Spring.Bouncy)
-
-	--[[
-		A transparency ramp that is opaque in the middle and clear at both ends. Applied to the fill, so
-		the fade is a property of the gradient rather than a stack of frames -- and a `UIGradient` is not
-		a GuiObject, so its rotation cannot break clipping the way a rotated frame would.
-	]]
-	local fade = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.22, 0.15),
-		NumberSequenceKeypoint.new(0.5, 0),
-		NumberSequenceKeypoint.new(0.78, 0.15),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-
-	return e(P.Group, {
+	return e(FadeBanner.Banner, {
 		key = props.key or "RewardToast",
-		size = UDim2.fromOffset(width, height),
+		title = props.title,
+		detail = props.detail,
+		--- Falls back to the coin: a reward banner with no art at all would read as a bug.
+		glyph = props.glyph or (if props.image then nil else "coin"),
+		image = props.image,
+		accent = props.accent or "Gold",
+		shine = props.best == true,
+		width = props.width,
+		height = props.height,
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
-		--[[
-			`P.compact`, NOT a table literal.
-
-			The shine entry below is conditional and sits in the MIDDLE of this list. A nil there leaves a
-			hole, `ipairs` stops dead at it, and every child after it is dropped -- so any prize that was
-			not the jackpot rendered as an empty gradient bar with no icon and no text. That is exactly
-			what "it didn't show anything when I got money from a spin" was: the banner was there, the
-			contents were not.
-
-			Same class of bug as the friend boost's missing "+0%", which is why AGENTS.md rule 17 exists.
-		]]
-		children = P.compact(
-			e("UIScale", { key = "Entrance", Scale = entrance }),
-			--[[
-				The banner body. No stroke and no corner ink: an outline would give it the edges the fade
-				exists to remove.
-			]]
-			e("Frame", {
-				key = "Body",
-				BackgroundColor3 = Theme.Color[accentName] or Theme.Color.Gold,
-				BorderSizePixel = 0,
-				Size = UDim2.fromScale(1, 1),
-				ZIndex = 1,
-			}, {
-				e("UIGradient", {
-					key = "Fade",
-					Color = accent,
-					Transparency = fade,
-					Rotation = 0,
-				}),
-			}),
-			--- A darker inner band so white text stays readable over a pale accent.
-			e("Frame", {
-				key = "Ink",
-				BackgroundColor3 = Theme.Color.Ink,
-				BackgroundTransparency = 0.45,
-				BorderSizePixel = 0,
-				Size = UDim2.new(1, 0, 0, height - 26),
-				Position = UDim2.fromScale(0.5, 0.5),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				ZIndex = 2,
-			}, {
-				e("UIGradient", {
-					key = "Fade",
-					Transparency = fade,
-					Rotation = 0,
-				}),
-			}),
-			if props.best
-				then e(Shine.Layer, {
-					key = "Shine",
-					glow = true,
-					sparkles = true,
-					color = Theme.Color[accentName] or Theme.Color.Gold,
-					zIndex = 3,
-				})
-				else nil,
-			--- The icon well: a solid disc so the art reads against the fade behind it.
-			e(P.Panel, {
-				key = "Well",
-				size = UDim2.fromOffset(wellExtent, wellExtent),
-				position = UDim2.new(0.5, -width / 2 + wellExtent / 2 + 26, 0.5, 0),
-				anchorPoint = Vector2.new(0.5, 0.5),
-				gradient = Theme.Gradient.Slot,
-				radius = wellExtent / 2,
-				strokeThickness = 4,
-				studs = false,
-				zIndex = 4,
-				children = {
-					e(Icon, {
-						key = "Glyph",
-						glyph = props.glyph or "coin",
-						image = image,
-						plain = true,
-						size = UDim2.fromOffset(wellExtent - 18, wellExtent - 18),
-						position = UDim2.fromScale(0.5, 0.5),
-						anchorPoint = Vector2.new(0.5, 0.5),
-					}),
-				},
-			}),
-			e(P.Group, {
-				key = "Text",
-				size = UDim2.fromOffset(width - wellExtent - 80, height - 26),
-				position = UDim2.new(0, wellExtent + 46, 0.5, 0),
-				anchorPoint = Vector2.new(0, 0.5),
-				zIndex = 4,
-				layout = P.list({ padding = 2, vAlign = Enum.VerticalAlignment.Center }),
-				children = P.compact(
-					e(P.Label, {
-						key = "Title",
-						text = string.upper(tostring(props.title or "")),
-						textSize = Theme.TextSize.Heading,
-						color = Theme.Color.White,
-						align = Enum.TextXAlignment.Left,
-						size = UDim2.new(1, 0, 0, 30),
-						layoutOrder = 1,
-					}),
-					if props.detail
-						then e(P.Label, {
-							key = "Detail",
-							text = props.detail,
-							textSize = Theme.TextSize.Body,
-							font = Theme.Font.Bold,
-							color = Theme.Color.Positive,
-							align = Enum.TextXAlignment.Left,
-							size = UDim2.new(1, 0, 0, 24),
-							layoutOrder = 2,
-						})
-						else nil
-				),
-			})
-		),
 	})
 end
 

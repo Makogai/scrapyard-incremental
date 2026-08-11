@@ -28,6 +28,7 @@ local Icon = require(UI.Icon)
 local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
 local Overlays = require(UI.Components.Overlays)
+local FadeBanner = require(UI.Components.FadeBanner)
 
 local e = React.createElement
 
@@ -710,6 +711,45 @@ function Parts.EventBanner(props)
 		else Theme.Gradient.Gray
 
 	--[[
+		TWO LOOKS, ONE SWITCH. `Theme.Variant.EventBanner` picks the default; `props.variant` overrides
+		it for a single instance, which is what the story uses to show both at once.
+
+			"fade"   the spin-reward treatment -- accent dissolving to both edges, no outline
+			"panel"  the outlined dark slab the rest of the HUD uses
+
+		The countdown badge goes in the fade banner's right slot either way, so the two differ only in
+		their surface.
+	]]
+	local timer = e(Indicators.TimerBadge, {
+		key = "Timer",
+		seconds = props.seconds or 0,
+		gradient = accentGradient,
+		position = UDim2.fromScale(1, 0.5),
+		anchorPoint = Vector2.new(1, 0.5),
+		zIndex = 4,
+	})
+
+	if (props.variant or Theme.Variant.EventBanner) == "fade" then
+		return e(FadeBanner.Banner, {
+			key = props.key or "EventBanner",
+			title = props.title,
+			detail = props.detail,
+			glyph = props.glyph,
+			accent = if live then accentName else "Gray",
+			--- Smaller than a reward banner's: this sits in the HUD all day, not for three seconds.
+			titleSize = if height < 50 then Theme.TextSize.Small else Theme.TextSize.Body,
+			detailColor = Theme.Color.Gray,
+			width = width,
+			height = height,
+			right = timer,
+			rightWidth = timerWidth,
+			position = props.position,
+			anchorPoint = props.anchorPoint,
+			zIndex = props.zIndex,
+		})
+	end
+
+	--[[
 		Laid out, not hand-positioned. Every child used to be placed by absolute
 		offsets computed against `width`, and any one of them could end up outside
 		the panel when the width changed. Now: one horizontal auto-layout owns the
@@ -725,8 +765,8 @@ function Parts.EventBanner(props)
 		radius = Theme.Radius.Card,
 		color = Theme.Color.PanelDark,
 		gradient = Theme.Gradient.PanelDeep,
-		strokeColor = accent,
-		strokeThickness = Theme.Stroke.Card,
+		-- strokeColor = accent,
+		-- strokeThickness = Theme.Stroke.Card,
 		studs = false,
 		clip = true,
 		children = {
@@ -790,13 +830,13 @@ function Parts.EventBanner(props)
 					}),
 				},
 			}),
-			e(Indicators.TimerBadge, {
-				key = "Timer",
-				seconds = props.seconds or 0,
-				gradient = accentGradient,
+			e(P.Group, {
+				key = "TimerSlot",
+				size = UDim2.fromOffset(timerWidth, height),
 				position = UDim2.new(1, -10, 0.5, 0),
 				anchorPoint = Vector2.new(1, 0.5),
 				zIndex = 4,
+				children = { timer },
 			}),
 		},
 	})

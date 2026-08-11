@@ -4,6 +4,17 @@
 	The stack sits under the boost timers on the right so it never covers the
 	event banner, the menu column, or the mobile touch controls. Press SPAWN to
 	push a live toast through the real store, expiry included.
+
+	TWO VARIANTS, and this is where they get compared. `Theme.Variant.Toast` picks
+	what ships; the control here overrides it so both are on screen together:
+
+		"fade"  the spin-reward treatment -- accent dissolving to both edges, no
+		        outline, an icon well on the left
+		"card"  the outlined dark slab with a colour stripe down its left edge
+
+	The right-hand column also shows each variant WITHOUT an icon, which is the
+	case no in-game caller currently exercises -- `Bridge.notify` always sets a
+	glyph -- and therefore the one most likely to be broken when someone needs it.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -69,9 +80,14 @@ return UILabs.CreateReactStory({
 	summary = "Toast styles and the live auto-expiring stack.",
 	controls = {
 		ShowStatic = UILabs.Boolean(true),
+		--- Overrides `Theme.Variant.Toast` for this story only.
+		Variant = UILabs.Choose({ "fade", "card" }, 1),
 	},
 }, function(props)
+	local variant = props.controls.Variant
+
 	local statics = {}
+	local iconless = {}
 	if props.controls.ShowStatic then
 		for index, toast in ipairs(Mock.notifications) do
 			statics[#statics + 1] = e(UI.Overlays.Toast, {
@@ -81,6 +97,19 @@ return UILabs.CreateReactStory({
 				reward = toast.reward,
 				glyph = toast.glyph,
 				accent = Theme.Gradient[toast.accent],
+				accentName = toast.accent,
+				variant = variant,
+				layoutOrder = index,
+			})
+			--- The same toast with the glyph withheld: the text should close the gap, not leave a hole.
+			iconless[#iconless + 1] = e(UI.Overlays.Toast, {
+				key = "NoIcon" .. index,
+				title = toast.title,
+				body = toast.body,
+				reward = toast.reward,
+				accent = Theme.Gradient[toast.accent],
+				accentName = toast.accent,
+				variant = variant,
 				layoutOrder = index,
 			})
 		end
@@ -100,6 +129,22 @@ return UILabs.CreateReactStory({
 				position = UDim2.fromOffset(40, 170),
 				layout = P.list({ padding = 10 }),
 				children = statics,
+			}),
+			e(P.Label, {
+				key = "NoIconHeading",
+				text = "NO ICON",
+				textSize = Theme.TextSize.Small,
+				color = Theme.Color.Gray,
+				align = Enum.TextXAlignment.Left,
+				size = UDim2.fromOffset(340, 22),
+				position = UDim2.fromOffset(420, 148),
+			}),
+			e(P.Group, {
+				key = "Iconless",
+				size = UDim2.fromOffset(340, 600),
+				position = UDim2.fromOffset(420, 170),
+				layout = P.list({ padding = 10 }),
+				children = iconless,
 			}),
 		},
 	})

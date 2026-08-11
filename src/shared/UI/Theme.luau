@@ -558,4 +558,26 @@ Theme.Layer = {
 	Announcement = 500,
 }
 
+--------------------------------------------------------------------------------
+-- Surface variants — the one place the announcement look is chosen
+--------------------------------------------------------------------------------
+
+--[[
+	Two surfaces can be drawn either way, and this is the switch.
+
+		"fade"   the spin-reward look: accent gradient dissolving to both edges, no outline.
+		         `Components/FadeBanner`.
+		"panel"  the outlined dark slab the rest of the HUD uses. `P.Panel`.
+
+	Change a value here and every instance follows -- that is the point of it living in one table
+	rather than at each call site. Individual callers can still pass `variant` to override, which is
+	what the stories do so both looks stay reviewable side by side.
+]]
+Theme.Variant = {
+	--- The HUD event strip.
+	EventBanner = "fade",
+	--- The corner notification feed.
+	Toast = "fade",
+}
+
 return Theme

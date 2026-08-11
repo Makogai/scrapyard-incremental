@@ -39,7 +39,15 @@ local function NotificationStack(props)
 			body = toast.Body,
 			reward = toast.Reward,
 			glyph = toast.Glyph,
+			--[[
+				BOTH FORMS OF THE ACCENT, because the two toast variants want different things.
+
+				The card variant strokes a gradient down its stripe; the fade variant needs the theme KEY
+				so it can pull the matching solid colour for its fill as well. Resolving the gradient here
+				and passing the name alongside keeps the switch in `Theme.Variant` free of call-site edits.
+			]]
 			accent = Theme.Gradient[toast.Accent or "Green"],
+			accentName = toast.Accent or "Green",
 			width = props.width or 320,
 			layoutOrder = index,
 		})
