@@ -13,6 +13,7 @@ local TopbarController = require(script.Controllers.TopbarController)
 local PetFollowerController = require(script.Controllers.PetFollowerController)
 local PlotSignController = require(script.Controllers.PlotSignController)
 local TutorialArrowController = require(script.Controllers.TutorialArrowController)
+local EventBillboardController = require(script.Controllers.EventBillboardController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -49,5 +50,10 @@ PlotSignController.Start()
 	has pulled the first snapshot. Starting it earlier is harmless but pointless.
 ]]
 TutorialArrowController.Start()
+--[[
+	The world event billboard. Independent of the React UI: it fills an authored SurfaceGui from
+	attributes the server publishes, so it needs neither the store nor the Bridge.
+]]
+EventBillboardController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))

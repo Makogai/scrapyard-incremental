@@ -1033,16 +1033,40 @@ local function StatusIcon(props)
 				size = UDim2.new(1, 0, 0, valueHeight),
 				zIndex = 3,
 			}),
-			--- Count pip, top-right, only when there is something to count.
-			if props.badge
-				then e(Indicators.Badge, {
-					key = "Badge",
-					text = props.badge,
-					gradient = props.badgeGradient or Theme.Gradient.Red,
-					textSize = Theme.TextSize.Micro,
-					position = UDim2.new(1, 4, 0, -2),
+			--[[
+				A WARNING DOT, NOT A COUNT.
+
+				This was `Indicators.Badge` with text in it, which made the icon look like a message inbox
+				with three unread items -- and the number was never useful: the spin icon already prints its
+				count underneath, and "1" on the daily icon says nothing that the icon lighting up does not.
+
+				What a player needs from the corner of an icon is one bit: something here needs you. So it
+				is a red disc with an exclamation and nothing else, and any caller that has a real count
+				puts it in `value`, under the icon, where the spin count already lives.
+			]]
+			if props.attention
+				then e(P.Panel, {
+					key = "Attention",
+					size = UDim2.fromOffset(18, 18),
+					position = UDim2.new(1, 3, 0, -3),
 					anchorPoint = Vector2.new(1, 0),
+					gradient = Theme.Gradient.Red,
+					radius = 9,
+					strokeThickness = 2.5,
+					studs = false,
 					zIndex = 5,
+					children = {
+						e(P.Label, {
+							key = "Mark",
+							text = "!",
+							textSize = Theme.TextSize.Micro,
+							color = Theme.Color.White,
+							--- The disc is 18px: a text outline at this size fills it in and loses the mark.
+							stroke = false,
+							size = UDim2.fromScale(1, 1),
+							zIndex = 2,
+						}),
+					},
 				})
 				else nil,
 			--[[
@@ -1086,8 +1110,10 @@ function Parts.FriendBoost(props)
 		extent = props.extent,
 		value = `+{percent}%`,
 		valueColor = if active then Theme.Color.Cash else Theme.Color.GrayDark,
-		badge = if active then tostring(count) else nil,
-		badgeGradient = Theme.Gradient.Cyan,
+		--[[
+			No dot here at all. A friend boost is not something to act on -- it is a readout of who is
+			already in the server -- and the percentage under the glyph is the fact worth showing.
+		]]
 		tipTitle = "FRIEND BOOST",
 		tipBody = if active
 			then `+{percent}% money from {count} friend{if count == 1 then "" else "s"} in this server. Bring more and it climbs.`
@@ -1102,8 +1128,11 @@ function Parts.FriendBoost(props)
 end
 
 --[[
-	Spin wheel. The count of spins banked is the number that matters, so it is both the value under
-	the glyph and the badge.
+	Spin wheel.
+
+	The banked count is the number that matters and it sits UNDER the glyph, where every other status
+	icon puts its value. It used to be repeated in a red corner dot as well, which is the same figure
+	twice and made a full stash look like an error.
 ]]
 function Parts.SpinWheel(props)
 	local spins = props.spins or 0
@@ -1115,8 +1144,6 @@ function Parts.SpinWheel(props)
 		extent = props.extent,
 		value = if ready then `{spins}` else "-",
 		valueColor = if ready then Theme.Color.Gold else Theme.Color.GrayDark,
-		badge = if ready then tostring(spins) else nil,
-		badgeGradient = Theme.Gradient.Red,
 		tipTitle = "DAILY SPIN",
 		tipBody = if ready
 			then `{spins} spin{if spins == 1 then "" else "s"} ready. Top prize is the God Potion.`
@@ -1137,7 +1164,7 @@ end
 	a free gift, it is a standing multiplier you keep by turning up. Showing "+15%" states that where a
 	calendar icon on its own says nothing about why you should care.
 
-	The badge is a "!" rather than a number, because the interesting fact is binary -- there is
+	The dot is a bare "!" rather than a number, because the interesting fact is binary -- there is
 	something to claim, or there is not.
 ]]
 function Parts.DailyBoost(props)
@@ -1158,8 +1185,8 @@ function Parts.DailyBoost(props)
 		extent = props.extent,
 		value = if claimable then "READY" else Format.timer(props.resetSeconds or 0),
 		valueColor = if claimable then Theme.Color.Positive else Theme.Color.Gray,
-		badge = if claimable then "!" else nil,
-		badgeGradient = Theme.Gradient.Red,
+		--- One bit: the reward is waiting. The value line already says how long until the next one.
+		attention = claimable,
 		tipTitle = "DAILY LOGIN",
 		tipBody = if claimable
 			then `Reward ready to claim. Streak {streak} day{if streak == 1 then "" else "s"}, worth +{percent}% cash -- keep it going and it climbs.`

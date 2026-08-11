@@ -757,6 +757,7 @@ function Store.use()
 		advertise an event that did not exist.
 	]]
 	local event = nil
+	local nextEvent = nil
 	if activeEvent and activeEvent.Id then
 		local definition = nil
 		for _, candidate in ipairs(EventConfig.Events) do
@@ -765,17 +766,37 @@ function Store.use()
 				break
 			end
 		end
-		if definition then
-			local live = activeEvent.Live == true
-			local target = if live then activeEvent.EndsAt else activeEvent.StartsAt
-			local remaining = math.max(0, (target or now) - now)
+		--[[
+			THE HUD STRIP IS FOR LIVE EVENTS ONLY.
+
+			It used to carry the upcoming one too, in grey, so a player would learn the cadence. That job
+			moved to the world billboard, which is a better place for it: the HUD is where the game tells
+			you what is true RIGHT NOW, and a permanent strip counting down to Saturday is the same kind of
+			furniture the fake banner was -- always on screen, never actionable.
+
+			`nextEvent` is still exposed for anything that wants to build anticipation elsewhere.
+		]]
+		local live = activeEvent.Live == true
+		local target = if live then activeEvent.EndsAt else activeEvent.StartsAt
+		local remaining = math.max(0, (target or now) - now)
+		if definition and live then
 			event = {
 				id = definition.Id,
 				title = definition.Title,
-				detail = if live then definition.Detail else `Next event: {definition.Detail}`,
+				detail = definition.Detail,
 				glyph = definition.Glyph,
 				accent = definition.Accent,
-				live = live,
+				live = true,
+				seconds = remaining,
+			}
+		elseif definition then
+			nextEvent = {
+				id = definition.Id,
+				title = definition.Title,
+				detail = definition.Detail,
+				glyph = definition.Glyph,
+				accent = definition.Accent,
+				live = false,
 				seconds = remaining,
 			}
 		end
@@ -809,6 +830,7 @@ function Store.use()
 
 		boosts = boosts,
 		event = event,
+		nextEvent = nextEvent,
 		screen = screen,
 		detail = if detail then { kind = detail.Kind, id = detail.Id } else nil,
 		confirm = confirm,

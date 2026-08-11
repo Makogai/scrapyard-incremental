@@ -12,6 +12,8 @@
 
 		- Push a fresh snapshot to everyone when the window turns over, so the HUD banner changes at the
 		  same moment the multipliers do.
+		- Publish the live AND next event to `ReplicatedStorage.EventState`, which is what the world
+		  billboard reads.
 		- Announce it once, so a player already in-game sees it start rather than discovering it.
 
 	Polling, not scheduling. A `task.delay` to the exact boundary sounds tighter but breaks in the two
@@ -34,6 +36,19 @@ local EventService = {}
 --- How often the schedule is checked. The banner may lag a window edge by at most this long.
 local POLL_SECONDS = 5
 
+--[[
+	WHERE THE WORLD READS THE SCHEDULE FROM.
+
+	The player's snapshot carries the live event, which is what the HUD strip needs. The world billboard
+	needs something else: BOTH what is on now and what is next, because it is the surface that teaches
+	the cadence while the HUD only announces the moment.
+
+	Published as attributes on a folder in `ReplicatedStorage` rather than on the billboard model itself.
+	Attributes replicate, any number of billboards can read them, and none of it breaks if the map is
+	rearranged -- which a model-attached version would.
+]]
+local STATE_FOLDER = "EventState"
+
 --- The id we last told clients about, so a turnover is detected rather than re-announced forever.
 local lastEventId: string? = nil
 local started = false
@@ -41,6 +56,36 @@ local started = false
 --- The live event, or nil. Anything server-side that wants the current event asks here.
 function EventService.Current(): (EventConfig.EventDefinition?, number)
 	return EventConfig.activeAt(os.time())
+end
+
+--- The published folder, created on first use so `Start` order cannot matter.
+local function stateFolder(): Folder
+	local existing = ReplicatedStorage:FindFirstChild(STATE_FOLDER)
+	if existing and existing:IsA("Folder") then
+		return existing
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = STATE_FOLDER
+	folder.Parent = ReplicatedStorage
+	return folder
+end
+
+--[[
+	Publish both halves of the schedule.
+
+	ABSOLUTE TIMESTAMPS, not remaining seconds. A "seconds left" attribute would need rewriting every
+	second and would still be stale between writes; an end time is written once per window and every
+	client can count down from it against the same server clock.
+]]
+local function publish()
+	local now = os.time()
+	local folder = stateFolder()
+	local live, remaining = EventConfig.activeAt(now)
+	local upcoming, wait = EventConfig.nextAt(now)
+	folder:SetAttribute("LiveId", if live then live.Id else "")
+	folder:SetAttribute("LiveEndsAt", if live then now + remaining else 0)
+	folder:SetAttribute("NextId", if upcoming then upcoming.Id else "")
+	folder:SetAttribute("NextStartsAt", if upcoming then now + wait else 0)
 end
 
 --[[
@@ -84,12 +129,14 @@ function EventService.Start()
 		end
 		lastEventId = id
 		--- Snapshot first, popup second: the HUD should already be right when the popup names it.
+		publish()
 		PlayerStateService.PushAll()
 		if not first then
 			announce(definition)
 		end
 	end
 
+	publish()
 	poll(true)
 
 	task.spawn(function()
