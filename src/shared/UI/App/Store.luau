@@ -289,8 +289,9 @@ local function liveActions()
 		Bridge.petAction("UnequipPet", petId)
 	end
 
-	function self.deletePet(petId: string)
-		Bridge.petAction("DeletePet", petId)
+	--- `count` copies of one pet, so the pets window's bulk delete is a few calls rather than dozens.
+	function self.deletePet(petId: string, count: number?)
+		Bridge.petAction("DeletePet", petId, count)
 	end
 
 	function self.buyPetSlot()
@@ -733,6 +734,8 @@ function Store.use()
 	local activeEvent = useAtom(Atoms.activeEvent)
 	local totalScrapCollected = useAtom(Atoms.totalScrapCollected)
 	local eggOpenCounts = useAtom(Atoms.eggOpenCounts)
+	local petStorageCapacity = useAtom(Atoms.petStorageCapacity)
+	local secretTickets = useAtom(Atoms.secretTickets)
 	local unlockedAchievements = useAtom(Atoms.unlockedAchievements)
 	local unlockedTitles = useAtom(Atoms.unlockedTitles)
 	local equippedTitle = useAtom(Atoms.equippedTitle)
@@ -993,6 +996,9 @@ function Store.use()
 		equippedPets = equippedPets,
 		-- The server's number, not a guess derived from what is equipped.
 		petSlots = maximumEquippedPets,
+		--- What the pets window's storage counter reads, and what hatching is refused over.
+		petStorageCapacity = petStorageCapacity,
+		secretTickets = secretTickets,
 		discoveredScrap = discoveredScrap,
 		settings = settings,
 

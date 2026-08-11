@@ -2,7 +2,7 @@
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.CurrentVersion = 15
+PlayerDataSchema.CurrentVersion = 16
 
 local PET_IDS = {
 	"Pup",
@@ -94,6 +94,14 @@ local DAILY_CALENDAR_LENGTH = 7
 local MAXIMUM_PLAYTIME_SECONDS = 86400
 local PLAYTIME_MILESTONE_COUNT = 9
 local MAXIMUM_STORED_SPINS = 25
+
+--[[
+	A ceiling on guaranteed-Secret tickets.
+
+	Bounded like everything else, and low on purpose: an edited save claiming a million of these would be
+	a million guaranteed Secrets, which is the single most valuable thing in the game to forge.
+]]
+local MAXIMUM_SECRET_TICKETS = 100
 
 --- Bounds for config-keyed sets (achievements, titles) the schema cannot validate by name.
 local MAXIMUM_ID_LENGTH = 64
@@ -281,6 +289,14 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 			`EquippedTitle` is an id, never the display text. Text belongs to `TitleConfig`, so rewording a
 			title updates every player who wears it instead of leaving stale strings in saves.
 		]]
+		--[[
+			Guaranteed Secret rolls, as a COUNT of tickets rather than a flag.
+
+			A count is what makes it testable and grantable in bulk: five tickets is five rolls that must
+			come up Secret, whatever egg they are spent on. Consumed one per roll inside `TryOpenEgg`.
+		]]
+		SecretTickets = 0,
+
 		UnlockedAchievements = {},
 		UnlockedTitles = {},
 		EquippedTitle = "",
@@ -773,6 +789,7 @@ function PlayerDataSchema.validate(
 		which ids mean anything: `AchievementConfig.ById` and `TitleConfig.resolve` both return nil for an
 		unknown id, so a stale key is inert everywhere it is read.
 	]]
+	clean.SecretTickets = boundedInteger(raw.SecretTickets, 0, 0, MAXIMUM_SECRET_TICKETS)
 	clean.UnlockedAchievements = boundedIdSet(raw.UnlockedAchievements)
 	clean.UnlockedTitles = boundedIdSet(raw.UnlockedTitles)
 

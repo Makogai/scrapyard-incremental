@@ -192,7 +192,9 @@ function PetService.Start()
 		elseif action == "UnequipPet" then
 			success, message = PlayerStateService.TryUnequipPet(player, targetId)
 		elseif action == "DeletePet" then
-			success, message = PlayerStateService.TryDeletePet(player, targetId)
+			--- `count` is how many copies of this pet to drop; the screen's bulk delete uses it.
+			local copies = if typeof(count) == "number" then math.floor(count) else 1
+			success, message = PlayerStateService.TryDeletePet(player, targetId, copies)
 		elseif action == "BuyPetSlot" then
 			success, message = PlayerStateService.TryBuyPetSlot(player)
 		else

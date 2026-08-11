@@ -109,6 +109,15 @@ Atoms.activeEvent = Charm.atom(nil :: { [string]: any }?)
 --- Eggs opened per egg id, which one achievement counts and nothing else reads yet.
 Atoms.eggOpenCounts = Charm.atom({} :: { [string]: number })
 
+--[[
+	Pet storage, and guaranteed-Secret tickets.
+
+	Storage capacity is the number hatching is refused over, so the pets window shows it: a player told
+	"pet storage is full" can look up and see 50/50 rather than counting cards.
+]]
+Atoms.petStorageCapacity = Charm.atom(0)
+Atoms.secretTickets = Charm.atom(0)
+
 Atoms.unlockedAchievements = Charm.atom({} :: { [string]: boolean })
 Atoms.unlockedTitles = Charm.atom({} :: { [string]: boolean })
 Atoms.equippedTitle = Charm.atom("")
@@ -249,6 +258,12 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.Inventory) == "table" then
 		Atoms.inventory(snapshot.Inventory)
+	end
+	if type(snapshot.PetStorageCapacity) == "number" then
+		Atoms.petStorageCapacity(snapshot.PetStorageCapacity)
+	end
+	if type(snapshot.SecretTickets) == "number" then
+		Atoms.secretTickets(snapshot.SecretTickets)
 	end
 	if type(snapshot.EggOpenCounts) == "table" then
 		Atoms.eggOpenCounts(snapshot.EggOpenCounts)

@@ -187,8 +187,9 @@ end
 	BuyPetSlot. There is no bulk equip on the server, so "equip best" is a client
 	loop of EquipPet intents -- each one still validated server-side.
 ]]
-function Bridge.petAction(action: string, petId: string?)
-	fire("PetAction", action, petId)
+--- `count` is only meaningful for `DeletePet`, where it is how many copies to drop.
+function Bridge.petAction(action: string, petId: string?, count: number?)
+	fire("PetAction", action, petId, count)
 end
 
 --- `count` is the hatch batch size; the server checks the entitlement behind it and clamps.

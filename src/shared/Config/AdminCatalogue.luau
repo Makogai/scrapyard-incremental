@@ -122,6 +122,21 @@ function AdminCatalogue.build(): { AdminSection }
 				Accent = "Cyan",
 			},
 			{
+				--[[
+					A guaranteed-Secret roll. The amount box sets how many.
+
+					Lives with RESOURCES because it is a count the player holds, and the point of it is the
+					ROLL: spending one runs the real hatch, the real reveal and the real server-wide
+					announcement, which is what anyone granting this is actually trying to look at.
+				]]
+				Id = "GrantSecretTicket",
+				Label = "SECRET TICKETS",
+				Command = "GrantSecretTicket",
+				Amount = true,
+				Glyph = "star",
+				Accent = "Gold",
+			},
+			{
 				Id = "AddRebirths",
 				Label = "REBIRTHS",
 				Command = "AddRebirths",

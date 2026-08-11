@@ -99,7 +99,7 @@ expectEqual(limiter:Allow("player", 2), false, "rate limit rejection")
 expectEqual(limiter:Allow("player", 5), true, "rate limit window reset")
 
 local defaultData = PlayerDataSchema.createDefault(1000)
-expectEqual(defaultData.SchemaVersion, 15, "default schema version")
+expectEqual(defaultData.SchemaVersion, 16, "default schema version")
 expectEqual(defaultData.ActivePlotTheme, "FrontYard", "default plot theme")
 expectEqual(defaultData.PetSlotUpgradeLevel, 0, "default pet slot upgrade")
 expectEqual(#defaultData.EquippedPets, 0, "default equipped pets")
@@ -128,7 +128,7 @@ local migratedOk, migrated = PlayerDataSchema.validate({
 	LastLoginTimestamp = 800,
 }, 1000)
 expectEqual(migratedOk, true, "version one migration")
-expectEqual(migrated.SchemaVersion, 15, "migrated schema version")
+expectEqual(migrated.SchemaVersion, 16, "migrated schema version")
 expectEqual(migrated.ActivePlotTheme, "FrontYard", "migrated plot theme defaults to the scrapyard")
 expectEqual(migrated.Money, 125, "migrated money")
 expectEqual(migrated.UpgradeLevels.MagnetStrength, 3, "migrated upgrade")
@@ -301,7 +301,7 @@ local thirteenOk, thirteen = PlayerDataSchema.validate({
 	ActivePlotTheme = "WorkshopYard",
 }, 3000)
 expectEqual(thirteenOk, true, "version thirteen migration")
-expectEqual(thirteen.SchemaVersion, 15, "migrated to fifteen from thirteen")
+expectEqual(thirteen.SchemaVersion, 16, "migrated to sixteen from thirteen")
 expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
@@ -635,9 +635,36 @@ local fourteenOk, fourteen = PlayerDataSchema.validate({
 	DailyStreak = 4,
 }, 4000)
 expectEqual(fourteenOk, true, "version fourteen migration")
-expectEqual(fourteen.SchemaVersion, 15, "migrated to fifteen")
+expectEqual(fourteen.SchemaVersion, 16, "migrated to sixteen")
 expectEqual(fourteen.DailyStreak, 4, "migration preserves the streak")
 expectEqual(fourteen.EquippedTitle, "", "migrated player wears no title")
 expectEqual(next(fourteen.UnlockedTitles), nil, "migrated player holds no titles")
+
+--[[
+	Secret tickets. The most valuable forgeable number in the save, so the bound matters more than the
+	default: an edited profile claiming a million guaranteed Secrets must come back clamped.
+]]
+local ticketOk, ticketData = PlayerDataSchema.validate({
+	SchemaVersion = 16,
+	SecretTickets = 1e9,
+}, 5000)
+expectEqual(ticketOk, true, "secret tickets validate")
+expectEqual(ticketData.SecretTickets, 100, "secret tickets are clamped")
+
+local negativeOk, negativeData = PlayerDataSchema.validate({
+	SchemaVersion = 16,
+	SecretTickets = -12,
+}, 5000)
+expectEqual(negativeOk, true, "negative tickets validate")
+expectEqual(negativeData.SecretTickets, 0, "negative tickets floor at zero")
+
+--- A save written before the field existed reads as none, not nil.
+local fifteenOk, fifteen = PlayerDataSchema.validate({
+	SchemaVersion = 15,
+	Money = 400,
+}, 5000)
+expectEqual(fifteenOk, true, "version fifteen migration")
+expectEqual(fifteen.SchemaVersion, 16, "migrated fifteen to sixteen")
+expectEqual(fifteen.SecretTickets, 0, "migrated player holds no tickets")
 
 print(`Scrapyard foundation and data tests passed: {passed}`)

@@ -20,6 +20,7 @@ local React = require(ReplicatedStorage.Packages.React)
 local UI = script.Parent.Parent
 local Theme = require(UI.Theme)
 local Motion = require(UI.Motion)
+local Sound = require(UI.Sound)
 local P = require(UI.Primitives)
 local Icon = require(UI.Icon)
 
@@ -38,10 +39,29 @@ local HEIGHT = 86
 		model     optional pet/egg model id, rendered in place of the glyph
 		modelKind "pet" | "egg"
 		top       design pixels from the top of the screen
+		sound     cue name, played once when the banner arrives
+		celebrate boolean?  sparkles and a sweep, for the rare ones
 ]]
 function Announcement.Banner(props)
 	local accent = props.accent or Theme.Gradient.Pink
 	local entrance = Motion.useEntrance(Motion.Spring.Bouncy)
+
+	--[[
+		A SOUND, ONCE, ON ARRIVAL.
+
+		A server-wide announcement is the one interruption every player in the game gets at the same moment,
+		and it was silent -- so anyone not looking at the top of their screen missed it entirely. `celebrate`
+		is the cue when the caller asks for one; the banner never picks its own, because a routine
+		announcement should not sound like a Secret hatch.
+
+		In a `useEffect` with no dependencies, so it fires when the banner MOUNTS. Playing it during render
+		would fire again on every re-render the tick causes.
+	]]
+	React.useEffect(function()
+		if props.sound then
+			Sound.play(props.sound)
+		end
+	end, {})
 
 	--[[
 		Drops in from above rather than scaling: the banner is full width, and a
@@ -50,6 +70,7 @@ function Announcement.Banner(props)
 	local offset = Motion.lerp(entrance, -HEIGHT - 24, 0)
 
 	local ModelView = require(script.Parent.ModelView)
+	local Shine = require(script.Parent.Shine)
 
 	return e(P.Group, {
 		key = props.key or "Announcement",
@@ -60,6 +81,22 @@ function Announcement.Banner(props)
 		anchorPoint = Vector2.new(0.5, 0),
 		zIndex = props.zIndex or Theme.Layer.Announcement,
 		children = P.compact(
+			--[[
+				CELEBRATION, only when asked for.
+
+				Sparkles and a glow across the whole strip, on an overlay above the wash so it lights the
+				banner rather than tinting one element of it. A routine announcement gets none of this -- the
+				effect is what tells everyone that what just happened was rare.
+			]]
+			if props.celebrate
+				then e(Shine.Layer, {
+					key = "Celebrate",
+					sparkles = true,
+					sweep = true,
+					color = Theme.Color.White,
+					zIndex = 8,
+				})
+				else nil,
 			-- Full-bleed wash, brightest in the middle, so the ends melt into the
 			-- screen edges instead of stopping at a hard border.
 			e("Frame", {

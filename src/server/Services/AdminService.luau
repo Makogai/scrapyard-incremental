@@ -79,6 +79,7 @@ local function boundedAmount(command: string, value: any): number?
 		and command ~= "AddSpins"
 		and command ~= "SetDailyStreak"
 		and command ~= "AddRebirths"
+		and command ~= "GrantSecretTicket"
 	then
 		return nil
 	end

@@ -239,6 +239,8 @@ local function publicSnapshot(data: { [string]: any })
 			+ data.PetSlotUpgradeLevel
 			+ (if data.Entitlements.ExtraPetSlots == true then PetConfig.PassBonusSlots else 0),
 		PetStorageCapacity = PetConfig.BaseStorageCapacity,
+		--- Guaranteed-Secret rolls in hand, so the pets window can say so rather than surprising anyone.
+		SecretTickets = data.SecretTickets,
 
 		--[[
 			Return-to-play state. The client renders these; it never decides them. `DailyClaimable`
@@ -1176,6 +1178,13 @@ function PlayerStateService.AdminMutate(
 		end
 		data.OwnedPets[itemId] =
 			math.min(PetConfig.MaximumOwnedPerPet, (data.OwnedPets[itemId] or 0) + grant)
+	elseif command == "GrantSecretTicket" then
+		--[[
+			Tickets, not a forced pet. Handing the pet over directly would skip the roll -- and the roll is
+			the thing worth testing: the reveal, the batch, and the server-wide announcement all hang off it.
+		]]
+		local grant = math.floor(math.clamp(amount or 1, 1, 100))
+		data.SecretTickets = math.min(100, (data.SecretTickets or 0) + grant)
 	elseif command == "GrantEntitlement" then
 		local definition = if itemId then MonetizationConfig.Passes[itemId] else nil
 		if definition == nil then
@@ -1300,7 +1309,18 @@ function PlayerStateService.TryOpenEgg(
 	for _ = 1, batch do
 		local nextOpenCount = (data.EggOpenCounts[eggId] or 0) + 1
 		local wonPetId
-		if nextOpenCount % PetConfig.SecretPityRolls == 0 then
+		--[[
+			A TICKET BEATS EVERY OTHER RULE, including both pity counters: it is granted precisely so its
+			holder can see a Secret on demand, and a ticket that lost to a weight roll would be worthless.
+
+			Spent per ROLL, not per press, so a x5 with two tickets is two guaranteed Secrets and three
+			normal rolls. The pity counter still advances underneath, because the ticket is extra rather
+			than instead.
+		]]
+		if (data.SecretTickets or 0) > 0 then
+			data.SecretTickets -= 1
+			wonPetId = egg.PetIds[6]
+		elseif nextOpenCount % PetConfig.SecretPityRolls == 0 then
 			wonPetId = egg.PetIds[6]
 		elseif nextOpenCount % PetConfig.LegendaryPityRolls == 0 then
 			wonPetId = if math.random(1, 10) == 1 then egg.PetIds[6] else egg.PetIds[5]
@@ -1371,7 +1391,18 @@ function PlayerStateService.TryUnequipPet(player: Player, petId: string): (boole
 	return false, "Pet is not equipped"
 end
 
-function PlayerStateService.TryDeletePet(player: Player, petId: string): (boolean, string)
+--[[
+	Delete pets. `count` copies of one pet, defaulting to one.
+
+	A count rather than a list of ids because the remote carries one target: the screen's bulk delete
+	sends one call per SELECTED PET with how many of that pet to drop, which is a handful of calls
+	instead of one per copy -- and the rate limiter counts calls.
+]]
+function PlayerStateService.TryDeletePet(
+	player: Player,
+	petId: string,
+	count: number?
+): (boolean, string)
 	local session = sessions[player]
 	local definition = PetConfig.Pets[petId]
 	if session == nil or definition == nil then
@@ -1382,23 +1413,37 @@ function PlayerStateService.TryDeletePet(player: Player, petId: string): (boolea
 	if owned <= 0 then
 		return false, "Pet is not owned"
 	end
-	local equippedIndex: number? = nil
+
+	--- Never more than are owned, and never fewer than one: a count of zero would be a silent no-op.
+	local removing = math.clamp(math.floor(count or 1), 1, owned)
+
+	--[[
+		Unequip as many copies as are being deleted, newest first.
+
+		A pet can be equipped more than once when several copies are owned, so deleting two copies has to
+		free two slots. Iterating backwards means the indices behind the one being removed stay valid.
+	]]
+	local toUnequip = removing
 	for index = #data.EquippedPets, 1, -1 do
-		if data.EquippedPets[index] == petId then
-			equippedIndex = index
+		if toUnequip <= 0 then
 			break
 		end
+		if data.EquippedPets[index] == petId then
+			table.remove(data.EquippedPets, index)
+			toUnequip -= 1
+		end
 	end
-	if equippedIndex then
-		table.remove(data.EquippedPets, equippedIndex)
-	end
-	if owned == 1 then
+
+	if owned - removing <= 0 then
 		data.OwnedPets[petId] = nil
 	else
-		data.OwnedPets[petId] = owned - 1
+		data.OwnedPets[petId] = owned - removing
 	end
 	pushState(player, data)
-	return true, `{definition.DisplayName} deleted`
+	local message = if removing == 1
+		then `{definition.DisplayName} deleted`
+		else `{removing}x {definition.DisplayName} deleted`
+	return true, message
 end
 
 function PlayerStateService.TryBuyPetSlot(player: Player): (boolean, string)

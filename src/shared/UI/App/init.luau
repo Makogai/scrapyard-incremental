@@ -341,6 +341,15 @@ local function App(props)
 				model = state.announce.PetId,
 				modelKind = "pet",
 				glyph = "star",
+				--[[
+					A Secret hatch gets the chord and the sparkles; anything else arrives quietly.
+
+					This is the only server-wide interruption in the game, and it was silent -- so unless a
+					player happened to be looking at the top of their screen when it dropped, the rarest event
+					in the game passed them by.
+				]]
+				sound = if state.announce.Kind == "SecretPet" then "secret" else nil,
+				celebrate = state.announce.Kind == "SecretPet",
 				top = safe.top,
 			})
 			else nil,
