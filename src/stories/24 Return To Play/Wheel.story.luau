@@ -8,6 +8,9 @@
 	`Segments` drives that last one -- drag it down to 4 and up to 10 and the wedges should stay tidy
 	at every step. `Rotation` parks the wheel at any angle, which is how you check that a wedge under
 	the pointer really is the one the screen would claim won.
+
+	`Spinning` and `Winner` are the animated states, held still here rather than only appearing for a
+	second and a half during a real spin.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +37,13 @@ return UILabs.CreateReactStory({
 		Extent = UILabs.Slider(392, 240, 520, 8),
 		--- The gold wedge and its shine follow the `Best` flag, so this proves it is data-driven.
 		ShowBest = UILabs.Boolean(true),
+		--[[
+			The two animated states. `Spinning` kicks the pointer; `Winner` pulses one wedge, and 0 means
+			nobody has won -- both are the flags the spin screen sets, driven here so the animation can be
+			judged without sitting through a real spin.
+		]]
+		Spinning = UILabs.Boolean(false),
+		Winner = UILabs.Slider(0, 0, 10, 1),
 	},
 }, function(props)
 	local controls = props.controls
@@ -66,6 +76,11 @@ return UILabs.CreateReactStory({
 						segments = segments,
 						rotation = controls.Rotation,
 						extent = controls.Extent,
+						spinning = controls.Spinning,
+						winner = if controls.Winner > 0
+								and controls.Winner <= controls.Segments
+							then controls.Winner
+							else nil,
 					}),
 				},
 				itemSize = UDim2.fromOffset(controls.Extent + 20, controls.Extent + 46),

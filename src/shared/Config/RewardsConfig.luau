@@ -185,7 +185,11 @@ local spinSegments = {
 		Spins = 2,
 		Label = "+2 Spins",
 		Accent = "Cyan",
-		Glyph = "star",
+		--[[
+			The wheel, not a star. `star` draws a big gold eight-point sparkle, which at wedge size read as
+			an orange splat rather than a prize -- and a wheel is what "+2 Spins" actually gets you.
+		]]
+		Glyph = "wheel",
 	}),
 	--[[
 		THE BEST PRIZE. `Best` is a flag, not a hardcoded id in the UI: the wheel finds whichever

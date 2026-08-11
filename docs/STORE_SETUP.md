@@ -50,7 +50,7 @@ is what the game actually gives. Also worth knowing: `QuantumMagnet`'s 3D model 
 `AdvancedMagnet` with a different material — a 399 R$ item that is a recolour of a 60,000-cash one.
 See `docs/MAGNETS.md`.
 
-## 2. Developer products — 7 to create
+## 2. Developer products — 9 to create
 
 | # | Create as | Price (R$) | Grants | Config key |
 | --- | --- | --- | --- | --- |
@@ -61,6 +61,13 @@ See `docs/MAGNETS.md`.
 | 13 | **Booster Bundle** | 199 | 6 Cash Potions, 6 Strength Potions | `BoosterBundle` |
 | 14 | **Mega Starter Bundle** | 299 | $100,000 plus a potion set | `MegaBundle` |
 | 15 | **Instant Rebirth** | 149 | Completes one rebirth with no cash requirement | `SkipRebirth` |
+| 16 | **One Spin** | 59 | 1 wheel spin | `SpinOne` |
+| 17 | **Three Spins** | 120 | 3 wheel spins | `SpinThree` |
+
+Items 16 and 17 are sold from the spin wheel itself, beside the wheel, rather than from the shop --
+the moment a player wants another spin is the moment they have just watched one land. Both clamp
+against `RewardsConfig.Spin.MaximumStored` (25), so a player who is already at the cap gets nothing
+from a purchase: **wire the cap check into the prompt before these go live**, or refunds follow.
 
 ---
 

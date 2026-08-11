@@ -1061,12 +1061,19 @@ function Parts.DailyBoost(props)
 	local percent = props.boostPercent or 0
 	local claimable = props.claimable == true
 
+	--[[
+		THE VALUE LINE ANSWERS "WHEN", NOT "WHAT".
+
+		It used to read `+12%`, which is the streak bonus -- true, but the tooltip already says it, and it
+		tells a player nothing they can act on. When the reward is waiting the line says so; when it is
+		not, it says how long until the next one. The percent stays in the tooltip.
+	]]
 	return e(StatusIcon, {
 		key = props.key or "DailyBoost",
 		glyph = props.glyph or "calendar",
 		extent = props.extent,
-		value = `+{percent}%`,
-		valueColor = if percent > 0 then Theme.Color.Gold else Theme.Color.GrayDark,
+		value = if claimable then "READY" else Format.timer(props.resetSeconds or 0),
+		valueColor = if claimable then Theme.Color.Positive else Theme.Color.Gray,
 		badge = if claimable then "!" else nil,
 		badgeGradient = Theme.Gradient.Red,
 		tipTitle = "DAILY LOGIN",
@@ -1112,6 +1119,7 @@ function Parts.StatusCluster(props)
 				streak = props.dailyStreak,
 				boostPercent = props.dailyBoostPercent,
 				claimable = props.dailyClaimable,
+				resetSeconds = props.dailyResetSeconds,
 				extent = extent,
 				layoutOrder = 1,
 				onClick = props.onOpenDaily,

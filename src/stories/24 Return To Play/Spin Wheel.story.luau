@@ -8,6 +8,10 @@
 
 	`idle` is the state worth looking at hardest: the wheel should be visibly turning before anything is
 	pressed, because that is what tells a player the thing is interactive at all.
+
+	The screen also carries the ODDS panel and the two Robux spin packs. Those percentages are computed
+	from the same `Weight` values the server draws from, so if a weight changes in config and this list
+	does not follow, the list is lying.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,7 +40,11 @@ return UILabs.CreateReactStory({
 		Phase = UILabs.Choose(PHASES, 1),
 		--- Which segment the "server" chose, so every prize row can be reviewed lit.
 		Segment = UILabs.Slider(8, 1, #RewardsConfig.Spin.Segments, 1),
-		SpinsAvailable = UILabs.Slider(2, 0, 10, 1),
+		--[[
+			Take this to the cap (25) to review the two spin packs in their disabled state: a purchase that
+			could not be delivered has to be visibly unavailable, not merely clamped after the fact.
+		]]
+		SpinsAvailable = UILabs.Slider(2, 0, RewardsConfig.Spin.MaximumStored, 1),
 	},
 }, function(props)
 	local controls = props.controls

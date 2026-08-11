@@ -41,6 +41,7 @@ local P = require(UI.Primitives)
 local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
 local Rows = require(UI.Components.Rows)
+local RewardToast = require(UI.Components.RewardToast)
 local Icon = require(UI.Icon)
 local Shine = require(UI.Components.Shine)
 local Overlays = require(UI.Components.Overlays)
@@ -98,9 +99,12 @@ local function PlaytimeCard(props)
 	local remaining = math.max(0, props.milestone.Seconds - props.seconds)
 
 	--[[
-		Greyed rather than merely dimmed. `Theme.Gradient.Dead` is the kit's own "this is not available"
-		fill, the same one a disabled button uses, so a locked milestone matches every other
-		unavailable thing in the game instead of inventing a fourth shade of blue.
+		Locked cards have to RECEDE, and the obvious choice was wrong.
+
+		`Theme.Gradient.Dead` is the kit's disabled fill, but at 62708A it is LIGHTER than the recessed
+		Slot fill -- so a "greyed" milestone came out more prominent than an available one, which is the
+		opposite of the point. Locked cards use the deep Slot fill plus an ink wash and a grey glyph
+		instead, so they read as recessed holes rather than as lit cards.
 	]]
 	local fill
 	if claimed then
@@ -108,7 +112,7 @@ local function PlaytimeCard(props)
 	elseif ready then
 		fill = accent
 	else
-		fill = Theme.Gradient.Dead
+		fill = Theme.Gradient.Slot
 	end
 
 	return e(P.Panel, {
@@ -155,7 +159,12 @@ local function PlaytimeCard(props)
 							then "wheel"
 							elseif props.milestone.Items then "potion"
 							else "coin",
+						--- Real item art where the milestone grants one, same as the calendar and the wheel.
+						image = RewardToast.imageFor(props.milestone),
 						plain = true,
+						--- Tinted grey while locked, so the art recedes with the card rather than staying vivid.
+						imageColor = if locked then Theme.Color.GrayDark else nil,
+						glyphColor = if locked then Theme.Color.GrayDark else nil,
 						size = UDim2.fromScale(0.82, 0.82),
 						position = UDim2.fromScale(0.5, 0.5),
 						anchorPoint = Vector2.new(0.5, 0.5),
@@ -211,6 +220,17 @@ local function PlaytimeCard(props)
 					zIndex = 9,
 				})
 				else nil,
+			--- The same ink wash claimed cards get, so a locked card is unmistakably not lit.
+			if locked
+				then e("Frame", {
+					key = "LockedWash",
+					BackgroundColor3 = Theme.Color.Ink,
+					BackgroundTransparency = 0.45,
+					BorderSizePixel = 0,
+					Size = UDim2.fromScale(1, 1),
+					ZIndex = 6,
+				}, { P.corner(Theme.Radius.Card) })
+				else nil,
 			if claimed
 				then e("Frame", {
 					key = "ClaimedWash",
@@ -234,6 +254,8 @@ local function DailyRewardsScreen(props)
 	local currentDay = state.dailyCalendarDay or 1
 	local claimable = state.dailyClaimable == true
 	local streak = state.dailyStreak or 0
+	--- Seconds to the next day boundary, refreshed by the store's own ticker.
+	local resetSeconds = state.dailyResetSeconds or 0
 
 	--[[
 		`DailyCalendarDay` IS THE DAY ON OFFER NEXT, not the one you last took.
@@ -275,8 +297,16 @@ local function DailyRewardsScreen(props)
 			label = day.Label,
 			amount = amountText(day),
 			glyph = day.Glyph,
+			image = RewardToast.imageFor(day),
 			premium = index == heroIndex,
 			state = stateFor(day.Day),
+			--[[
+				Only the pointer day, and only while it is not claimable. Every other locked day's wait
+				depends on claims that have not happened yet, so a countdown on those would be a guess.
+			]]
+			timer = if day.Day == currentDay and not claimable
+				then Format.timer(resetSeconds)
+				else nil,
 			size = if index == heroIndex
 				then UDim2.fromOffset(HERO.X, HERO.Y)
 				else UDim2.fromOffset(CARD.X, CARD.Y),
@@ -314,16 +344,14 @@ local function DailyRewardsScreen(props)
 		headerColor = Theme.Gradient.Green,
 		width = blockWidth + HERO.X + GAP + 56,
 		--[[
-			Tall enough for whichever tab is up: the calendar is two card rows plus the hero, the playtime
-			grid is three. Sized to the taller so switching tabs does not resize the window under the
-			player's cursor.
+			Sized to the ACTIVE tab, not the taller of the two.
+
+			Sizing to the taller left a 170px dead band under the calendar, because the daily tab is two
+			card rows plus a hero (328) while the playtime grid is three rows (498). The window resizing
+			when you switch tabs is the lesser evil by a distance -- a modal with a third of its body empty
+			reads as broken, a modal that resizes reads as fitting its contents.
 		]]
-		--[[
-			The taller of the two tabs plus the tab bar, and nothing beyond. The trailing slack is what left
-			a dead band under the calendar; it is still sized to the taller tab so switching cannot resize
-			the window under the cursor.
-		]]
-		contentHeight = math.max(HERO.Y, CARD.Y * 3 + GAP * 2) + TAB_LANE,
+		contentHeight = (if tab == "daily" then HERO.Y else CARD.Y * 3 + GAP * 2) + TAB_LANE,
 		onClose = actions.closeScreen,
 		footerHeight = 64,
 		--[[

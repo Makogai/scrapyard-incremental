@@ -281,6 +281,17 @@ function PlayerStateService.GrantDeveloperProduct(
 	local rewards = definition.Rewards
 	data.Money =
 		math.min(Environment.MaximumMoney, data.Money + math.max(0, math.floor(rewards.Money or 0)))
+	--[[
+		Spins, for the wheel packs. Clamped to the same stored maximum every other spin grant uses, so a
+		product cannot push a player past a cap the rest of the game respects.
+	]]
+	if typeof(rewards.Spins) == "number" then
+		data.SpinsAvailable = math.clamp(
+			data.SpinsAvailable + math.floor(rewards.Spins),
+			0,
+			RewardsConfig.Spin.MaximumStored
+		)
+	end
 	for itemId, amount in rewards.Items or {} do
 		if InventoryConfig.Consumables[itemId] and typeof(amount) == "number" then
 			data.Inventory[itemId] =
@@ -922,6 +933,20 @@ function PlayerStateService.AdminMutate(
 	elseif command == "AddGears" then
 		local grant = math.floor(math.clamp(amount or 0, 0, Environment.MaximumGears))
 		data.Gears = math.min(Environment.MaximumGears, data.Gears + grant)
+	elseif command == "AddSpins" then
+		--[[
+			Clamped to the same `MaximumStored` the schema sanitiser enforces. Granting past it would be
+			silently trimmed on the next load, so the panel would report a success the save then undid.
+		]]
+		local grant = math.floor(math.clamp(amount or 0, 0, RewardsConfig.Spin.MaximumStored))
+		data.SpinsAvailable =
+			math.min(RewardsConfig.Spin.MaximumStored, data.SpinsAvailable + grant)
+	elseif command == "SetDailyStreak" then
+		--- Set, not add: the point of testing a streak is landing on a specific day of the calendar.
+		data.DailyStreak = math.floor(math.clamp(amount or 0, 0, 3650))
+		data.DailyCalendarDay = (data.DailyStreak % #RewardsConfig.Daily.Days) + 1
+	elseif command == "AddRebirths" then
+		data.PrestigeCount = math.floor(math.clamp(data.PrestigeCount + (amount or 0), 0, 9999))
 	elseif command == "UnlockAllAreas" then
 		for _, areaId in AreaConfig.Order do
 			data.UnlockedAreas[areaId] = true

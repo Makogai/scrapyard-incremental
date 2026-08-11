@@ -18,6 +18,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -33,7 +34,35 @@ local function retireAuthoredUI(playerGui: PlayerGui)
 	end
 end
 
+--[[
+	Turns off Roblox's own Backpack.
+
+	`StarterPack.Magnet` is a legacy Tool from before `InventoryService` welded the magnet model to the
+	hand, and its only remaining effect was a hotbar across the bottom of the screen reading "1 slot
+	magnet" -- a second, non-functional way to think about equipping, next to the real one in the
+	Inventory window.
+
+	Disabling the CoreGui also disables its number-key hotkeys, so the Tool becomes unreachable rather
+	than merely invisible. `SetCoreGuiEnabled` throws before the CoreGui is ready, hence the retry.
+]]
+local function hideBackpack()
+	task.spawn(function()
+		local deadline = os.clock() + 10
+		while os.clock() < deadline do
+			local ok = pcall(function()
+				StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+			end)
+			if ok then
+				return
+			end
+			task.wait(0.25)
+		end
+		warn("[ScrapyardUI] could not disable the Backpack CoreGui")
+	end)
+end
+
 function ReactUIController.Start()
+	hideBackpack()
 	local packages = ReplicatedStorage:WaitForChild("Packages", 30)
 	local shared = ReplicatedStorage:WaitForChild("Shared", 30)
 	if not packages or not shared then

@@ -154,6 +154,7 @@ local function HudMobile(props)
 				dailyStreak = state.dailyStreak,
 				dailyBoostPercent = state.dailyBoostPercent,
 				dailyClaimable = state.dailyClaimable,
+				dailyResetSeconds = state.dailyResetSeconds,
 				friendCount = state.friendCount,
 				friendBoost = state.friendBoost,
 				spinsAvailable = state.spinsAvailable,

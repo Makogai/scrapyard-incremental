@@ -31,6 +31,7 @@ local Motion = require(UI.Motion)
 local P = require(UI.Primitives)
 local Icon = require(UI.Icon)
 local Shine = require(UI.Components.Shine)
+local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 
 local e = React.createElement
 
@@ -43,6 +44,35 @@ local RewardToast = {}
 	potion, because every consumable in the game is one. An explicit `glyph` always wins, so a caller
 	with better information is never fighting this.
 ]]
+--[[
+	The IMAGE for a reward, when one exists, which beats any glyph.
+
+	A reward that grants an item should show that item's own art -- `InventoryConfig` carries an
+	`IconId` per consumable and magnet, and four different potions all drawing the generic `potion`
+	glyph is four identical green flasks. Callers pass the result as `image`, which `Icon` prefers over
+	`glyph`, so a missing id falls back to the glyph without any extra branching at the call site.
+
+	Only for a SINGLE-item reward. A bundle has no one icon, so it keeps the generic glyph.
+]]
+function RewardToast.imageFor(reward: { [string]: any }): string?
+	if reward.Items == nil then
+		return nil
+	end
+	local onlyId: string? = nil
+	for itemId in reward.Items do
+		if onlyId ~= nil then
+			return nil
+		end
+		onlyId = itemId
+	end
+	if onlyId == nil then
+		return nil
+	end
+	local definition = InventoryConfig.Consumables[onlyId] or InventoryConfig.Magnets[onlyId]
+	local iconId = if definition then definition.IconId else nil
+	return if iconId ~= nil and iconId ~= "" then iconId else nil
+end
+
 function RewardToast.glyphFor(reward: { [string]: any }): string
 	if reward.Glyph then
 		return reward.Glyph
@@ -74,6 +104,8 @@ function RewardToast.Banner(props)
 	local width = props.width or 460
 	local height = props.height or 92
 	local wellExtent = height - 22
+	--- Item art when the caller supplied it; `Icon` prefers `image` over `glyph`.
+	local image = props.image
 
 	--- Springs in from slightly small, so it lands rather than appears.
 	local entrance = Motion.useEntrance(Motion.Spring.Bouncy)
@@ -97,7 +129,18 @@ function RewardToast.Banner(props)
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
-		children = {
+		--[[
+			`P.compact`, NOT a table literal.
+
+			The shine entry below is conditional and sits in the MIDDLE of this list. A nil there leaves a
+			hole, `ipairs` stops dead at it, and every child after it is dropped -- so any prize that was
+			not the jackpot rendered as an empty gradient bar with no icon and no text. That is exactly
+			what "it didn't show anything when I got money from a spin" was: the banner was there, the
+			contents were not.
+
+			Same class of bug as the friend boost's missing "+0%", which is why AGENTS.md rule 17 exists.
+		]]
+		children = P.compact(
 			e("UIScale", { key = "Entrance", Scale = entrance }),
 			--[[
 				The banner body. No stroke and no corner ink: an outline would give it the edges the fade
@@ -158,6 +201,7 @@ function RewardToast.Banner(props)
 					e(Icon, {
 						key = "Glyph",
 						glyph = props.glyph or "coin",
+						image = image,
 						plain = true,
 						size = UDim2.fromOffset(wellExtent - 18, wellExtent - 18),
 						position = UDim2.fromScale(0.5, 0.5),
@@ -195,8 +239,8 @@ function RewardToast.Banner(props)
 						})
 						else nil
 				),
-			}),
-		},
+			})
+		),
 	})
 end
 

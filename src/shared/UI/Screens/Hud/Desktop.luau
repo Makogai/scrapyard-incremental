@@ -114,7 +114,16 @@ local function HudDesktop(props)
 		key = props.key or "HudDesktop",
 		size = UDim2.fromScale(1, 1),
 		zIndex = props.zIndex,
-		children = {
+		--[[
+			`P.compact`, NOT a table literal. Two entries in here are conditional -- the admin icon and the
+			tutorial spotlight -- and both sit mid-list. A nil there leaves a hole, `ipairs` stops at it,
+			and every child after it is dropped: with a literal, a NON-ADMIN player lost the teleport bar,
+			the currencies, the status cluster, the storage meter and the boosts, because the admin icon
+			resolved to nil ahead of them.
+
+			AGENTS.md rule 17. This file is the reason it is not optional.
+		]]
+		children = P.compact(
 			e(Parts.MenuGrid, {
 				key = "Menu",
 				-- Centred on the left edge, so the column stays balanced as tiles
@@ -176,6 +185,7 @@ local function HudDesktop(props)
 				dailyStreak = state.dailyStreak,
 				dailyBoostPercent = state.dailyBoostPercent,
 				dailyClaimable = state.dailyClaimable,
+				dailyResetSeconds = state.dailyResetSeconds,
 				friendCount = state.friendCount,
 				friendBoost = state.friendBoost,
 				spinsAvailable = state.spinsAvailable,
@@ -234,8 +244,8 @@ local function HudDesktop(props)
 				anchorPoint = Vector2.new(0.5, 1),
 				zIndex = 19,
 				onSkip = actions.skipTutorial,
-			}),
-		},
+			})
+		),
 	})
 end
 

@@ -236,6 +236,27 @@ In Play mode, drive the real thing instead: `start_stop_play`, then
   `Shine`'s sweep is deliberately wider and taller than its host.
 - `key` is reserved by React and stripped from props, so every composite button is
   named `Button` in the Explorer. Locate elements by measuring, not by path.
+- **MCP round-trip latency is seconds, so anything on a timer cannot be checked by
+  wait-then-look.** A `screen_capture` issued after a click can easily land 6+
+  seconds later. The spin reveal is a 3.5s window, and chasing it with screenshots
+  produced four separate false "it never renders" conclusions -- the banner was
+  mounting correctly the whole time.
+  Instead, fire the real remote from inside the `execute_luau` call and poll in the
+  same call, so no latency sits between the trigger and the measurement:
+
+  ```lua
+  local slot = ... -- capture the parent BEFORE triggering
+  ReplicatedStorage.Remotes.RequestSpin:FireServer()
+  for _ = 1, 60 do task.wait(0.12) ... end -- poll here, in the same call
+  ```
+
+  A conclusion from a screenshot of a transient state is not evidence. Measure
+  inside one call, or extend the state's lifetime first.
+- **Mouse coordinates are VIEWPORT pixels; `screen_capture` returns a different,
+  larger image.** At 1365x768 the capture came back 1702 wide, so coordinates read
+  off a screenshot are ~1.25x too big and clicks land somewhere else entirely --
+  which silently closed a modal and looked like a broken button. Always take click
+  targets from `AbsolutePosition`, never from the image.
 
 ## Scope
 

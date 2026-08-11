@@ -97,6 +97,36 @@ function AdminCatalogue.build(): { AdminSection }
 				Glyph = "gear",
 				Accent = "Gold",
 			},
+			--[[
+				The three that were missing, and the reason this section is RESOURCES rather than
+				CURRENCIES: anything a player holds a COUNT of belongs here, so testing a spin, a streak
+				position or a rebirth tier needs no console command.
+			]]
+			{
+				Id = "AddSpins",
+				Label = "SPINS",
+				Command = "AddSpins",
+				Amount = true,
+				Glyph = "wheel",
+				Accent = "Purple",
+			},
+			{
+				Id = "SetDailyStreak",
+				--- SET, not add: the point of testing a streak is landing on a chosen calendar day.
+				Label = "STREAK (SET)",
+				Command = "SetDailyStreak",
+				Amount = true,
+				Glyph = "calendar",
+				Accent = "Cyan",
+			},
+			{
+				Id = "AddRebirths",
+				Label = "REBIRTHS",
+				Command = "AddRebirths",
+				Amount = true,
+				Glyph = "star",
+				Accent = "Pink",
+			},
 		},
 	})
 

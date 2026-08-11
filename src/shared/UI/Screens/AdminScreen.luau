@@ -34,7 +34,16 @@ local AdminCatalogue = require(ReplicatedStorage.Shared.Config.AdminCatalogue)
 local e = React.createElement
 
 local LEFT_WIDTH = 300
-local RIGHT_WIDTH = 620
+--[[
+	WIDE ENOUGH FOR THE TAB STRIP, which is what sets this number.
+
+	Six section tabs at `TAB_WIDTH` plus their gaps need 726px, and at 620 the last one -- ACTIONS --
+	hung off the edge of the column. A panel whose own navigation does not fit is broken in the most
+	visible way possible, so the column is sized from the strip rather than the strip squeezed into the
+	column. 1120 total is in line with the widest screens in the game (`ShopScreen`, `PetsScreen`).
+]]
+local TAB_WIDTH = 116
+local RIGHT_WIDTH = 748
 local GAP = 16
 local ENTRY_HEIGHT = 42
 
@@ -152,7 +161,7 @@ local function AdminScreen(props)
 			text = section.Label,
 			glyph = section.Glyph,
 			active = activeSection == section.Id,
-			size = UDim2.fromOffset(122, 38),
+			size = UDim2.fromOffset(TAB_WIDTH, 38),
 			layoutOrder = index,
 			textSize = Theme.TextSize.Tiny,
 			onClick = function()

@@ -430,6 +430,24 @@ function Rows.RewardCard(props)
 	local isClaimed = state == "claimed"
 	local size = props.size or UDim2.fromOffset(140, 178)
 
+	--[[
+		THE CARD LAYS ITSELF OUT FROM ITS OWN HEIGHT, which the hero card is the reason for.
+
+		Every offset used to be a constant tuned for a 158px card: the art well at y=42, the amount at
+		126, the label at 150. Hand the same component a 328px hero card and it draws a small card's
+		worth of content in the top half and leaves the bottom half blank -- which is exactly the empty
+		space in the daily modal.
+
+		So the well takes whatever is between the header and the two text lines, and the text is measured
+		up from the BOTTOM. A card of any height then fills itself.
+	]]
+	local height = if size.Y.Offset > 0 then size.Y.Offset else 158
+	local HEADER = 34
+	local LABEL_LANE = 18
+	local AMOUNT_LANE = 24
+	local wellTop = HEADER + 8
+	local wellHeight = math.max(48, height - wellTop - AMOUNT_LANE - LABEL_LANE - 12)
+
 	local headerGradient
 	if props.premium then
 		headerGradient = Theme.Gradient.Purple
@@ -465,8 +483,8 @@ function Rows.RewardCard(props)
 		}),
 		e(P.Slot, {
 			key = "Reward",
-			size = UDim2.new(1, -16, 0, 78),
-			position = UDim2.fromOffset(8, 42),
+			size = UDim2.new(1, -16, 0, wellHeight),
+			position = UDim2.fromOffset(8, wellTop),
 			zIndex = 3,
 			children = {
 				--[[
@@ -477,6 +495,8 @@ function Rows.RewardCard(props)
 				e(Icon, {
 					key = "Icon",
 					glyph = props.glyph,
+					--- Item art when the reward is an item; `Icon` prefers `image` over `glyph`.
+					image = props.image,
 					plain = true,
 					size = UDim2.fromScale(0.86, 0.86),
 					position = UDim2.fromScale(0.5, 0.5),
@@ -488,10 +508,12 @@ function Rows.RewardCard(props)
 		e(P.Label, {
 			key = "Amount",
 			text = props.amount,
-			textSize = Theme.TextSize.Body,
+			textSize = if props.premium then Theme.TextSize.Body else Theme.TextSize.Small,
 			color = if props.premium then Theme.Color.Purple else Theme.Color.Gold,
-			size = UDim2.new(1, -10, 0, 24),
-			position = UDim2.fromOffset(5, 126),
+			--- Wrapped, because a hero's reward line is a sentence ("$50K + 1x GOD + 2 SPINS").
+			wrapped = props.premium,
+			size = UDim2.new(1, -10, 0, AMOUNT_LANE),
+			position = UDim2.fromOffset(5, height - LABEL_LANE - AMOUNT_LANE - 6),
 			zIndex = 4,
 		}),
 		e(P.Label, {
@@ -500,8 +522,8 @@ function Rows.RewardCard(props)
 			textSize = Theme.TextSize.Tiny,
 			font = Theme.Font.Bold,
 			color = Theme.Color.Gray,
-			size = UDim2.new(1, -10, 0, 18),
-			position = UDim2.fromOffset(5, 150),
+			size = UDim2.new(1, -10, 0, LABEL_LANE),
+			position = UDim2.fromOffset(5, height - LABEL_LANE - 4),
 			zIndex = 4,
 		}),
 		--[[
@@ -531,13 +553,67 @@ function Rows.RewardCard(props)
 				ZIndex = 8,
 			}, { P.corner(Theme.Radius.Card) })
 			else nil,
-		if state == "locked"
-			then e(Indicators.LockOverlay, {
-				key = "LockOverlay",
-				transparency = 0.6,
-				extent = 40,
-				radius = Theme.Radius.Card,
-				zIndex = 8,
+		--[[
+			LOCKED, TWO WAYS.
+
+			A day whose wait is KNOWABLE shows the wait. A padlock answers "can I have this" with "no",
+			which the player already worked out from the greyed card; a countdown answers "when", which is
+			the only thing they actually wanted. So the pointer day -- the one unlocking at the next reset
+			-- gets a timer, and days further out, whose wait depends on claims not yet made, keep the lock.
+		]]
+		if state == "locked" and props.timer
+			then e("Frame", {
+				key = "WaitWash",
+				BackgroundColor3 = Theme.Color.Ink,
+				BackgroundTransparency = 0.55,
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 8,
+			}, {
+				P.corner(Theme.Radius.Card),
+				e(P.Chip, {
+					key = "Wait",
+					size = UDim2.fromOffset(96, 30),
+					gradient = Theme.Gradient.PanelDeep,
+					position = UDim2.fromScale(0.5, 0.5),
+					anchorPoint = Vector2.new(0.5, 0.5),
+					zIndex = 3,
+					children = {
+						e(P.Label, {
+							key = "Time",
+							text = props.timer,
+							textSize = Theme.TextSize.Small,
+							color = Theme.Color.White,
+							size = UDim2.fromScale(1, 1),
+							zIndex = 3,
+						}),
+					},
+				}),
+			}) --[[
+				A locked day that is not next in line keeps a padlock, but a SMALL one in the corner rather
+				than `LockOverlay`'s centred 40px badge. Centred, it landed squarely on top of the prize art
+				-- so the one thing a player wants to see on a future day, what it is, was the one thing
+				covered up.
+			]]
+
+			elseif state == "locked" then e("Frame", {
+				key = "LockedWash",
+				BackgroundColor3 = Theme.Color.PanelDark,
+				BackgroundTransparency = 0.55,
+				BorderSizePixel = 0,
+				Size = UDim2.fromScale(1, 1),
+				ZIndex = 8,
+			}, {
+				P.corner(Theme.Radius.Card),
+				e(Icon, {
+					key = "Lock",
+					glyph = "lock",
+					plain = true,
+					size = UDim2.fromOffset(22, 22),
+					position = UDim2.new(1, -8, 0, 8),
+					anchorPoint = Vector2.new(1, 0),
+					zIndex = 2,
+				}),
 			})
 			else nil
 	)

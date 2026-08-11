@@ -127,6 +127,31 @@ local products = {
 		}),
 		Color = Color3.fromRGB(255, 76, 167),
 	}),
+	--[[
+		Spin packs. Prices set from the reference: one spin at 59 R$, three at 120 R$ -- the three-pack is
+		deliberately better per spin, because a pack that saves nothing is a pack nobody buys.
+
+		`MarketplaceId` is still 0, like every other entry: see `docs/STORE_SETUP.md`. The wheel shows
+		these buttons and they will prompt correctly the moment the ids land.
+	]]
+	SpinOne = table.freeze({
+		Id = "SpinOne",
+		MarketplaceId = 0,
+		DisplayName = "1 Spin",
+		Description = "One extra spin of the lucky wheel.",
+		DisplayPrice = 59,
+		Color = Color3.fromRGB(181, 48, 255),
+		Rewards = table.freeze({ Spins = 1 }),
+	}),
+	SpinThree = table.freeze({
+		Id = "SpinThree",
+		MarketplaceId = 0,
+		DisplayName = "3 Spins",
+		Description = "Three extra spins of the lucky wheel.",
+		DisplayPrice = 120,
+		Color = Color3.fromRGB(181, 48, 255),
+		Rewards = table.freeze({ Spins = 3 }),
+	}),
 	SkipRebirth = table.freeze({
 		Id = "SkipRebirth",
 		MarketplaceId = 0,
@@ -158,6 +183,8 @@ return table.freeze({
 		"BoosterPair",
 		"BoosterBundle",
 		"MegaBundle",
+		"SpinOne",
+		"SpinThree",
 		"SkipRebirth",
 	}),
 })

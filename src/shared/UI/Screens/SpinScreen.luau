@@ -36,6 +36,9 @@ local Buttons = require(UI.Components.Buttons)
 local Overlays = require(UI.Components.Overlays)
 local Wheel = require(UI.Components.Wheel)
 local RewardToast = require(UI.Components.RewardToast)
+local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
+local RobuxPrice = require(UI.Components.RobuxPrice)
+local Icon = require(UI.Icon)
 
 local e = React.createElement
 
@@ -52,6 +55,144 @@ local SPIN_SPRING = { tension = 24, friction = 26 }
 --- How fast it drifts while nobody has pressed anything.
 local IDLE_DEGREES_PER_SECOND = 7
 
+--- cos(45 degrees): the factor that turns a radius into an on-the-circle diagonal offset.
+local DIAGONAL = math.sqrt(2) / 2
+
+--[[
+	A buyable pack of spins.
+
+	The card carries the label; the price hangs off its lower-right as a `RobuxPrice` corner tag, so the
+	gold-on-ink treatment and the wiggle come from that component rather than being restated here. Only
+	`best` gets the brighter gradient -- if both packs shouted, neither would.
+]]
+local function SpinPack(props)
+	--- Locked when the grant could not be delivered: see the note on the price below.
+	local locked = props.locked == true
+
+	--[[
+		A `TextButton` root through `usePressable`, the same path `StatusIcon` and `BoostTile` use.
+		Roblox only routes hover to a Frame when nothing interactive covers it, so a card that wants
+		hover has to be the button itself.
+	]]
+	local press = Motion.usePressable({
+		disabled = locked,
+		hoverScale = 1.04,
+		pressScale = 0.98,
+		onClick = function()
+			props.onBuy(props.productId, "Product")
+		end,
+	})
+
+	local rootProps = {
+		key = props.key or "SpinPack",
+		Text = "",
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Size = UDim2.new(1, 0, 0, 62),
+		LayoutOrder = props.layoutOrder,
+	}
+	for event, handler in pairs(press.events) do
+		rootProps[event] = handler
+	end
+
+	return e("TextButton", rootProps, {
+		e("UIScale", { key = "Scale", Scale = press.scale }),
+		e(P.Panel, {
+			key = "Slab",
+			size = UDim2.fromScale(1, 1),
+			--- Only the better-value pack gets the bright gradient. If both shouted, neither would.
+			gradient = if props.best
+				then Theme.Gradient[props.accent]
+				else Theme.Gradient.PanelDeep,
+			radius = Theme.Radius.Card,
+			strokeThickness = Theme.Stroke.Card,
+			studs = false,
+			children = {
+				e(Icon, {
+					key = "Glyph",
+					glyph = "wheel",
+					plain = true,
+					size = UDim2.fromOffset(26, 26),
+					position = UDim2.fromOffset(10, 7),
+				}),
+				e(P.Label, {
+					key = "Label",
+					text = props.label,
+					textSize = Theme.TextSize.Small,
+					color = Theme.Color.White,
+					align = Enum.TextXAlignment.Left,
+					position = UDim2.fromOffset(42, 7),
+					size = UDim2.new(1, -50, 0, 26),
+				}),
+				--[[
+					The price treatment lives in `RobuxPrice`, not here, so it matches every other price -- and
+					AT THE CAP THE PRICE IS REPLACED BY THE REASON.
+
+					`SpinsAvailable` is clamped to `MaximumStored`, so buying spins while already at the cap
+					takes Robux and grants nothing: the schema trims the excess on the next save. A disabled
+					card that says why is the difference between a hard limit and a refund request.
+				]]
+				if locked
+					then e(P.Label, {
+						key = "Capped",
+						text = "SPIN STASH FULL",
+						textSize = Theme.TextSize.Tiny,
+						color = Theme.Color.GrayDark,
+						align = Enum.TextXAlignment.Left,
+						position = UDim2.new(0, 10, 1, -7),
+						anchorPoint = Vector2.new(0, 1),
+						size = UDim2.new(1, -20, 0, 18),
+					})
+					else e(RobuxPrice.Tag, {
+						key = "Price",
+						amount = props.robux,
+						variant = "inline",
+						position = UDim2.new(0, 10, 1, -7),
+						anchorPoint = Vector2.new(0, 1),
+					}),
+			},
+		}),
+	})
+end
+
+--- One line of the odds list: a wedge's label against its real chance, straight off the same weights.
+local function OddsRow(props)
+	return e(P.Group, {
+		key = props.key or "OddsRow",
+		size = UDim2.new(1, 0, 0, 26),
+		layoutOrder = props.layoutOrder,
+		children = {
+			e(Icon, {
+				key = "Glyph",
+				glyph = props.glyph,
+				plain = true,
+				size = UDim2.fromOffset(20, 20),
+				position = UDim2.fromScale(0, 0.5),
+				anchorPoint = Vector2.new(0, 0.5),
+			}),
+			e(P.Label, {
+				key = "Label",
+				text = props.label,
+				textSize = Theme.TextSize.Small,
+				color = if props.best then Theme.Color.Gold else Theme.Color.White,
+				align = Enum.TextXAlignment.Left,
+				position = UDim2.fromOffset(28, 0),
+				size = UDim2.new(1, -96, 1, 0),
+			}),
+			e(P.Label, {
+				key = "Chance",
+				text = props.chance,
+				textSize = Theme.TextSize.Small,
+				color = Theme.Color.Gray,
+				align = Enum.TextXAlignment.Right,
+				size = UDim2.new(0, 64, 1, 0),
+				position = UDim2.fromScale(1, 0),
+				anchorPoint = Vector2.new(1, 0),
+			}),
+		},
+	})
+end
+
 local function SpinScreen(props)
 	local state = props.state
 	local actions = props.actions
@@ -60,6 +201,7 @@ local function SpinScreen(props)
 	local spins = state.spinsAvailable or 0
 	local roll = state.spinRoll
 	local phase = if roll then roll.Phase else nil
+
 	local spinning = phase == "spinning"
 	local revealed = phase == "revealed"
 	local active = spinning or revealed
@@ -110,6 +252,38 @@ local function SpinScreen(props)
 		end
 	end
 
+	--[[
+		The odds list is built from the same `Weight` values the server draws from, so it cannot drift out
+		of step with the real chances the way a hand-written table would.
+	]]
+	local oddsOpen, setOddsOpen = React.useState(false)
+	local oddsRows = React.useMemo(function()
+		local total = 0
+		for _, segment in ipairs(segments) do
+			total += segment.Weight or 0
+		end
+
+		local rows = {}
+		for index, segment in ipairs(segments) do
+			local chance = if total > 0 then (segment.Weight or 0) / total * 100 else 0
+			table.insert(
+				rows,
+				e(OddsRow, {
+					key = segment.Id,
+					label = segment.Label,
+					glyph = RewardToast.glyphFor(segment),
+					--- Two decimals for the rare end: a 1-in-100 jackpot shown as "0%" reads as impossible.
+					chance = if chance < 1
+						then string.format("%.2f%%", chance)
+						else string.format("%.1f%%", chance),
+					best = segment.Best == true,
+					layoutOrder = index,
+				})
+			)
+		end
+		return rows
+	end, { segments })
+
 	return e(P.Group, {
 		key = props.key or "SpinScreen",
 		size = UDim2.fromScale(1, 1),
@@ -128,11 +302,26 @@ local function SpinScreen(props)
 				zIndex = 1,
 				onClick = if spinning then nil else actions.closeScreen,
 			}),
+			--[[
+				ON THE RIM'S TOP-RIGHT, at 45 degrees.
+
+				In a takeover there is no window frame for a corner button to belong to, so a close in the
+				screen corner reads as unrelated to the thing it closes. Squaring the offsets -- centre plus
+				half the extent in each axis -- put it diagonally off the rim, floating in empty space; the
+				corner of a circle's bounding box is not on the circle. Placing it at `radius / sqrt(2)` in
+				each axis puts it exactly ON the rim, where it reads as attached.
+			]]
 			e(Buttons.CloseButton, {
 				key = "Close",
-				position = UDim2.new(1, -28, 0, 28),
-				anchorPoint = Vector2.new(1, 0),
-				zIndex = 8,
+				extent = 46,
+				position = UDim2.new(
+					0.5,
+					(extent / 2 + 14) * DIAGONAL,
+					0.5,
+					-30 - (extent / 2 + 14) * DIAGONAL
+				),
+				anchorPoint = Vector2.new(0.5, 0.5),
+				zIndex = 12,
 				onClick = actions.closeScreen,
 			}),
 			e(Wheel.Wheel, {
@@ -140,6 +329,9 @@ local function SpinScreen(props)
 				segments = segments,
 				rotation = rotation,
 				extent = extent,
+				--- The pointer only kicks while it turns, and the winner only pulses once it has stopped.
+				spinning = spinning,
+				winner = if revealed then targetIndex else nil,
 				position = UDim2.new(0.5, 0, 0.5, -30),
 				anchorPoint = Vector2.new(0.5, 0.5),
 				zIndex = 3,
@@ -154,6 +346,7 @@ local function SpinScreen(props)
 					title = won.Label,
 					detail = "ADDED TO YOUR ACCOUNT",
 					glyph = RewardToast.glyphFor(won),
+					image = RewardToast.imageFor(won),
 					accent = won.Accent,
 					best = won.Best == true,
 					width = math.min(460, extent + 60),
@@ -163,13 +356,96 @@ local function SpinScreen(props)
 				})
 				else nil,
 			--[[
-				The control block, lifted well clear of the bottom edge so it sits under the wheel rather
-				than in the corner of the screen.
-
-				The SPIN button carries the spin count as its SUBTEXT rather than in brackets in the label,
-				and there is no separate badge -- one chunky button that says how many you have beats a
-				plain button plus a chip explaining it.
+				SUPPORTING PANEL, right of the wheel. The screen had a lot of empty space either side of a
+				wheel floating alone; this puts the two things a player wants next to it -- more spins, and
+				what the odds actually are.
 			]]
+			e(P.Group, {
+				key = "Packs",
+				size = UDim2.fromOffset(210, 260),
+				position = UDim2.new(0.5, extent / 2 + 110, 0.5, -30),
+				anchorPoint = Vector2.new(0.5, 0.5),
+				zIndex = 7,
+				layout = P.list({ padding = 12 }),
+				children = {
+					e(P.Label, {
+						key = "Heading",
+						text = "MORE SPINS",
+						textSize = Theme.TextSize.Small,
+						color = Theme.Color.Gray,
+						size = UDim2.new(1, 0, 0, 22),
+						layoutOrder = 1,
+					}),
+					e(SpinPack, {
+						key = "PackOne",
+						label = "+1 SPIN",
+						productId = "SpinOne",
+						robux = 59,
+						accent = "Purple",
+						locked = spins + 1 > RewardsConfig.Spin.MaximumStored,
+						layoutOrder = 2,
+						onBuy = actions.purchase,
+					}),
+					e(SpinPack, {
+						key = "PackThree",
+						label = "+3 SPINS",
+						productId = "SpinThree",
+						robux = 120,
+						accent = "Pink",
+						locked = spins + 3 > RewardsConfig.Spin.MaximumStored,
+						best = true,
+						layoutOrder = 3,
+						onBuy = actions.purchase,
+					}),
+					e(Buttons.Button, {
+						key = "Odds",
+						text = "ODDS",
+						glyph = "book",
+						variant = "Neutral",
+						textSize = Theme.TextSize.Small,
+						size = UDim2.new(1, 0, 0, 42),
+						layoutOrder = 4,
+						onClick = function()
+							setOddsOpen(not oddsOpen)
+						end,
+					}),
+				},
+			}),
+			--[[
+				The odds list, opened from that button rather than printed on the wheel. A percentage on every
+				wedge is what makes a prize wheel look like a spreadsheet; this keeps the wheel clean and
+				still tells anyone who asks.
+			]]
+			if oddsOpen
+				then e(P.Panel, {
+					key = "Odds",
+					size = UDim2.fromOffset(280, math.min(360, 56 + #segments * 30)),
+					position = UDim2.new(0.5, -(extent / 2) - 160, 0.5, -30),
+					anchorPoint = Vector2.new(0.5, 0.5),
+					gradient = Theme.Gradient.PanelDeep,
+					radius = Theme.Radius.Panel,
+					strokeThickness = Theme.Stroke.Panel,
+					studs = false,
+					zIndex = 9,
+					children = {
+						e(P.Label, {
+							key = "Title",
+							text = "ODDS",
+							textSize = Theme.TextSize.Body,
+							color = Theme.Color.White,
+							position = UDim2.fromOffset(0, 10),
+							size = UDim2.new(1, 0, 0, 24),
+						}),
+						e(P.Group, {
+							key = "Rows",
+							size = UDim2.new(1, -24, 1, -46),
+							position = UDim2.fromOffset(12, 40),
+							layout = P.list({ padding = 2 }),
+							children = oddsRows,
+						}),
+					},
+				})
+				else nil,
 			e(P.Group, {
 				key = "Controls",
 				size = UDim2.fromOffset(360, 86),
@@ -180,10 +456,12 @@ local function SpinScreen(props)
 					e(Buttons.Button, {
 						key = "SpinButton",
 						text = if spinning then "SPINNING" else "SPIN",
+						--- Just the count. "LEFT TODAY" was wrong: packs and rewards add spins beyond the daily one.
 						subtext = if spinning
 							then nil
-							elseif spins > 0 then `{spins} LEFT TODAY`
-							else "COME BACK TOMORROW",
+							elseif spins == 1 then "1 SPIN"
+							elseif spins > 1 then `{spins} SPINS`
+							else "OUT OF SPINS",
 						glyph = if spinning then nil else "wheel",
 						variant = if spinning or spins <= 0 then "Neutral" else "Primary",
 						disabled = spinning or spins <= 0,

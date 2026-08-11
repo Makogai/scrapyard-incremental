@@ -176,7 +176,20 @@ end
 
 function SplashController.Stop()
 	pcall(function()
-		game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
+		local starterGui = game:GetService("StarterGui")
+		starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
+		--[[
+			EXCEPT THE BACKPACK, which this game owns.
+
+			`CoreGuiType.All` is a blanket restore, and it was undoing `ReactUIController.hideBackpack`
+			every single join -- the splash lifts AFTER the UI mounts, so whatever the controller had
+			turned off came straight back on. That is why Roblox's tool row kept reappearing with
+			"Magnet" in it under a HUD that has its own inventory.
+
+			Turned off here as well as in the controller rather than instead of: this covers the restore,
+			the controller covers the CoreGui not being ready yet at mount.
+		]]
+		starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	end)
 	if root then
 		root:unmount()

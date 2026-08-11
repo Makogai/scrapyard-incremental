@@ -15,6 +15,25 @@ I am estimating rather than measuring, it says so.
 > **`docs/STORE_SETUP.md`** — the fifteen Marketplace assets to create and where each id goes.
 > The remaining open items are 3.3 (the fake event banner), 3.4 (no trading), 3.6 and 3.7.
 
+> **STATUS — second pass, presentation and admin.** The wheel was rebuilt for depth and legibility:
+> a three-ring bevelled rim, radially shaded wedges, alternating tone so two same-accent prizes cannot
+> merge into one slice, icons sized from the wedge chord so they can never cross a seam, a dark hub, a
+> chunky pin pointer that kicks while the wheel turns, and an ODDS panel built from the same `Weight`
+> values the server draws from. Prize art now comes from each item's own `IconId`, so four different
+> potions stop being four identical green flasks — on the wheel, the calendar and the playtime grid
+> alike. Spin packs (1 and 3 spins) sit beside the wheel through the new `RobuxPrice` component, which
+> is now the single place a Robux price is drawn.
+>
+> Also fixed: Roblox's Backpack row kept coming back because the splash restored
+> `CoreGuiType.All` after the UI had disabled it; the reward banner dropped its icon and text for
+> every non-jackpot prize (mid-array `nil`, AGENTS rule 17) and the same hole would have cost
+> non-admins most of the desktop HUD; the daily modal's dead band and the hero card's empty lower half
+> (`Rows.RewardCard` now lays out from its own height); locked playtime cards read as *more* prominent
+> than live ones because `Gradient.Dead` is lighter than `Gradient.Slot`.
+>
+> Admin can now grant **spins, a daily-streak position and rebirths** — anything a player holds a
+> count of — and the panel is wide enough for its own tab strip, which ACTIONS used to hang off.
+
 ## The headline
 
 **The game is mechanically further along than it is commercially.** There are 22 server services,

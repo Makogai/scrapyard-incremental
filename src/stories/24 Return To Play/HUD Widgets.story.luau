@@ -73,10 +73,10 @@ return UILabs.CreateReactStory({
 		sections = {
 			{
 				--[[
-					The shipped bottom-left cluster. Reviewed as one unit because the two icons have to
+					The shipped bottom-right cluster. Reviewed as one unit because the two icons have to
 					read as a matched pair -- same glyph weight, same value line, same popup behaviour.
 				]]
-				title = "Status cluster (the real bottom-left corner)",
+				title = "Status cluster (the real bottom-right corner)",
 				items = {
 					e(Parts.StatusCluster, {
 						key = "Cluster",
@@ -85,6 +85,8 @@ return UILabs.CreateReactStory({
 							math.min(math.max(0, controls.DailyStreak - 1) * 5, 100)
 						),
 						dailyClaimable = controls.DailyClaimable,
+						--- A fixed wait so the story's countdown line is stable between renders.
+						dailyResetSeconds = 8 * 3600 + 42 * 60,
 						friendCount = controls.Friends,
 						friendBoost = controls.Friends * RewardsConfig.Friends.BoostPerFriend,
 						spinsAvailable = controls.Spins,

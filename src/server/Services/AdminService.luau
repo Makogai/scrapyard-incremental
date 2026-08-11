@@ -76,6 +76,9 @@ local function boundedAmount(command: string, value: any): number?
 		and command ~= "GrantPet"
 		and command ~= "GrantConsumable"
 		and command ~= "AddUpgradeLevels"
+		and command ~= "AddSpins"
+		and command ~= "SetDailyStreak"
+		and command ~= "AddRebirths"
 	then
 		return nil
 	end
@@ -151,6 +154,9 @@ function AdminService.Start()
 				(
 					command == "AddMoney"
 					or command == "AddGears"
+					or command == "AddSpins"
+					or command == "SetDailyStreak"
+					or command == "AddRebirths"
 					or command == "GrantPet"
 					or command == "GrantConsumable"
 					or command == "AddUpgradeLevels"
