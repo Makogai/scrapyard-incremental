@@ -59,6 +59,16 @@ local function HudMobile(props)
 	-- first band under the strip and the rest of the HUD stacks below it.
 	local topRow = safe.top + 44
 
+	--[[
+		Canvas height in design pixels, for the tutorial spotlight -- which needs an absolute rect and
+		this file otherwise only ever positions things relative to an edge. There is deliberately no
+		HEIGHT constant here: the layout stacks up from the bottom so it holds on any screen height, and
+		this is the one thing that has to know the number.
+	]]
+	local viewport = Hooks.useViewport()
+	local scale = Hooks.useScale()
+	local canvasHeight = viewport.Y / math.max(scale, 0.01)
+
 	local children = P.compact(
 		-- Currencies run side by side rather than stacked: two chips fit the width
 		-- and leave the whole strip below them free.
@@ -161,14 +171,39 @@ local function HudMobile(props)
 			})
 			else nil,
 
-		--- Under the event banner, the one horizontal band with room for it.
+		--[[
+			Spotlight on the menu TOGGLE rather than the upgrade tile: on mobile the tiles live inside a
+			drawer that is closed by default, so the thing the player has to press first is the toggle
+			that opens it.
+		]]
+		if state.tutorialStep
+				and state.tutorialStep.Target == "upgrades"
+				and not open
+			then e(Parts.TutorialSpotlight, {
+				key = "Spotlight",
+				rect = {
+					WIDTH - MARGIN - TOGGLE_HEIGHT,
+					canvasHeight - TOGGLE_BOTTOM - TOGGLE_HEIGHT,
+					TOGGLE_HEIGHT,
+					TOGGLE_HEIGHT,
+				},
+				zIndex = 18,
+			})
+			else nil,
+
+		--[[
+			Above the storage meter, same as desktop. Narrower and shorter, because at 750x361 a 560px
+			caption would span most of the screen.
+		]]
 		e(Parts.TutorialCaption, {
 			key = "Tutorial",
 			step = state.tutorialStep,
 			total = state.tutorialTotal,
-			width = WIDTH - MARGIN * 2 - 160,
-			position = UDim2.fromOffset(MARGIN, topRow + 92),
-			anchorPoint = Vector2.zero,
+			width = WIDTH - MARGIN * 2 - 120,
+			height = 88,
+			position = UDim2.new(0.5, 0, 1, -(Theme.Safe.BottomBand + STORAGE_HEIGHT + 12)),
+			anchorPoint = Vector2.new(0.5, 1),
+			zIndex = 19,
 			onSkip = actions.skipTutorial,
 		}),
 

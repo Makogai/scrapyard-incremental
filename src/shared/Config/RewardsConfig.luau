@@ -72,27 +72,50 @@ local dailyDays = {
 	Milestones inside a single day's play, resetting with the daily reset. Playtime was already
 	being accumulated for the leaderboard and never rewarded -- this spends it.
 
-	Front-loaded on purpose: the 5-minute one exists to be hit during the first session, because
-	a reward a new player never sees is not a retention mechanic.
+	Front-loaded on purpose -- 5, 10 and 20 minutes are all inside a first session, because a reward a
+	new player never reaches is a number in a config rather than a retention mechanic. The back half is
+	spaced wider so the ladder still has somewhere to go for a player who stays all evening.
 ]]
 local playtimeMilestones = {
-	table.freeze({ Index = 1, Seconds = 300, Money = 1000, Label = "5 min", Accent = "Green" }),
-	table.freeze({ Index = 2, Seconds = 900, Money = 4000, Label = "15 min", Accent = "Green" }),
+	table.freeze({ Index = 1, Seconds = 300, Money = 1000, Label = "5 MIN", Accent = "Green" }),
+	table.freeze({ Index = 2, Seconds = 600, Money = 2500, Label = "10 MIN", Accent = "Green" }),
 	table.freeze({
 		Index = 3,
-		Seconds = 1800,
+		Seconds = 1200,
 		Items = table.freeze({ CashPotion = 1 }),
-		Label = "30 min",
+		Label = "20 MIN",
 		Accent = "Gold",
 	}),
-	table.freeze({ Index = 4, Seconds = 3600, Spins = 2, Label = "60 min", Accent = "Cyan" }),
+	table.freeze({ Index = 4, Seconds = 1800, Money = 8000, Label = "30 MIN", Accent = "Green" }),
+	table.freeze({ Index = 5, Seconds = 2700, Spins = 1, Label = "45 MIN", Accent = "Cyan" }),
 	table.freeze({
-		Index = 5,
+		Index = 6,
+		Seconds = 3600,
+		Items = table.freeze({ LuckPotion = 1 }),
+		Label = "1 HR",
+		Accent = "Purple",
+	}),
+	table.freeze({ Index = 7, Seconds = 4800, Money = 30000, Label = "1 HR 20", Accent = "Green" }),
+	table.freeze({
+		Index = 8,
+		Seconds = 6000,
+		Items = table.freeze({ StrengthPotion = 1 }),
+		Label = "1 HR 40",
+		Accent = "Cyan",
+	}),
+	--[[
+		The two-hour prize is SPINS, not cash. Two hours in a day is a committed session, and a spin is
+		worth more than its cash value because it might be the God Potion -- ending the ladder on a
+		gamble is a better last step than ending it on a bigger number.
+	]]
+	table.freeze({
+		Index = 9,
 		Seconds = 7200,
 		Money = 75000,
-		Items = table.freeze({ StrengthPotion = 1 }),
-		Label = "2 hr",
-		Accent = "Purple",
+		Spins = 3,
+		Label = "2 HR",
+		Accent = "Gold",
+		Best = true,
 	}),
 }
 
@@ -209,6 +232,14 @@ return table.freeze({
 		MaximumStored = 25,
 		--- How long the client's wheel animation runs, so the server can rate-limit sanely.
 		AnimationSeconds = 3.2,
+		--[[
+			How long the prize banner stays up before the wheel goes back to idle.
+
+			There is no COLLECT button -- the reward was granted the instant the server resolved the spin,
+			so a button claiming to collect it would be a lie. The banner announces and then clears itself,
+			which is also what frees the wheel for another spin.
+		]]
+		RevealSeconds = 3.5,
 	}),
 
 	Friends = table.freeze({

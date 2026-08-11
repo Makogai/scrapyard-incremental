@@ -3,7 +3,11 @@
 
 	The wheel is decoration over a decided result -- the server picks the segment and sends back an
 	index -- so the story drives it by setting the same `spinRoll` atom the real `SpinResult` remote
-	writes. Pressing SPIN in the story runs the mock action, which fakes exactly that round trip.
+	writes. Pressing SPIN in the story runs the mock action, which fakes exactly that round trip
+	including the auto-clear, so the idle drift resuming afterwards is reviewable here too.
+
+	`idle` is the state worth looking at hardest: the wheel should be visibly turning before anything is
+	pressed, because that is what tells a player the thing is interactive at all.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,7 +29,7 @@ return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
 	name = "Spin Wheel",
-	summary = "Daily spin wheel: idle, spinning, and the revealed prize.",
+	summary = "Spin takeover: idle drift, spinning, and the revealed prize banner.",
 	controls = {
 		Device = UILabs.Choose({ "desktop", "tablet", "mobile" }, 1),
 		GameView = UILabs.Boolean(true),

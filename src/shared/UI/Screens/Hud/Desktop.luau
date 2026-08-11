@@ -92,6 +92,23 @@ local function HudDesktop(props)
 	local travelTop = 6
 	local travelHeight = 44
 
+	--[[
+		The UPGRADE tile's rectangle, for the tutorial spotlight.
+
+		Derived from the SAME numbers that position `MenuGrid` two lines below rather than measured off
+		the instance: measuring would mean threading a ref out of a shared component purely so one
+		optional overlay can find it. The cost is that these have to move together -- if the menu is
+		repositioned, this follows.
+
+		UPGRADE is the first cell of the grid, so it is the top-left tile.
+	]]
+	local viewport = Hooks.useViewport()
+	local scale = Hooks.useScale()
+	local canvasHeight = viewport.Y / math.max(scale, 0.01)
+	local tile = if touch then 92 else 104
+	local menuTop = if touch then (safe.top + 8) else (canvasHeight / 2 - (tile * 2 + 10 + 68) / 2)
+	local upgradeRect = { MARGIN, menuTop, tile, tile }
+
 	return e(P.Group, {
 		key = props.key or "HudDesktop",
 		size = UDim2.fromScale(1, 1),
@@ -168,15 +185,30 @@ local function HudDesktop(props)
 				anchorPoint = Vector2.new(1, 1),
 			}),
 			--[[
-				Centred under the travel bar, where the player is already looking, and only while the
-				chain is unfinished -- `TutorialCaption` renders nothing once `step` is nil.
+				The spotlight, only on a step that names a SCREEN target. World steps get the 3D arrow from
+				`TutorialArrowController` instead, and putting a dark wash over the screen while the player
+				is meant to be walking around their yard would be actively unhelpful.
+
+				Under the caption in z-order so the instructions stay readable through the dim.
+			]]
+			if state.tutorialStep and state.tutorialStep.Target == "upgrades"
+				then e(Parts.TutorialSpotlight, {
+					key = "Spotlight",
+					rect = upgradeRect,
+					zIndex = 18,
+				})
+				else nil,
+			--[[
+				Directly above the storage meter, which is where the player's eyes already are -- they are
+				watching that bar fill. Renders nothing once the chain is finished.
 			]]
 			e(Parts.TutorialCaption, {
 				key = "Tutorial",
 				step = state.tutorialStep,
 				total = state.tutorialTotal,
-				position = UDim2.new(0.5, 0, 0, travelTop + travelHeight + 74),
-				anchorPoint = Vector2.new(0.5, 0),
+				position = UDim2.new(0.5, 0, 1, -(MARGIN + bottomLift + 92)),
+				anchorPoint = Vector2.new(0.5, 1),
+				zIndex = 19,
 				onSkip = actions.skipTutorial,
 			}),
 		},

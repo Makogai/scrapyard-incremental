@@ -7,7 +7,7 @@
 		ConfirmModal    small centred yes/no dialog
 		Tooltip         dark pointer-follow card
 		Toast           single notification card
-		Backdrop        dim wash behind a modal
+		Backdrop        dim wash behind a modal, optionally with a real Lighting blur
 
 	Modals are deliberately smaller than the screen: the player has to be able
 	to see the game behind them.
@@ -35,7 +35,43 @@ local Overlays = {}
 -- Backdrop
 --------------------------------------------------------------------------------
 
+--[[
+	`blur` adds a real `BlurEffect` to Lighting for as long as the backdrop is mounted.
+
+	It has to live in Lighting because that is the only place Roblox will blur the 3D world from -- a
+	ScreenGui cannot blur what is behind it. Created and destroyed with the component so it can never
+	outlive the overlay that asked for it, which is the failure mode that leaves a player staring at a
+	permanently blurred game.
+
+	Guarded with `pcall`: `Lighting` is present in a story too, so this is safe there, but a future
+	caller mounting it somewhere unusual should degrade to "no blur" rather than throw inside an effect.
+]]
+local function useBackdropBlur(enabled: boolean?, size: number?)
+	React.useEffect(function()
+		if not enabled then
+			return
+		end
+		local blur
+		local ok = pcall(function()
+			blur = Instance.new("BlurEffect")
+			blur.Size = size or 18
+			blur.Name = "ScrapyardBackdropBlur"
+			blur.Parent = game:GetService("Lighting")
+		end)
+		if not ok then
+			return
+		end
+		return function()
+			if blur then
+				blur:Destroy()
+			end
+		end
+	end, { enabled, size })
+end
+
 function Overlays.Backdrop(props)
+	useBackdropBlur(props.blur, props.blurSize)
+
 	return e("TextButton", {
 		key = props.key or "Backdrop",
 		Text = "",

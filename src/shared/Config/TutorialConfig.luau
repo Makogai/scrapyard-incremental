@@ -12,11 +12,20 @@
 	the player cannot fake (`TutorialService` evaluates `Condition` against the live snapshot).
 	The client is told which step it is on; it never decides.
 
-	`Target` tells the client what to point the arrow at:
-		"scrap"    the nearest piece of scrap on the player's plot
-		"crusher"  the plot's CrusherSellZone
-		"upgrades" the Upgrade button in the HUD
-		nil        no arrow, caption only
+	`Target` says what to point at, and there are two kinds:
+
+		WORLD targets get a 3D arrow floating above them, built from parts by
+		`TutorialArrowController`:
+			"yard"     the middle of the player's own scrap field -- NOT one piece of scrap. An arrow
+			           stuck to a single collectable is wrong twice over: it vanishes the moment the
+			           piece is collected, and it teaches "go to that one thing" when the lesson is
+			           "walk around your yard".
+			"crusher"  the plot's CrusherSellZone
+
+		SCREEN targets darken the HUD and leave one control lit:
+			"upgrades" the UPGRADE tile in the menu grid
+
+		nil        caption only, no pointer
 ]]
 
 export type TutorialStep = {
@@ -33,8 +42,8 @@ local steps: { TutorialStep } = {
 	table.freeze({
 		Index = 1,
 		Title = "GRAB SOME SCRAP",
-		Detail = "Walk up to scrap in your yard. Your magnet does the rest.",
-		Target = "scrap",
+		Detail = "Walk around your yard. Your magnet picks up scrap on its own.",
+		Target = "yard",
 		Money = 250,
 		Condition = table.freeze({ Field = "TotalScrapCollected", AtLeast = 5 }),
 	}),
@@ -49,7 +58,7 @@ local steps: { TutorialStep } = {
 	table.freeze({
 		Index = 3,
 		Title = "BUY AN UPGRADE",
-		Detail = "Open UPGRADE and spend that cash. Bigger magnet, more scrap.",
+		Detail = "Tap UPGRADE and spend that cash. A bigger magnet grabs heavier scrap.",
 		Target = "upgrades",
 		Money = 1000,
 		Condition = table.freeze({ Field = "TotalUpgradeLevels", AtLeast = 1 }),

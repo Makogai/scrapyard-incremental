@@ -175,15 +175,20 @@ local function DailyRewardsScreen(props)
 	local streak = state.dailyStreak or 0
 
 	--[[
-		"claimed" means behind the current day in the calendar, NOT claimed today. Those are different
-		questions, and conflating them is what makes a looping calendar confusing: on day 3 you want
-		days 1 and 2 dimmed whether or not today's claim is still pending.
+		`DailyCalendarDay` IS THE DAY ON OFFER NEXT, not the one you last took.
+
+		The server advances it the moment you claim, so straight after a claim `currentDay` already
+		points at tomorrow. Treating `day == currentDay` as claimed-when-not-claimable therefore put the
+		tick on TOMORROW'S card -- the bug where you claim one and the next one shows a tick.
+
+		So the only card that can be claimed-looking is one strictly behind the pointer. The card the
+		pointer is on is either live now, or locked until the reset.
 	]]
 	local function stateFor(dayNumber: number): string
 		if dayNumber < currentDay then
 			return "claimed"
 		elseif dayNumber == currentDay then
-			return if claimable then "current" else "claimed"
+			return if claimable then "current" else "locked"
 		end
 		return "locked"
 	end
@@ -247,7 +252,12 @@ local function DailyRewardsScreen(props)
 		glyph = "calendar",
 		headerColor = Theme.Gradient.Green,
 		width = blockWidth + HERO.X + GAP + 56,
-		contentHeight = HERO.Y + TAB_LANE + 8,
+		--[[
+			Tall enough for whichever tab is up: the calendar is two card rows plus the hero, the playtime
+			grid is three. Sized to the taller so switching tabs does not resize the window under the
+			player's cursor.
+		]]
+		contentHeight = math.max(HERO.Y, CARD.Y * 3 + GAP * 2) + TAB_LANE + 8,
 		onClose = actions.closeScreen,
 		footerHeight = 70,
 		--[[
@@ -371,9 +381,14 @@ local function DailyRewardsScreen(props)
 							else nil
 					),
 				})
+				--[[
+					Nine milestones as a 3x3. Same card size as the calendar so the two tabs share a rhythm,
+					and 3x3 is why there are nine rather than eight or ten -- a grid with a ragged last row
+					reads as unfinished.
+				]]
 				else e(P.Group, {
 					key = "Playtime",
-					size = UDim2.fromOffset(blockWidth + GAP + HERO.X, HERO.Y),
+					size = UDim2.fromOffset(CARD.X * 3 + GAP * 2, CARD.Y * 3 + GAP * 2),
 					position = UDim2.new(0.5, 0, 0, TAB_LANE),
 					anchorPoint = Vector2.new(0.5, 0),
 					layout = P.grid({

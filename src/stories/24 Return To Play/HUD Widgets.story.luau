@@ -1,8 +1,9 @@
 --[[
 	The three HUD pieces the return-to-play systems added, in isolation:
 
-		StatusCluster    bottom-right trio: daily login boost, friend boost, spin wheel
-		TutorialCaption  the current onboarding objective
+		StatusCluster      bottom-right trio: daily login boost, friend boost, spin wheel
+		TutorialCaption    the current onboarding objective
+		TutorialSpotlight  darkens the screen and leaves one control lit
 
 	Isolated rather than reviewed inside the full HUD because each has states that are awkward to
 	reach in situ -- a friend count of nine, a milestone exactly ready, the last tutorial step. The
@@ -110,7 +111,22 @@ return UILabs.CreateReactStory({
 						total = #TutorialConfig.Steps,
 					}),
 				},
-				itemSize = UDim2.fromOffset(432, 92),
+				itemSize = UDim2.fromOffset(576, 118),
+			},
+			{
+				--[[
+					The spotlight over a stand-in rect. Four dark panels around a hole rather than a hole
+					punched in one panel, because Roblox cannot mask -- so what to check is that the lit
+					rectangle has no seams down its edges where the panels meet.
+				]]
+				title = "Tutorial spotlight (lit rect at 40,40 — 104x104)",
+				items = {
+					e(Parts.TutorialSpotlight, {
+						key = "Spotlight",
+						rect = { 40, 40, 104, 104 },
+					}),
+				},
+				itemSize = UDim2.fromOffset(300, 200),
 			},
 		},
 	})

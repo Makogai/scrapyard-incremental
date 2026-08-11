@@ -380,6 +380,17 @@ function Bridge.start(): boolean
 						Index = index,
 						Label = label,
 					})
+					--[[
+						And clear it again once the banner has had its moment. Nothing else clears it now
+						that the COLLECT button is gone, and a roll left in place blocks the next spin --
+						`spinWheel` refuses while one is live.
+					]]
+					task.delay(RewardsConfig.Spin.RevealSeconds, function()
+						local shown = Atoms.spinRoll()
+						if shown ~= nil and shown.Index == index and shown.Phase == "revealed" then
+							Atoms.spinRoll(nil)
+						end
+					end)
 				end
 			end)
 		end)

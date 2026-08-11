@@ -5,7 +5,7 @@ return table.freeze({
 	IsDevelopment = false,
 	EnableDebugLogging = false,
 	UseDevelopmentDataStore = false,
-	DataStoreName = "ScrapyardIncremental_PlayerData_v1",
+	DataStoreName = "ScrapyardIncremental_PlayerData_v1.1",
 	DevelopmentDataStoreName = "ScrapyardIncremental_Development_v1",
 	AutoSaveIntervalSeconds = 120,
 	AutoSaveJitterFraction = 0.15,

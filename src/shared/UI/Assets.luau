@@ -94,17 +94,15 @@ Assets.Icons = {
 	home = "rbxassetid://130068439240504",
 	basket = "rbxassetid://114042671041972", -- gift
 	bag = "rbxassetid://125806058579575", -- inventory
-	-- Friend boost. Blank keeps the drawn two-figure glyph; drop an id here to replace it.
-	friends = "",
-	-- Spin wheel. Blank keeps the drawn colour-wheel glyph.
-	wheel = "",
+	friends = "rbxassetid://18544111811",
+	wheel = "rbxassetid://17449975508",
 
 	-- plot and chrome
 	ground = "",
 	fence = "",
 	sign = "",
 	palette = "",
-	calendar = "",
+	calendar = "rbxassetid://114117050042852",
 	-- The authored window headers used this for their "index" mark.
 	book = "rbxassetid://125806058579575",
 	-- No changelog art existed in the authored pack; the UPDATES topbar icon runs

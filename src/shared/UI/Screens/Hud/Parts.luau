@@ -11,7 +11,8 @@
 		EventBanner     temporary event strip
 		ContextActions  teleport home / sell / auto-collect status
 		StatusCluster   bottom-right trio: daily login boost, friend boost, spin wheel
-		TutorialCaption the current onboarding objective, with a bouncing arrow
+		TutorialSpotlight darkens the screen and leaves one control lit
+		TutorialCaption the current onboarding objective
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1142,102 +1143,194 @@ function Parts.StatusCluster(props)
 end
 
 --------------------------------------------------------------------------------
--- TutorialCaption
+-- Tutorial: spotlight and caption
 --------------------------------------------------------------------------------
 
 --[[
-	The onboarding objective: one caption, one bouncing arrow, one SKIP.
+	Darkens the screen and leaves ONE rectangle lit.
 
-	NOT A TUTORIAL DIALOG. Nothing blocks play, there is nothing to acknowledge, and the arrow
-	points rather than explains. Complex onboarding backfires on Roblox, and at least one team
-	raised retention by deleting theirs outright -- see `TutorialConfig`.
+	FOUR PANELS AROUND A HOLE, not one panel with a hole in it. Roblox has no way to punch a hole in a
+	frame -- no masking, no inverse clipping -- and the rotated-frame tricks that fake it break
+	`ClipsDescendants` (rule 11). Four solid rectangles butted against the target's edges leave it
+	untouched and are pixel-exact, which is what "highlight that one" needs.
 
-	The arrow bounces on POSITION only. Rotating it would be the obvious choice and is the wrong
-	one: a rotated GuiObject ignores its ancestors' `ClipsDescendants` and can paint over the entire
-	screen (AGENTS.md rule 11).
+	The lit control stays fully interactive because nothing is drawn over it. That matters: the step is
+	completed by pressing the thing, so covering it with even a transparent panel would break the
+	objective it is pointing at.
+
+	`rect` is in design pixels: { x, y, width, height }.
+]]
+function Parts.TutorialSpotlight(props)
+	local rect = props.rect
+	if rect == nil then
+		return nil
+	end
+
+	local x, y, width, height = rect[1], rect[2], rect[3], rect[4]
+	local dim = props.transparency or 0.62
+	local pad = props.padding or 8
+
+	--- Panels are inset by the padding so the lit hole is slightly larger than the control itself.
+	local left = x - pad
+	local top = y - pad
+	local right = x + width + pad
+	local bottom = y + height + pad
+
+	local function shade(key: string, position: UDim2, size: UDim2)
+		return e("Frame", {
+			key = key,
+			BackgroundColor3 = Theme.Color.Ink,
+			BackgroundTransparency = dim,
+			BorderSizePixel = 0,
+			Position = position,
+			Size = size,
+			ZIndex = 1,
+		})
+	end
+
+	return e(P.Group, {
+		key = props.key or "TutorialSpotlight",
+		size = UDim2.fromScale(1, 1),
+		zIndex = props.zIndex,
+		children = {
+			shade("Top", UDim2.fromOffset(0, 0), UDim2.new(1, 0, 0, math.max(0, top))),
+			shade("Bottom", UDim2.fromOffset(0, bottom), UDim2.new(1, 0, 1, -bottom)),
+			shade(
+				"Left",
+				UDim2.fromOffset(0, top),
+				UDim2.fromOffset(math.max(0, left), bottom - top)
+			),
+			shade("Right", UDim2.fromOffset(right, top), UDim2.new(1, -right, 0, bottom - top)),
+			--[[
+				A ring around the hole, so the lit area reads as chosen rather than as a gap in the dark.
+				Background-transparent with a stroke, and non-interactive -- `Active = false` keeps it out
+				of the input path so it cannot swallow the press it is advertising.
+			]]
+			e("Frame", {
+				key = "Ring",
+				BackgroundTransparency = 1,
+				Active = false,
+				Position = UDim2.fromOffset(left, top),
+				Size = UDim2.fromOffset(right - left, bottom - top),
+				ZIndex = 2,
+			}, {
+				e("UICorner", { key = "Corner", CornerRadius = UDim.new(0, Theme.Radius.Panel) }),
+				e("UIStroke", {
+					key = "Glow",
+					Thickness = 4,
+					Color = Theme.Color.Gold,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				}),
+			}),
+		},
+	})
+end
+
+--[[
+	The onboarding objective: a caption, a progress chip, and SKIP.
+
+	NOT A TUTORIAL DIALOG. Nothing blocks play and there is nothing to acknowledge. Complex onboarding
+	backfires on Roblox, and at least one team raised retention by deleting theirs outright -- see
+	`TutorialConfig`.
+
+	Sized and placed to sit directly above the storage meter, which is where a player's eyes already
+	are: they are watching that bar fill. It is deliberately large -- this is the one piece of text a
+	new player has to read, and the previous version was a 420px strip lost under the travel bar.
 ]]
 function Parts.TutorialCaption(props)
 	local step = props.step
+	local pulse = Motion.useWiggle({ every = 1.6, angle = 4, shakes = 2 })
 	--[[
-		`useWiggle` swings a number back to zero on a period. Used here as a vertical bob rather than
-		a rotation, with a short period so the arrow is always moving -- an arrow that sits still for
-		six seconds between hops reads as broken.
-	]]
-	local bounce = Motion.useWiggle({ every = 1.1, angle = 7, shakes = 2 })
-	--[[
-		Hooks run before the early return, always. Returning above `useWiggle` on the frame the
-		tutorial finishes would change the hook count between renders, which React treats as a
-		different component and throws on.
+		Hooks run before the early return, always. Bailing above `useWiggle` on the frame the tutorial
+		finishes would change the hook count between renders, which React treats as a different
+		component and throws on.
 	]]
 	if step == nil then
 		return nil
 	end
 
-	local width = props.width or 420
+	local width = props.width or 560
+	local height = props.height or 104
 
 	return e(P.Panel, {
 		key = props.key or "TutorialCaption",
-		size = UDim2.fromOffset(width, 78),
+		size = UDim2.fromOffset(width, height),
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
 		gradient = Theme.Gradient.Panel,
 		radius = Theme.Radius.Panel,
 		strokeThickness = Theme.Stroke.Panel,
-		studs = false,
-		children = {
-			--- Points down at the caption, and is the only moving thing on the strip.
-			e(P.Label, {
-				key = "Arrow",
-				text = "▼",
-				textSize = Theme.TextSize.Title,
-				color = Theme.Color.Gold,
-				position = bounce:map(function(offset: number)
-					return UDim2.fromOffset(32, -26 + offset)
+		studs = true,
+		children = P.compact(
+			--[[
+				The step chip doubles as the pointer: it nudges on a period so the caption has one moving
+				element. Position only -- rotating it would let it escape a clipping ancestor (rule 11).
+			]]
+			e(P.Group, {
+				key = "Step",
+				size = UDim2.fromOffset(64, 64),
+				position = pulse:map(function(offset: number)
+					return UDim2.new(0, 16, 0.5, offset)
 				end),
-				anchorPoint = Vector2.new(0.5, 0),
-				size = UDim2.fromOffset(40, 34),
-				zIndex = 3,
-			}),
-			e(Indicators.Badge, {
-				key = "Progress",
-				text = `{step.Index}/{props.total or 4}`,
-				gradient = Theme.Gradient.Gold,
-				textSize = Theme.TextSize.Tiny,
-				position = UDim2.fromOffset(10, 8),
-				anchorPoint = Vector2.new(0, 0),
+				anchorPoint = Vector2.new(0, 0.5),
+				zIndex = 4,
+				children = {
+					e(P.Panel, {
+						key = "Chip",
+						size = UDim2.fromScale(1, 1),
+						gradient = Theme.Gradient.Gold,
+						radius = Theme.Radius.Card,
+						strokeThickness = Theme.Stroke.Card,
+						studs = false,
+						children = {
+							e(P.Label, {
+								key = "Number",
+								text = `{step.Index}/{props.total or 4}`,
+								textSize = Theme.TextSize.Body,
+								color = Theme.Color.Ink,
+								position = UDim2.fromScale(0.5, 0.5),
+								anchorPoint = Vector2.new(0.5, 0.5),
+								size = UDim2.fromScale(1, 0.5),
+							}),
+						},
+					}),
+				},
 			}),
 			e(P.Label, {
 				key = "Title",
 				text = step.Title,
-				textSize = Theme.TextSize.Body,
+				textSize = Theme.TextSize.Heading,
 				color = Theme.Color.White,
 				align = Enum.TextXAlignment.Left,
-				position = UDim2.fromOffset(62, 10),
-				size = UDim2.fromOffset(width - 150, 22),
+				position = UDim2.fromOffset(94, 16),
+				size = UDim2.fromOffset(width - 200, 30),
+				zIndex = 4,
 			}),
 			e(P.Label, {
 				key = "Detail",
 				text = step.Detail,
-				textSize = Theme.TextSize.Small,
+				textSize = Theme.TextSize.Body,
 				font = Theme.Font.Body,
 				color = Theme.Color.Gray,
 				align = Enum.TextXAlignment.Left,
 				wrapped = true,
-				position = UDim2.fromOffset(14, 36),
-				size = UDim2.fromOffset(width - 100, 34),
+				position = UDim2.fromOffset(94, 48),
+				size = UDim2.fromOffset(width - 210, 44),
+				zIndex = 4,
 			}),
 			e(Buttons.Button, {
 				key = "Skip",
 				text = "SKIP",
 				variant = "Neutral",
 				textSize = Theme.TextSize.Tiny,
-				size = UDim2.fromOffset(62, 26),
-				position = UDim2.new(1, -10, 1, -8),
+				size = UDim2.fromOffset(74, 30),
+				position = UDim2.new(1, -14, 1, -12),
 				anchorPoint = Vector2.new(1, 1),
+				zIndex = 5,
 				onClick = props.onSkip,
-			}),
-		},
+			})
+		),
 	})
 end
 

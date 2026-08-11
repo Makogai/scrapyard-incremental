@@ -331,11 +331,22 @@ local function liveActions()
 
 	function self.spinWheel()
 		--[[
-			Refused locally when there is nothing to spend, so a mistimed click does not spend a
-			remote call to be told no. The server still checks -- this is politeness, not security.
+			Refused locally when there is nothing to spend, so a mistimed click does not spend a remote
+			call to be told no. The server still checks -- this is politeness, not security.
+
+			A REVEALED roll is cleared rather than treated as busy. The reward is already granted and the
+			banner is only an announcement, so making the player wait for it to time out before spinning
+			again would be the UI holding them up for no reason. Only a spin still turning blocks.
 		]]
-		if Atoms.spinsAvailable() <= 0 or Atoms.spinRoll() ~= nil then
+		local roll = Atoms.spinRoll()
+		if roll ~= nil and roll.Phase == "spinning" then
 			return
+		end
+		if Atoms.spinsAvailable() <= 0 then
+			return
+		end
+		if roll ~= nil then
+			Atoms.spinRoll(nil)
 		end
 		Bridge.requestSpin()
 	end
@@ -504,6 +515,12 @@ local function mockActions()
 					Label = segment.Label,
 				})
 				Atoms.money(Atoms.money() + (segment.Money or 0))
+				task.delay(RewardsConfig.Spin.RevealSeconds, function()
+					local shown = Atoms.spinRoll()
+					if shown ~= nil and shown.Phase == "revealed" then
+						Atoms.spinRoll(nil)
+					end
+				end)
 			end
 		end)
 	end

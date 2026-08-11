@@ -169,6 +169,40 @@ function Motion.useWiggle(options: any?)
 	return binding
 end
 
+--[[
+	A value that climbs forever at `degreesPerSecond`, for something that idles in motion.
+
+	NOT a spring, and deliberately not a Ripple motion either. A spring settles, and settling is the
+	opposite of what an idle wheel wants -- it should be visibly alive before anyone touches it, which
+	is what tells the player the thing is interactive at all. Ripple only notifies `onStep` while its
+	solver is running, so driving it with `set` every frame is relying on behaviour that is not what
+	`set` is for.
+
+	So this is a bare `useBinding` updated from the shared heartbeat: one connection, one addition and
+	one binding write per frame. Wrapped at 360 so the number cannot grow without bound over a long
+	session, and it stops accumulating while `enabled` is false so a wheel mid-spin is not fighting its
+	own idle drift.
+]]
+function Motion.useSpin(degreesPerSecond: number, enabled: boolean?)
+	local binding, setBinding = React.useBinding(0)
+
+	React.useEffect(function()
+		if enabled == false then
+			return
+		end
+		local angle = 0
+		local disconnect = Motion.heartbeat:Connect(function(deltaTime)
+			angle = (angle + degreesPerSecond * deltaTime) % 360
+			setBinding(angle)
+		end)
+		return function()
+			disconnect:Disconnect()
+		end
+	end, { degreesPerSecond, enabled })
+
+	return binding
+end
+
 --- Springs toward `target` whenever it changes. Read-only convenience wrapper.
 function Motion.useSpring(target: any, options: any?)
 	local binding, motion = Motion.useMotion(target)
