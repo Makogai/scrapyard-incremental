@@ -89,6 +89,15 @@ Atoms.ownedMagnets = Charm.atom({} :: { [string]: boolean })
 Atoms.equippedMagnet = Charm.atom("MagnetBasic")
 Atoms.inventory = Charm.atom({} :: { [string]: number })
 Atoms.activeBoosts = Charm.atom({} :: { [string]: number })
+
+--[[
+	The server-wide event: `{ Id, EndsAt | StartsAt, Live }`.
+
+	Identity comes from the server, not from running the schedule locally, so a player with a wrong
+	system clock cannot be shown a banner that disagrees with the multipliers they are getting. The
+	title, glyph and accent are looked up from `EventConfig` by id at render time.
+]]
+Atoms.activeEvent = Charm.atom(nil :: { [string]: any }?)
 Atoms.entitlements = Charm.atom({} :: { [string]: boolean })
 Atoms.ownedPets = Charm.atom({} :: { [string]: number })
 Atoms.equippedPets = Charm.atom({} :: { string })
@@ -226,6 +235,9 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.Inventory) == "table" then
 		Atoms.inventory(snapshot.Inventory)
+	end
+	if type(snapshot.ActiveEvent) == "table" then
+		Atoms.activeEvent(snapshot.ActiveEvent)
 	end
 	if type(snapshot.ActiveBoosts) == "table" then
 		Atoms.activeBoosts(snapshot.ActiveBoosts)

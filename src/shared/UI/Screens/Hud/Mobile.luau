@@ -85,13 +85,22 @@ local function HudMobile(props)
 			position = UDim2.fromOffset(MARGIN, topRow),
 		}),
 
-		e(Parts.EventBanner, {
-			key = "EventBanner",
-			width = WIDTH - MARGIN * 2,
-			height = 44,
-			position = UDim2.new(0.5, 0, 0, topRow + 42),
-			anchorPoint = Vector2.new(0.5, 0),
-		}),
+		--- Only when there is an event to name; see the note in `Desktop`.
+		if state.event
+			then e(Parts.EventBanner, {
+				key = "EventBanner",
+				title = state.event.title,
+				detail = state.event.detail,
+				glyph = state.event.glyph,
+				accent = state.event.accent,
+				seconds = state.event.seconds,
+				live = state.event.live,
+				width = WIDTH - MARGIN * 2,
+				height = 44,
+				position = UDim2.new(0.5, 0, 0, topRow + 42),
+				anchorPoint = Vector2.new(0.5, 0),
+			})
+			else nil,
 
 		-- Boosts share the right edge with the drawer, so they step aside for it.
 		if not open

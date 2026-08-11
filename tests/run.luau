@@ -8,6 +8,7 @@ local PlotRules = require("../src/shared/Utility/PlotRules")
 local AreaRules = require("../src/shared/Utility/AreaRules")
 local AdminConfig = require("../src/shared/Config/AdminConfig")
 local DayClock = require("../src/shared/Utility/DayClock")
+local EventConfig = require("../src/shared/Config/EventConfig")
 
 local passed = 0
 
@@ -302,5 +303,143 @@ expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
 expectEqual(thirteen.ActivePlotTheme, "WorkshopYard", "migration preserves the plot theme")
+
+--[[
+	The event schedule.
+
+	Worth testing hard and cheap to test at all, because it is pure arithmetic over UTC time and every
+	way it can be wrong is invisible in game until the wrong week: an off-by-one weekday, a window that
+	never opens, two events live at once, or a window that fails to wrap past Saturday midnight.
+
+	Reference instants are built with `os.time` against an explicit UTC table so the expectations do
+	not depend on where the test runs. 2024-01-07 was a Sunday, which anchors the whole week.
+]]
+local function utc(day: number, hour: number, minute: number?): number
+	--- 2024-01-07 is a Sunday, so `day` 7..13 walks Sunday through Saturday.
+	return os.time({
+		year = 2024,
+		month = 1,
+		day = day,
+		hour = hour,
+		min = minute or 0,
+		sec = 0,
+	} :: any)
+end
+
+local sundayNoon = utc(7, 12)
+local tuesdayEvening = utc(9, 18, 30)
+local wednesdayEvening = utc(10, 19)
+local fridayNoon = utc(12, 12)
+local saturdayOneAm = utc(13, 1)
+
+--[[
+	Saturday 00:00 to Monday 00:00 is Scrap Rush, and the Sunday half of that window is the wrap case:
+	the window opens in one week and closes in the next, so a naive comparison misses it entirely.
+]]
+local sundayEvent = EventConfig.activeAt(sundayNoon)
+expectEqual(sundayEvent ~= nil, true, "sunday is inside the weekend window")
+expectEqual(if sundayEvent then sundayEvent.Id else "", "ScrapRush", "sunday runs scrap rush")
+
+local saturdayEvent = EventConfig.activeAt(saturdayOneAm)
+expectEqual(if saturdayEvent then saturdayEvent.Id else "", "ScrapRush", "saturday runs scrap rush")
+
+expectEqual(EventConfig.activeAt(fridayNoon), nil, "friday has no event")
+
+local tuesdayEvent = EventConfig.activeAt(tuesdayEvening)
+expectEqual(if tuesdayEvent then tuesdayEvent.Id else "", "ScrapStorm", "tuesday evening storm")
+
+local wednesdayEvent = EventConfig.activeAt(wednesdayEvening)
+expectEqual(if wednesdayEvent then wednesdayEvent.Id else "", "LuckyHour", "wednesday evening luck")
+
+--- Half-open windows: the closing instant belongs to nobody, so events cannot double up on the edge.
+expectEqual(EventConfig.activeAt(utc(9, 20)), nil, "storm window is half-open at its end")
+expectEqual(
+	if EventConfig.activeAt(utc(9, 18)) then EventConfig.activeAt(utc(9, 18)).Id else "",
+	"ScrapStorm",
+	"storm window includes its opening instant"
+)
+
+--- Remaining time, so the banner's countdown is the real one.
+local _, stormRemaining = EventConfig.activeAt(utc(9, 19))
+expectEqual(stormRemaining, 3600, "one hour left of a two hour window")
+local _, rushRemaining = EventConfig.activeAt(utc(13, 0))
+expectEqual(rushRemaining, 48 * 3600, "full weekend remaining at its start")
+
+--- The multiplier the gameplay actually reads.
+expectEqual(EventConfig.multiplierAt("ScrapValue", sundayNoon), 2, "weekend doubles scrap value")
+expectEqual(EventConfig.multiplierAt("Luck", sundayNoon), 1, "weekend does not touch luck")
+expectEqual(EventConfig.multiplierAt("ScrapValue", fridayNoon), 1, "no event means no multiplier")
+expectEqual(EventConfig.multiplierAt("Luck", wednesdayEvening), 2, "lucky hour doubles luck")
+
+--- What is next, which is what the banner shows when nothing is live.
+local nextDefinition, nextWait = EventConfig.nextAt(fridayNoon)
+expectEqual(
+	if nextDefinition then nextDefinition.Id else "",
+	"ScrapRush",
+	"friday looks ahead to the weekend"
+)
+expectEqual(nextWait, 12 * 3600, "twelve hours from friday noon to saturday")
+
+--[[
+	NO TWO WINDOWS MAY OVERLAP, swept at hourly resolution across a whole week.
+
+	Deliberately does NOT use `activeAt`, which returns the first match and so could never report an
+	overlap -- that version of this test passed while proving nothing. Containment is recomputed here
+	from the definitions, which makes it an independent check of the config rather than a restatement
+	of the code under test.
+
+	One event at a time is the assumption both the stacked multipliers and the single banner rest on,
+	and the only way to keep it true as events are added is to check every hour rather than the few
+	instants I happened to think of.
+]]
+local WEEK_SECONDS = 24 * 3600 * 7
+local function containsHour(definition: any, weekSecond: number): boolean
+	local start = (definition.StartDay - 1) * 24 * 3600 + definition.StartHour * 3600
+	local duration = definition.DurationHours * 3600
+	for _, position in { weekSecond, weekSecond + WEEK_SECONDS } do
+		if position >= start and position < start + duration then
+			return true
+		end
+	end
+	return false
+end
+
+local weekStart = utc(7, 0)
+for hour = 0, 24 * 7 - 1 do
+	local weekSecond = hour * 3600
+	local live = {}
+	for _, definition in ipairs(EventConfig.Events) do
+		if containsHour(definition, weekSecond) then
+			table.insert(live, definition.Id)
+		end
+	end
+	if #live > 1 then
+		error(`overlapping events at hour {hour}: {table.concat(live, ", ")}`, 2)
+	end
+	--- And the sweep must agree with `activeAt`, which is the function the game actually calls.
+	local active = EventConfig.activeAt(weekStart + weekSecond)
+	local expected = if #live == 1 then live[1] else nil
+	if (if active then active.Id else nil) ~= expected then
+		error(`activeAt disagrees with the schedule at hour {hour}`, 2)
+	end
+end
+passed += 1
+
+--[[
+	And every event must actually open at some point in the week. A window with a bad weekday or a zero
+	duration would silently never fire, which is the failure nobody notices until someone asks why the
+	event never happened.
+]]
+for _, definition in ipairs(EventConfig.Events) do
+	local seen = false
+	for hour = 0, 24 * 7 - 1 do
+		local candidate = EventConfig.activeAt(weekStart + hour * 3600)
+		if candidate and candidate.Id == definition.Id then
+			seen = true
+			break
+		end
+	end
+	expectEqual(seen, true, `{definition.Id} opens at some point in the week`)
+end
 
 print(`Scrapyard foundation and data tests passed: {passed}`)

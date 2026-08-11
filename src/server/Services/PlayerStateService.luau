@@ -15,6 +15,7 @@ local GameMath = require(ReplicatedStorage.Shared.Utility.GameMath)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
+local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PlayerDataSchema = require(ReplicatedStorage.Shared.Utility.PlayerDataSchema)
@@ -99,6 +100,15 @@ local function derivedStats(data: { [string]: any })
 	]]
 	local friendBoost = 1 + (data.FriendBoostCount or 0) * RewardsConfig.Friends.BoostPerFriend
 	scrapValue *= friendBoost
+	--[[
+		The live server-wide event, read from the schedule rather than from a service.
+
+		`EventConfig` is pure arithmetic over `os.time()`, so this needs no state, no dependency and no
+		ordering guarantee -- and it cannot drift out of step with what the HUD banner is claiming,
+		because the banner is computed from the same function.
+	]]
+	local now = os.time()
+	scrapValue *= EventConfig.multiplierAt("ScrapValue", now)
 	local storageCapacity = effect("StorageCapacity")
 	storageCapacity *= petEffects.Storage
 	if data.Entitlements.StoragePlus == true then
@@ -108,6 +118,8 @@ local function derivedStats(data: { [string]: any })
 	local respawnMultiplier = effect("ScrapFlow")
 	collectionSpeed *= petEffects.CollectionSpeed
 	respawnMultiplier *= petEffects.RespawnRate
+	collectionSpeed *= EventConfig.multiplierAt("CollectionSpeed", now)
+	respawnMultiplier *= EventConfig.multiplierAt("RespawnRate", now)
 	if godActive then
 		collectionSpeed *= InventoryConfig.Consumables.GodPotion.CollectionMultiplier
 		respawnMultiplier *= InventoryConfig.Consumables.GodPotion.RespawnMultiplier
@@ -143,7 +155,28 @@ function PlayerStateService.GetLuckMultiplier(player: Player): number
 	if boosts.GodBoostEndsAt > os.time() then
 		multiplier *= InventoryConfig.Consumables.GodPotion.LuckMultiplier
 	end
+	--- Lucky Hour, from the same schedule the scrap-value events come from.
+	multiplier *= EventConfig.multiplierAt("Luck", os.time())
 	return multiplier
+end
+
+--[[
+	The event payload: which event is live and when it ends, or which is next and when it starts.
+
+	Both cases are sent because a banner that only exists during an event teaches nobody the cadence,
+	and the cadence is the reason the system exists (audit 3.7).
+]]
+local function activeEventPayload(): { [string]: any }
+	local now = os.time()
+	local definition, remaining = EventConfig.activeAt(now)
+	if definition then
+		return { Id = definition.Id, EndsAt = now + remaining, Live = true }
+	end
+	local upcoming, wait = EventConfig.nextAt(now)
+	if upcoming then
+		return { Id = upcoming.Id, StartsAt = now + wait, Live = false }
+	end
+	return { Live = false }
 end
 
 local function publicSnapshot(data: { [string]: any })
@@ -183,6 +216,17 @@ local function publicSnapshot(data: { [string]: any })
 		EquippedPets = table.clone(data.EquippedPets),
 		PetSlotUpgradeLevel = data.PetSlotUpgradeLevel,
 		EggOpenCounts = table.clone(data.EggOpenCounts),
+		--[[
+			THE LIVE EVENT, from the server's clock.
+
+			Identity and end time come from here rather than being recomputed on the client, because a
+			player with a wrong system clock would otherwise see a banner that disagrees with the
+			multipliers they are actually getting -- which is the exact failure the fake banner was.
+
+			The client looks the title, glyph and accent up from `EventConfig` by id and ticks the
+			countdown itself, the same way boost timers already work.
+		]]
+		ActiveEvent = activeEventPayload(),
 		MaximumEquippedPets = PetConfig.BaseEquipSlots
 			+ data.PetSlotUpgradeLevel
 			+ (if data.Entitlements.ExtraPetSlots == true then PetConfig.PassBonusSlots else 0),
@@ -725,6 +769,21 @@ function PlayerStateService.Start()
 			saveSession(player, true)
 		end
 	end)
+end
+
+--[[
+	Re-push every loaded player's snapshot.
+
+	For state that changes without any player doing anything -- a scheduled event opening or closing.
+	`EventService` owns the "when"; this is the only thing it needs from here, which keeps the two
+	services from knowing anything else about each other.
+]]
+function PlayerStateService.PushAll()
+	for player, session in sessions do
+		if not session.Released then
+			pushState(player, session.Data)
+		end
+	end
 end
 
 function PlayerStateService.GetPublicState(player: Player): { [string]: any }?

@@ -37,6 +37,7 @@ local localUserId = if PlayersService.LocalPlayer then PlayersService.LocalPlaye
 
 local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
+local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
 local TutorialConfig = require(ReplicatedStorage.Shared.Config.TutorialConfig)
 local React = require(ReplicatedStorage.Packages.React)
@@ -676,6 +677,7 @@ function Store.use()
 	local equippedMagnet = useAtom(Atoms.equippedMagnet)
 	local inventory = useAtom(Atoms.inventory)
 	local activeBoosts = useAtom(Atoms.activeBoosts)
+	local activeEvent = useAtom(Atoms.activeEvent)
 	local entitlements = useAtom(Atoms.entitlements)
 	local ownedPets = useAtom(Atoms.ownedPets)
 	local equippedPets = useAtom(Atoms.equippedPets)
@@ -746,6 +748,39 @@ function Store.use()
 		return a.seconds > b.seconds
 	end)
 
+	--[[
+		The server-wide event, resolved from the id the server sent.
+
+		The countdown is computed against the client clock exactly as the boost timers above are -- the
+		server owns WHICH event and WHEN it ends, the client only counts down to it. `nil` when the
+		schedule has nothing at all, which is the honest state for a HUD that used to permanently
+		advertise an event that did not exist.
+	]]
+	local event = nil
+	if activeEvent and activeEvent.Id then
+		local definition = nil
+		for _, candidate in ipairs(EventConfig.Events) do
+			if candidate.Id == activeEvent.Id then
+				definition = candidate
+				break
+			end
+		end
+		if definition then
+			local live = activeEvent.Live == true
+			local target = if live then activeEvent.EndsAt else activeEvent.StartsAt
+			local remaining = math.max(0, (target or now) - now)
+			event = {
+				id = definition.Id,
+				title = definition.Title,
+				detail = if live then definition.Detail else `Next event: {definition.Detail}`,
+				glyph = definition.Glyph,
+				accent = definition.Accent,
+				live = live,
+				seconds = remaining,
+			}
+		end
+	end
+
 	local state = {
 		loaded = loaded,
 
@@ -773,6 +808,7 @@ function Store.use()
 		settings = settings,
 
 		boosts = boosts,
+		event = event,
 		screen = screen,
 		detail = if detail then { kind = detail.Kind, id = detail.Id } else nil,
 		confirm = confirm,

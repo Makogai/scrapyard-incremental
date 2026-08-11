@@ -206,11 +206,25 @@ local function HudDesktop(props)
 				position = UDim2.new(0.5, 0, 1, -(MARGIN + bottomLift)),
 				anchorPoint = Vector2.new(0.5, 1),
 			}),
-			e(Parts.EventBanner, {
-				key = "EventBanner",
-				position = UDim2.new(0.5, 0, 0, travelTop + travelHeight + 8),
-				anchorPoint = Vector2.new(0.5, 0),
-			}),
+			--[[
+				Only when there is an event to name. Rendered unconditionally, this component fell back to
+				its own hardcoded "SCRAP RUSH EVENT -- 3x scrap value" and lied to every player forever
+				(audit 3.3). `state.event` is nil when the schedule has nothing, and nil is safe here
+				because this list goes through `P.compact`.
+			]]
+			if state.event
+				then e(Parts.EventBanner, {
+					key = "EventBanner",
+					title = state.event.title,
+					detail = state.event.detail,
+					glyph = state.event.glyph,
+					accent = state.event.accent,
+					seconds = state.event.seconds,
+					live = state.event.live,
+					position = UDim2.new(0.5, 0, 0, travelTop + travelHeight + 8),
+					anchorPoint = Vector2.new(0.5, 0),
+				})
+				else nil,
 			e(Parts.BoostTimers, {
 				key = "Boosts",
 				boosts = state.boosts,

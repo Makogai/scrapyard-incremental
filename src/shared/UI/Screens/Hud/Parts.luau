@@ -678,11 +678,36 @@ end
 -- EventBanner
 --------------------------------------------------------------------------------
 
+--[[
+	props:
+		title, detail, glyph, accent   the event, resolved by the store from EventConfig
+		seconds                        time left if live, time until start if not
+		live                           false renders the muted "next event" state
+
+	NO DEFAULTS FOR THE CONTENT. This component used to fall back to "SCRAP RUSH EVENT -- 3x scrap
+	value in every area" with an invented countdown, and it was rendered with no props at all, so every
+	player permanently saw an event that did not exist (audit 3.3). A banner with nothing to say must
+	not be rendered at all, and the callers now decide that.
+]]
 function Parts.EventBanner(props)
 	local width = props.width or 520
 	local height = props.height or 56
 	local iconExtent = height - 14
 	local timerWidth = 110
+	--[[
+		LIVE VERSUS UPCOMING, in one component.
+
+		A banner that appears only during an event teaches nobody the cadence, and the cadence is the
+		whole point of a schedule (audit 3.7). So an upcoming event still shows, in the muted grey
+		treatment, counting down to when it opens -- and the live one takes the event's own accent so
+		there is no mistaking which state you are looking at.
+	]]
+	local live = props.live ~= false
+	local accentName = props.accent or "Cyan"
+	local accent = if live then (Theme.Color[accentName] or Theme.Color.Cyan) else Theme.Color.Gray
+	local accentGradient = if live
+		then (Theme.Gradient[accentName] or Theme.Gradient.Cyan)
+		else Theme.Gradient.Gray
 
 	--[[
 		Laid out, not hand-positioned. Every child used to be placed by absolute
@@ -700,7 +725,7 @@ function Parts.EventBanner(props)
 		radius = Theme.Radius.Card,
 		color = Theme.Color.PanelDark,
 		gradient = Theme.Gradient.PanelDeep,
-		strokeColor = Theme.Color.Cyan,
+		strokeColor = accent,
 		strokeThickness = Theme.Stroke.Card,
 		studs = false,
 		clip = true,
@@ -718,8 +743,8 @@ function Parts.EventBanner(props)
 				children = {
 					e(Icon, {
 						key = "Icon",
-						glyph = "star",
-						gradient = Theme.Gradient.Cyan,
+						glyph = props.glyph or "star",
+						gradient = accentGradient,
 						size = UDim2.fromOffset(iconExtent, iconExtent),
 						radius = Theme.Radius.Small,
 						layoutOrder = 1,
@@ -737,11 +762,11 @@ function Parts.EventBanner(props)
 							e(P.Label, {
 								key = "Title",
 								zIndex = 7,
-								text = props.title or "SCRAP RUSH EVENT",
+								text = props.title or "",
 								textSize = if height < 50
 									then Theme.TextSize.Small
 									else Theme.TextSize.Body,
-								color = Theme.Color.Cyan,
+								color = accent,
 								align = Enum.TextXAlignment.Left,
 								size = UDim2.new(1, 0, 0, if height < 50 then 18 else 22),
 								truncate = Enum.TextTruncate.AtEnd,
@@ -750,7 +775,7 @@ function Parts.EventBanner(props)
 							e(P.Label, {
 								key = "Detail",
 								zIndex = 7,
-								text = props.detail or "3x scrap value in every area",
+								text = props.detail or "",
 								textSize = if height < 50
 									then Theme.TextSize.Tiny
 									else Theme.TextSize.Small,
@@ -767,8 +792,8 @@ function Parts.EventBanner(props)
 			}),
 			e(Indicators.TimerBadge, {
 				key = "Timer",
-				seconds = props.seconds or 2_734,
-				gradient = Theme.Gradient.Cyan,
+				seconds = props.seconds or 0,
+				gradient = accentGradient,
 				position = UDim2.new(1, -10, 0.5, 0),
 				anchorPoint = Vector2.new(1, 0.5),
 				zIndex = 4,

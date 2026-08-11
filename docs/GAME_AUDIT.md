@@ -13,7 +13,7 @@ I am estimating rather than measuring, it says so.
 > spin wheel, the friend boost, and the first-session objective chain.** Section 3.2 and 3.5 are
 > closed. Monetisation (3.1) is deliberately untouched and is documented separately in
 > **`docs/STORE_SETUP.md`** — the fifteen Marketplace assets to create and where each id goes.
-> The remaining open items are 3.3 (the fake event banner), 3.4 (no trading), 3.6 and 3.7.
+> The remaining open items are 3.4 (no trading) and 3.6.
 
 > **STATUS — second pass, presentation and admin.** The wheel was rebuilt for depth and legibility:
 > a three-ring bevelled rim, radially shaded wedges, alternating tone so two same-accent prizes cannot
@@ -34,6 +34,14 @@ I am estimating rather than measuring, it says so.
 > Admin can now grant **spins, a daily-streak position and rebirths** — anything a player holds a
 > count of — and the panel is wide enough for its own tab strip, which ACTIONS used to hang off.
 
+> **STATUS — timed events.** 3.3 is closed and 3.7 has its vehicle. A weekly schedule
+> (`docs/EVENTS.md`) drives real multipliers and the real banner: Scrap Rush all weekend, plus two
+> midweek windows. The schedule is a pure function of UTC time, so every server agrees, nothing has to
+> be switched on, and the whole thing is swept hourly across a week in `tests/`. The banner shows the
+> live event in its own accent or the next one in grey, and renders nothing at all when the schedule is
+> empty — it can no longer invent content. What is still missing from 3.7 is the *content* half:
+> events change numbers, not what there is to collect.
+
 ## The headline
 
 **The game is mechanically further along than it is commercially.** There are 22 server services,
@@ -47,9 +55,9 @@ But:
 - ~~**Nothing brings a player back tomorrow.**~~ **FIXED.** Daily rewards, playtime milestones, a
   daily spin wheel and the friend boost are all live, with the objective chain teaching the loop on
   the first session. Quests and a real event system are still outstanding.
-- **The HUD advertises an event that does not exist.** `EventBanner` is rendered with no props, so
-  every player permanently sees "SCRAP RUSH EVENT — 3x scrap value in every area" with a countdown.
-  It is hardcoded placeholder text.
+- ~~**The HUD advertises an event that does not exist.**~~ **FIXED.** A real weekly schedule drives
+  real multipliers and the real banner; with nothing scheduled the banner does not render. See
+  `docs/EVENTS.md`.
 - **There is no social layer at all.** No trading, no guilds, no parties, no co-op. The research is
   blunt about this: social systems are worth **3–5× on retention**.
 
@@ -89,7 +97,7 @@ a healthy simulator core loop at **15–20 seconds**; ours has never been measur
 | Daily spin wheel, server-decided | **shipped** |
 | Friend boost, +10% money per friend in-server | **shipped** |
 | First-session objective chain (4 steps, server-verified) | **shipped** |
-| **Timed events** | **fake banner only** |
+| **Timed events** | **weekly schedule, real multipliers** |
 | Repeatable daily quests | do not exist (the objective chain is one-off) |
 | Onboarding / first-session direction | **shipped** — caption + world arrow, no modal |
 | Trading | does not exist |
@@ -177,15 +185,19 @@ need work. Repeatable daily *quests* are still outstanding.
   index and turns the reel to it. A client that spins and reports where it landed lands on the
   jackpot every time.
 
-### 3.3 The HUD lies to every player
+### 3.3 The HUD lies to every player — FIXED
 
-`EventBanner` is rendered from `Desktop.luau` and `Mobile.luau` with **no data props**, so it falls
+`EventBanner` was rendered from `Desktop.luau` and `Mobile.luau` with **no data props**, so it fell
 back to its own hardcoded defaults: "SCRAP RUSH EVENT", "3x scrap value in every area", and a
-countdown that means nothing. It is always on screen and always says the same thing.
+countdown that meant nothing. It was always on screen and always said the same thing.
 
-This is worse than a missing feature. A permanent banner promising a 3× multiplier that is not
-active teaches players to ignore the HUD, and the first time you ship a *real* event they will not
-notice it. Either wire it or hide it — do not ship it as decoration.
+That is worse than a missing feature. A permanent banner promising a 3× multiplier that is not active
+teaches players to ignore the HUD, and the first time you ship a *real* event they will not notice it.
+
+**Now:** a weekly UTC schedule (`docs/EVENTS.md`) drives real multipliers, the banner is rendered only
+when the schedule has something to say, and the component has no content defaults left to fall back
+on. The live state carries the event's own accent; an upcoming one is grey and counts down to its
+start, which is how a player learns the cadence at all.
 
 ### 3.4 No social layer, in a genre where social is the retention multiplier
 
@@ -261,8 +273,9 @@ Successful simulators ship **every 1–2 weeks**, with a monthly or seasonal eve
 collectibles without resetting progress. Pet Simulator 99 updates every Saturday at 5pm GMT — the
 predictability is the point.
 
-We have no event system, so there is no vehicle for a cadence even if the content existed. The
-closest thing is the codes system, which is a good start and already built.
+**Update:** the vehicle now exists — a weekly UTC schedule driving real multipliers and the real
+banner (`docs/EVENTS.md`). What is still missing is the content half: the events change numbers, not
+what there is to collect, so there is a cadence to hang updates on but no updates hanging on it yet.
 
 ### 3.8 Production health affects all of the above
 
@@ -314,7 +327,7 @@ this stage and it is what makes a 1–2 week cadence realistic.
 | Priority | Action | Why |
 | --- | --- | --- |
 | 1 | **Daily quests.** 3 rotating: sell N scrap, discover a new type, hatch an egg | The single most-cited D7 mechanic |
-| 2 | **Real timed events, and delete the fake banner.** Weekend 2–3× scrap value, wired to the existing banner | Fixes 3.3 and creates the cadence vehicle from 3.7. Weekend multiplier windows are what let F2P players keep pace |
+| 2 | ~~**Real timed events, and delete the fake banner.**~~ **DONE** — weekend 2× scrap value plus two midweek windows, on a UTC schedule | Fixed 3.3 and created the cadence vehicle from 3.7. Weekend multiplier windows are what let F2P players keep pace |
 | 3 | **Rebirth anticipation.** Progress bar toward the next rebirth in the HUD, with a preview of what it grants | Rebirth is the long-term goal and it is currently invisible |
 | 4 | **Weekly leaderboard resets** alongside the all-time boards | Gives non-whales a board they can actually win |
 
@@ -435,7 +448,7 @@ Ordered by return on effort, not by size.
 ### Week 1 — unblock revenue and stop lying
 
 - [ ] Fill in all 15 `MarketplaceId` values — **see `docs/STORE_SETUP.md`**
-- [ ] Hide or wire `EventBanner` — no fake events
+- [x] Hide or wire `EventBanner` — no fake events
 - [ ] Fix `QuantumMagnet`'s range mismatch and give it its own model
 - [ ] Add the two missing magnet icons
 
@@ -451,7 +464,7 @@ Ordered by return on effort, not by size.
 ### Weeks 4–6 — day seven
 
 - [ ] Daily quests (3 rotating) — the objective chain is the scaffold to build these on
-- [ ] Real timed event system, driving the real banner
+- [x] Real timed event system, driving the real banner
 - [ ] Rebirth progress bar and preview
 - [ ] Weekly leaderboard resets
 - [ ] Contextual offer prompts at the five moments above

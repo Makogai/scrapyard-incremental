@@ -28,6 +28,7 @@ local PlaytimeRewardService = require(script.Services.PlaytimeRewardService)
 local SpinService = require(script.Services.SpinService)
 local FriendBoostService = require(script.Services.FriendBoostService)
 local TutorialService = require(script.Services.TutorialService)
+local EventService = require(script.Services.EventService)
 
 FoundationValidator.validate()
 RemoteService.Start()
@@ -62,4 +63,9 @@ PlaytimeRewardService.Start()
 SpinService.Start()
 FriendBoostService.Start()
 TutorialService.Start()
+--[[
+	Events last, and only for the announcement side: the multipliers are already live because
+	`EventConfig` is a pure function of the clock, so a failure here costs a popup, not a payout.
+]]
+EventService.Start()
 print(string.format("[%s] Server bootstrap ready", Environment.GameName))
