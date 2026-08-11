@@ -1106,6 +1106,8 @@ function PlayerStateService.AdminMutate(
 	elseif command == "ResetTestProfile" then
 		session.Data = PlayerDataSchema.createDefault(os.time())
 		data = session.Data
+		--- The fresh profile wears nothing, so the nameplate has to be told or it keeps the old title.
+		publishTitle(player, data)
 		local character = player.Character
 		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
 		if humanoid then
@@ -1131,6 +1133,15 @@ function PlayerStateService.AdminMutate(
 		end
 		data.OwnedPets[itemId] =
 			math.min(PetConfig.MaximumOwnedPerPet, (data.OwnedPets[itemId] or 0) + grant)
+	elseif command == "GrantTitle" then
+		local definition = if itemId then TitleConfig.resolve(itemId) else nil
+		if definition == nil then
+			return false, "Unknown title ID"
+		end
+		--- Granted AND worn: see the note in `AdminCatalogue` for why this one equips itself.
+		data.UnlockedTitles[definition.Id] = true
+		data.EquippedTitle = definition.Id
+		publishTitle(player, data)
 	elseif command == "GrantMagnet" then
 		local definition = if itemId then InventoryConfig.Magnets[itemId] else nil
 		if definition == nil then

@@ -23,6 +23,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
@@ -244,6 +245,42 @@ function AdminCatalogue.build(): { AdminSection }
 		asks twice before sending it -- the server also refuses it outside Studio and for any target
 		other than yourself.
 	]]
+	--[[
+		Titles, in rarity order so the list reads the way the inventory tab does.
+
+		Granting a title from here WEARS it as well. That is the opposite of what an achievement does --
+		which only hands it over -- and it is deliberate: the reason to grant a title in a test session is
+		almost always to look at it over a head, and needing a second trip to the inventory to do that
+		wastes the one action the panel exists to save.
+	]]
+	local titles: { AdminEntry } = {}
+	local sortedTitles = table.clone(TitleConfig.Titles)
+	table.sort(sortedTitles, function(a, b)
+		local rankA, rankB = TitleConfig.rarityRank(a.Rarity), TitleConfig.rarityRank(b.Rarity)
+		if rankA ~= rankB then
+			return rankA < rankB
+		end
+		return a.Text < b.Text
+	end)
+	for _, definition in sortedTitles do
+		table.insert(titles, {
+			Id = definition.Id,
+			--- The rarity is in the label because the whole point of granting one is to see its tier.
+			Label = `{definition.Text} ({string.upper(definition.Rarity)})`,
+			Command = "GrantTitle",
+			ItemId = definition.Id,
+			Glyph = "trophy",
+			Accent = TitleConfig.RarityAccent[definition.Rarity] or "Gray",
+		})
+	end
+	table.insert(sections, {
+		Id = "titles",
+		Label = "TITLES",
+		Glyph = "trophy",
+		Accent = "Pink",
+		Entries = titles,
+	})
+
 	table.insert(sections, {
 		Id = "actions",
 		Label = "ACTIONS",

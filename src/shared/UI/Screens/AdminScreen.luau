@@ -35,15 +35,23 @@ local e = React.createElement
 
 local LEFT_WIDTH = 300
 --[[
-	WIDE ENOUGH FOR THE TAB STRIP, which is what sets this number.
+	WIDE ENOUGH FOR THE TAB STRIP, and COMPUTED from it rather than typed.
 
-	Six section tabs at `TAB_WIDTH` plus their gaps need 726px, and at 620 the last one -- ACTIONS --
-	hung off the edge of the column. A panel whose own navigation does not fit is broken in the most
-	visible way possible, so the column is sized from the strip rather than the strip squeezed into the
-	column. 1120 total is in line with the widest screens in the game (`ShopScreen`, `PetsScreen`).
+	At 620 the last tab hung off the edge of the column, so the column was widened to fit six. Then
+	TITLES made it seven and it overflowed again -- which is the whole argument for deriving the number:
+	the strip's width is a fact about how many sections `AdminCatalogue` produces, and hardcoding it
+	means every new section is a silent layout bug waiting for someone to notice.
+
+	A panel whose own navigation does not fit is broken in the most visible way possible.
 ]]
-local TAB_WIDTH = 116
-local RIGHT_WIDTH = 748
+local TAB_WIDTH = 104
+local TAB_GAP = 6
+
+--- Sized to whatever the catalogue produced, with room for the amount box under it.
+local function rightWidth(sectionCount: number): number
+	local strip = sectionCount * TAB_WIDTH + math.max(0, sectionCount - 1) * TAB_GAP
+	return math.max(620, strip + 8)
+end
 local GAP = 16
 local ENTRY_HEIGHT = 42
 
@@ -154,6 +162,8 @@ local function AdminScreen(props)
 	end
 
 	--- Section tabs down the right column.
+	local RIGHT_WIDTH = rightWidth(#sections)
+
 	local sectionTabs = {}
 	for index, section in ipairs(sections) do
 		sectionTabs[#sectionTabs + 1] = e(Buttons.TabButton, {
@@ -269,7 +279,7 @@ local function AdminScreen(props)
 						size = UDim2.new(1, 0, 0, 38),
 						layout = P.list({
 							direction = Enum.FillDirection.Horizontal,
-							padding = 6,
+							padding = TAB_GAP,
 							hAlign = Enum.HorizontalAlignment.Left,
 						}),
 						children = sectionTabs,

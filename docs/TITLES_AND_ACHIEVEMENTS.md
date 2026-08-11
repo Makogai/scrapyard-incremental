@@ -70,10 +70,41 @@ a grind checklist; the title is the real prize.
 
 | Surface | Built by | Notes |
 | --- | --- | --- |
-| Over the head | `TitleController` | Name on top, `[TITLE]` under it, in the rarity colour |
+| Over the head | `TitleController` | Name on top, the title under it — no brackets, dressed by rarity |
 | In chat | `TitleController` | `[TITLE] Name: message`, via `TextChatService.OnIncomingMessage` |
 | Inventory → TITLES | `InventoryScreen` + `Progression.TitleCard` | Wide cards, equip from here |
 | Index → AWARDS | `CollectionScreen` + `Progression.AchievementCard` | Progress and rewards |
+
+### Two forms of the same title
+
+Chat gets `[SCRAP BARON]` — a tag in a line of prose has to be told apart from the message around it.
+Over a head it is just **SCRAP BARON**: there is nothing to disambiguate from up there, and brackets
+make a title read as a placeholder.
+
+### The better the title, the better it looks
+
+One table in `TitleController` (`TIERS`), five steps, each adding to the one below — so the ladder is
+legible from across the yard before you can read the words:
+
+| Rarity | Treatment |
+| --- | --- |
+| Common | flat grey, 14px. It is a label |
+| Rare | the rarity colour, 15px |
+| Epic | a gradient across the glyphs — reads as metal rather than ink, 16px |
+| Legendary | gradient, 18px, and a glow behind it that breathes |
+| Mythic | all of it, 19px, plus the gradient SCROLLS and three sparkles orbit the text |
+
+Built from plain Frames and `TweenService`, the same way `Components/Shine` does it — no textures, no
+`ParticleEmitter`, nothing to upload. A nameplate is drawn for every player in the server, so the top
+tier has to stay in the region of a handful of tweens.
+
+**The glow is three faint layers, not two strong ones.** The engine has no blur for GUIs, so a glow is
+faked by stacking translucent discs, and that only works if each is nearly invisible: at two discs of
+0.55 and 0.8 transparency the pair read as a solid lozenge behind the text — a plate, not a halo.
+
+The title block is rebuilt from scratch when the worn title changes, because the tiers differ in which
+*children* exist. Reconciling that by hand is how a Mythic plate keeps its sparkles after switching to
+a Common one.
 
 ### The nameplate replaces Roblox's
 
@@ -90,6 +121,16 @@ everyone and arrive with the Player instance, so someone who joined before you a
 wearing theirs, with no request and no cache to invalidate.
 
 ---
+
+## Granting a title for testing
+
+Admin panel → **TITLES**, which lists all 15 in rarity order with the tier in the label. Granting from
+there **wears** it as well as handing it over — the opposite of what an achievement does, and
+deliberate: the reason to grant a title in a test session is almost always to look at it over a head,
+and a second trip to the inventory to equip it wastes the one action the panel exists to save.
+
+The panel's right column is sized from the number of sections `AdminCatalogue` produces, so adding a
+section cannot push the last tab off the edge again — which is exactly what TITLES did the first time.
 
 ## Adding an achievement
 
@@ -149,5 +190,6 @@ first means the worst case is a reward that failed to arrive — not one handed 
   hook is there for a hidden achievement whose description would spoil something.
 - **No title in the leaderboards or the plot owner sign.** Both already show a name; both could show
   the tag next to it, and the attribute is already there to read.
-- **Titles are not yet an admin grantable.** The panel can hand out spins and rebirths but not
-  titles, so testing a specific one means reaching its achievement.
+- **No rarity treatment on the title CARDS.** The inventory cards colour by rarity but do not carry the
+  gradient, glow or sparkles the nameplate now does — so picking a Mythic title does not preview what
+  it will look like over your head.
