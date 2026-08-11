@@ -110,6 +110,15 @@ function RewardToast.Banner(props)
 		glyph = props.glyph or (if props.image then nil else "coin"),
 		image = props.image,
 		accent = props.accent or "Gold",
+		--[[
+			HEAVIER THAN THE HUD SURFACES, deliberately.
+
+			The default fade sits well back because the event strip and the toast feed are chrome that has
+			to live over the game all day. This banner is a three-second moment announcing a prize -- it is
+			the thing being looked at, not something to look past -- so it keeps very close to the solid
+			centre it had before the treatment was shared.
+		]]
+		intensity = 0.1,
 		shine = props.best == true,
 		width = props.width,
 		height = props.height,

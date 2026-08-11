@@ -691,10 +691,17 @@ end
 	not be rendered at all, and the callers now decide that.
 ]]
 function Parts.EventBanner(props)
-	local width = props.width or 520
+	--[[
+		LONGER THAN IT LOOKS LIKE IT NEEDS TO BE, on purpose.
+
+		The fade eats both ends -- the outer fifth of the strip is nearly transparent -- so a banner sized
+		to its text has almost no readable middle left. At 700 the title and the countdown both sit in the
+		opaque part with room between them, which is what the extra width buys.
+	]]
+	local width = props.width or 700
 	local height = props.height or 56
 	local iconExtent = height - 14
-	local timerWidth = 110
+	local timerWidth = 104
 	--[[
 		LIVE VERSUS UPCOMING, in one component.
 
@@ -720,16 +727,28 @@ function Parts.EventBanner(props)
 		The countdown badge goes in the fade banner's right slot either way, so the two differ only in
 		their surface.
 	]]
+	--[[
+		The countdown, and in the fade variant it is BARE: a clock glyph and the digits, no pill.
+
+		A chip behind the timer gives it an edge to sit against, which is what you want on a dark card and
+		exactly what you do not want on a strip whose whole idea is not having edges. The panel variant
+		keeps the pill, because there it is sitting on a bordered slab and needs the separation.
+	]]
+	local fadeVariant = (props.variant or Theme.Variant.EventBanner) == "fade"
 	local timer = e(Indicators.TimerBadge, {
 		key = "Timer",
 		seconds = props.seconds or 0,
+		bare = fadeVariant,
 		gradient = accentGradient,
+		textSize = Theme.TextSize.Body,
+		textColor = if live then Theme.Color.White else Theme.Color.Gray,
+		size = if fadeVariant then UDim2.fromOffset(timerWidth, 26) else nil,
 		position = UDim2.fromScale(1, 0.5),
 		anchorPoint = Vector2.new(1, 0.5),
 		zIndex = 4,
 	})
 
-	if (props.variant or Theme.Variant.EventBanner) == "fade" then
+	if fadeVariant then
 		return e(FadeBanner.Banner, {
 			key = props.key or "EventBanner",
 			title = props.title,

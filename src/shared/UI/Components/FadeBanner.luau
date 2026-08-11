@@ -46,13 +46,27 @@ local FadeBanner = {}
 	One sequence with five keypoints, not two gradients: a single ramp can only fall off in one
 	direction, and a symmetrical fade needs the mirror written explicitly.
 ]]
-local FADE = NumberSequence.new({
-	NumberSequenceKeypoint.new(0, 1),
-	NumberSequenceKeypoint.new(0.22, 0.15),
-	NumberSequenceKeypoint.new(0.5, 0),
-	NumberSequenceKeypoint.new(0.78, 0.15),
-	NumberSequenceKeypoint.new(1, 1),
-})
+local function fadeSequence(floor: number): NumberSequence
+	return NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.22, math.min(1, floor + 0.16)),
+		NumberSequenceKeypoint.new(0.5, floor),
+		NumberSequenceKeypoint.new(0.78, math.min(1, floor + 0.16)),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+end
+
+--[[
+	How opaque the middle of the banner gets.
+
+	`0` was the original -- a solid bar of accent colour in the centre, which is right for a three-second
+	prize reveal and too heavy for a strip that sits in the HUD all day. Sitting further back lets the
+	world through and stops the banner competing with the thing the player is actually doing.
+
+	Callers that want the old weight pass `intensity = 0`.
+]]
+local DEFAULT_FLOOR = 0.34
+local INK_TRANSPARENCY = 0.62
 
 --- Left inset when there is no icon, and the gap between the well and the text when there is.
 local INSET = 22
@@ -70,6 +84,7 @@ local INSET = 22
 		titleSize    number?           default Heading; toasts want something smaller
 		detailColor  Color3?           default Positive
 		entrance     boolean?          false to skip the spring, for things already animated
+		intensity    number?           0..1 transparency floor at the centre; lower is heavier
 		wrap         boolean?          wrap and grow the text instead of truncating it
 		textRef      ref?              attached to the text column, for callers that measure it
 		right        element?          pinned to the right edge -- the event banner's timer lives here
@@ -83,15 +98,17 @@ function FadeBanner.Banner(props)
 	local width = props.width or 460
 	local height = props.height or 92
 	local hasIcon = props.glyph ~= nil or props.image ~= nil
-	local wellExtent = math.min(height - 22, 70)
+	--- No well to fit inside any more, so the art takes almost the banner's height.
+	local iconExtent = math.min(height - 12, 76)
 	local rightWidth = if props.right then (props.rightWidth or 110) else 0
 	local wrap = props.wrap == true
+	local fade = fadeSequence(if props.intensity ~= nil then props.intensity else DEFAULT_FLOOR)
 
 	--- Springs in from slightly small, so it lands rather than appears.
 	local entrance = Motion.useEntrance(Motion.Spring.Bouncy)
 
 	--- Where the text starts, and how much room it has once the icon and the right slot are counted.
-	local textLeft = if hasIcon then INSET + wellExtent + 16 else INSET
+	local textLeft = if hasIcon then INSET + iconExtent + 12 else INSET
 	local textWidth = math.max(40, width - textLeft - rightWidth - 12)
 
 	local body = P.compact(
@@ -109,21 +126,21 @@ function FadeBanner.Banner(props)
 		}, {
 			e(
 				"UIGradient",
-				{ key = "Fade", Color = accentGradient, Transparency = FADE, Rotation = 0 }
+				{ key = "Fade", Color = accentGradient, Transparency = fade, Rotation = 0 }
 			),
 		}),
 		--- A darker inner band, so white text stays readable over a pale accent.
 		e("Frame", {
 			key = "Ink",
 			BackgroundColor3 = Theme.Color.Ink,
-			BackgroundTransparency = 0.45,
+			BackgroundTransparency = INK_TRANSPARENCY,
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 0, math.max(20, height - 26)),
 			Position = UDim2.fromScale(0.5, 0.5),
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			ZIndex = 2,
 		}, {
-			e("UIGradient", { key = "Fade", Transparency = FADE, Rotation = 0 }),
+			e("UIGradient", { key = "Fade", Transparency = fade, Rotation = 0 }),
 		}),
 		if props.shine
 			then e(Shine.Layer, {
@@ -134,29 +151,25 @@ function FadeBanner.Banner(props)
 				zIndex = 3,
 			})
 			else nil,
-		--- The icon well: a solid disc so the art reads against the fade behind it.
+		--[[
+			THE ICON, WITH NOTHING BEHIND IT.
+
+			It used to sit in a `P.Panel` well -- a dark disc with a stroke -- which is the right call on a
+			card and the wrong one here: a bordered circle inside a borderless banner is the same
+			contradiction as putting an outline on the banner itself. The art already carries the heavy ink
+			outline the house style gives every glyph, so it reads on its own, and dropping the disc means
+			it can be bigger in the same space.
+		]]
 		if hasIcon
-			then e(P.Panel, {
-				key = "Well",
-				size = UDim2.fromOffset(wellExtent, wellExtent),
+			then e(Icon, {
+				key = "Glyph",
+				glyph = props.glyph,
+				image = props.image,
+				plain = true,
+				size = UDim2.fromOffset(iconExtent, iconExtent),
 				position = UDim2.new(0, INSET, 0.5, 0),
 				anchorPoint = Vector2.new(0, 0.5),
-				gradient = Theme.Gradient.Slot,
-				radius = wellExtent / 2,
-				strokeThickness = 4,
-				studs = false,
 				zIndex = 4,
-				children = {
-					e(Icon, {
-						key = "Glyph",
-						glyph = props.glyph,
-						image = props.image,
-						plain = true,
-						size = UDim2.fromOffset(wellExtent - 16, wellExtent - 16),
-						position = UDim2.fromScale(0.5, 0.5),
-						anchorPoint = Vector2.new(0.5, 0.5),
-					}),
-				},
 			})
 			else nil,
 		--[[
@@ -183,8 +196,9 @@ function FadeBanner.Banner(props)
 			AnchorPoint = Vector2.new(0, 0.5),
 			ZIndex = 4,
 		}, {
+			--- Tight: the two lines are one thought, and a gap between them reads as two.
 			P.list({
-				padding = 2,
+				padding = -2,
 				vAlign = if wrap then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Center,
 			}),
 			e(P.Label, {
@@ -219,7 +233,7 @@ function FadeBanner.Banner(props)
 					wrapped = wrap,
 					truncate = if wrap then nil else Enum.TextTruncate.AtEnd,
 					automaticSize = if wrap then Enum.AutomaticSize.Y else nil,
-					size = if wrap then UDim2.fromScale(1, 0) else UDim2.new(1, 0, 0, 24),
+					size = if wrap then UDim2.fromScale(1, 0) else UDim2.new(1, 0, 0, 22),
 					layoutOrder = 2,
 				})
 				else nil,

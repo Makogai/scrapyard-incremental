@@ -200,8 +200,55 @@ function Indicators.QuantityBadge(props)
 	})
 end
 
+--[[
+	Clock glyph plus a countdown.
+
+	`bare` drops the chip behind it and leaves the glyph and the digits on their own. On a dark panel
+	the chip gives the timer an edge to sit against; on a surface that is already fading out -- the
+	event banner -- that edge is one more box on a strip whose whole point is not having any, so the
+	bare form reads as part of the banner rather than as a control parked on it.
+
+	Both forms share the format, which is the reason this is a flag rather than a second component:
+	`Format.timer` should not have two callers that can disagree.
+]]
 function Indicators.TimerBadge(props)
 	local textSize = props.textSize or Theme.TextSize.Small
+
+	if props.bare then
+		return e(P.Group, {
+			key = props.key or "Timer",
+			size = props.size or UDim2.fromOffset(96, textSize + 8),
+			position = props.position,
+			anchorPoint = props.anchorPoint,
+			layoutOrder = props.layoutOrder,
+			zIndex = props.zIndex,
+			layout = P.list({
+				direction = Enum.FillDirection.Horizontal,
+				padding = 5,
+				hAlign = Enum.HorizontalAlignment.Right,
+				vAlign = Enum.VerticalAlignment.Center,
+			}),
+			children = {
+				e(Icon, {
+					key = "Icon",
+					glyph = "clock",
+					plain = true,
+					size = UDim2.fromOffset(textSize + 4, textSize + 4),
+					layoutOrder = 1,
+				}),
+				e(P.Label, {
+					key = "Value",
+					text = Format.timer(props.seconds or 0),
+					textSize = textSize,
+					color = props.textColor or Theme.Color.White,
+					size = UDim2.fromOffset(0, textSize + 4),
+					automaticSize = Enum.AutomaticSize.X,
+					layoutOrder = 2,
+				}),
+			},
+		})
+	end
+
 	return e(P.Chip, {
 		key = props.key or "Timer",
 		gradient = props.gradient or Theme.Gradient.PanelDeep,
