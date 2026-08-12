@@ -486,7 +486,14 @@ local function AdminScreen(props)
 				size = UDim2.fromOffset(RIGHT_WIDTH, 470),
 				position = UDim2.fromScale(1, 0),
 				anchorPoint = Vector2.new(1, 0),
-				children = {
+				--[[
+					`P.compact`, NOT a plain array.
+
+					The message row below is conditional, and a nil sitting in the middle of a `{ ... }` children
+					list truncates it -- so on every tab except SERVER the nil dropped the entry scroller that
+					followed it, and the panel looked empty. This is exactly the case `P.compact` exists for.
+				]]
+				children = P.compact(
 					e(P.Group, {
 						key = "SectionTabs",
 						--- Two rows of 38, plus the gap between them.
@@ -624,8 +631,8 @@ local function AdminScreen(props)
 						),
 						layout = P.list({ padding = 6 }),
 						children = entryRows,
-					}),
-				},
+					})
+				),
 			}),
 		},
 	})
