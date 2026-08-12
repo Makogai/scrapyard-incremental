@@ -387,7 +387,8 @@ function Parts.BroadcastNotice(props)
 		size = UDim2.fromOffset(560, 92),
 		position = props.position or UDim2.fromScale(0.5, 0.34),
 		anchorPoint = Vector2.new(0.5, 0.5),
-		zIndex = Theme.ZIndex.Announcement,
+		--- `Theme.Layer`, not `Theme.ZIndex` -- there is no such table, and indexing it threw inside render.
+		zIndex = Theme.Layer.Announcement,
 		children = {
 			e(P.Panel, {
 				key = "Card",
