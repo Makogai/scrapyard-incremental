@@ -149,12 +149,23 @@ function AdminCatalogue.build(): { AdminSection }
 				Glyph = "note",
 				Accent = "Cyan",
 			},
+			--[[
+				DANGER, so it takes the panel's tap-again confirm.
+
+				It sits next to BROADCAST, and the two are one mis-tap apart: pressing this ends every session
+				on the server, and there is no undo once the countdown starts -- CANCEL RESTART only helps if
+				somebody notices in time. `ResetProfile` is flagged for the same reason.
+
+				`Amount` is the countdown in SECONDS, clamped server-side to
+				`AdminConfig.MinimumRestartSeconds`..`MaximumRestartSeconds`.
+			]]
 			{
 				Id = "RestartServer",
 				Label = "RESTART",
 				Command = "RestartServer",
 				Amount = true,
 				Owner = true,
+				Danger = true,
 				Glyph = "clock",
 				Accent = "Red",
 			},

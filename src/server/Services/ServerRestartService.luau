@@ -101,6 +101,8 @@ function ServerRestartService.Start(seconds: number, byName: string): (boolean, 
 			Save everyone, then stop letting anyone else in. Saving first is the ordering that matters:
 			a player who joins during the save would be loaded into a server about to disappear.
 		]]
+		--- Captured before `startedBy` is cleared below, so the kick can still name who did it.
+		local startedByName = startedBy
 		for _, player in Players:GetPlayers() do
 			PlayerStateService.SaveNow(player)
 		end
@@ -111,7 +113,13 @@ function ServerRestartService.Start(seconds: number, byName: string): (boolean, 
 				player:Kick("This server is restarting. Please rejoin.")
 			end)
 			for _, player in Players:GetPlayers() do
-				player:Kick("Server restarting - rejoin for the latest update.")
+				--[[
+					NAME THE CAUSE. A bare "server restarting" is indistinguishable from a crash or a bug --
+					which is exactly how it was read the first time this fired in testing.
+				]]
+				player:Kick(
+					`Server restarted by {if #startedByName > 0 then startedByName else "staff"}. Rejoin for the latest update.`
+				)
 			end
 		end)
 	end)
