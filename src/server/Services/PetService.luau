@@ -229,6 +229,8 @@ function PetService.Start()
 				RemoteService.GetEvent("Announce"):FireAllClients({
 					Kind = "SecretPet",
 					PlayerName = player.DisplayName,
+					--- So the VFX can find the right character: display names are not unique.
+					UserId = player.UserId,
 					PetId = petId,
 					PetName = definition.DisplayName,
 					Rarity = definition.Rarity,

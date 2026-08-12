@@ -5,6 +5,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local FoundationValidator = require(ReplicatedStorage.Shared.Utility.FoundationValidator)
 local RemoteService = require(script.Services.RemoteService)
+local InboxService = require(script.Services.InboxService)
+local SocialRewardService = require(script.Services.SocialRewardService)
+local LimitedStockService = require(script.Services.LimitedStockService)
+local ServerRestartService = require(script.Services.ServerRestartService)
 local PlayerStateService = require(script.Services.PlayerStateService)
 local PlotService = require(script.Services.PlotService)
 local ScrapService = require(script.Services.ScrapService)
@@ -89,4 +93,16 @@ EventService.Start()
 	the first poll is three seconds away and every service is up by then.
 ]]
 AchievementService.Start()
+
+--[[
+	The mailbox, and the three services that feed or gate it.
+
+	`InboxService` after `PlayerStateService` (it writes through it) and before `AdminService`, which routes
+	gifts into it. `LimitedStockService` warms its DataStore cache on a slow timer, so it must be running
+	before the first purchase can be processed.
+]]
+InboxService.Start()
+SocialRewardService.Start()
+LimitedStockService.Start()
+ServerRestartService.Bind()
 print(string.format("[%s] Server bootstrap ready", Environment.GameName))

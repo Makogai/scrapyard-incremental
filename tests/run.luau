@@ -13,6 +13,8 @@ local TitleConfig = require("../src/shared/Config/TitleConfig")
 local AchievementConfig = require("../src/shared/Config/AchievementConfig")
 local AchievementRules = require("../src/shared/Utility/AchievementRules")
 local PrestigeConfig = require("../src/shared/Config/PrestigeConfig")
+local SocialConfig = require("../src/shared/Config/SocialConfig")
+local InboxConfig = require("../src/shared/Config/InboxConfig")
 
 local passed = 0
 
@@ -114,7 +116,98 @@ expectEqual(limiter:Allow("player", 2), false, "rate limit rejection")
 expectEqual(limiter:Allow("player", 5), true, "rate limit window reset")
 
 local defaultData = PlayerDataSchema.createDefault(1000)
-expectEqual(defaultData.SchemaVersion, 16, "default schema version")
+expectEqual(defaultData.SchemaVersion, 17, "default schema version")
+--[[
+	THE MAILBOX STARTS EMPTY AND SURVIVES A ROUND TRIP.
+
+	Asserted because the inbox is the one place a reward can sit UNPAID in a save: a sanitiser that dropped
+	messages would silently delete things players are owed, and a sanitiser that let anything through would
+	let a tampered save mail itself money.
+]]
+expectEqual(#defaultData.Inbox, 0, "a new profile has no mail")
+expectEqual(
+	next(defaultData.SocialClaims) == nil,
+	true,
+	"a new profile has claimed no social rewards"
+)
+
+local mailProfile = PlayerDataSchema.createDefault(1000)
+mailProfile.Inbox = {
+	{
+		Id = "keep",
+		Kind = "Staff",
+		Title = "A gift",
+		Body = "Enjoy",
+		FromName = "Makogai",
+		FromUserId = 7,
+		SentAt = 900,
+		Rewards = { Money = 5000, Spins = 2 },
+		Claimed = false,
+	},
+	--- Malformed: no Id. Dropped rather than repaired.
+	{ Kind = "Staff", Title = "Broken", Body = "no id" },
+	--- A tampered reward, clamped by the same bounds the rest of the save uses.
+	{
+		Id = "greedy",
+		Kind = "Staff",
+		Title = "Too much",
+		Body = "nice try",
+		FromName = "x",
+		FromUserId = 1,
+		SentAt = 900,
+		Rewards = { Money = -5, Spins = 99999 },
+		Claimed = false,
+	},
+}
+mailProfile.SocialClaims = { Like = true, Community = false }
+
+local mailOk, mailClean = PlayerDataSchema.validate(mailProfile, 1000)
+expectEqual(mailOk, true, "a save with mail validates")
+expectEqual(#mailClean.Inbox, 2, "malformed mail is dropped")
+expectEqual(mailClean.Inbox[1].Id, "keep", "well-formed mail survives")
+expectEqual(mailClean.Inbox[1].Rewards.Money, 5000, "mail rewards survive")
+expectEqual(mailClean.Inbox[2].Rewards.Money, 0, "a negative mail reward is floored at zero")
+expectEqual(mailClean.Inbox[2].Rewards.Spins, 1000, "an absurd mail reward is clamped")
+expectEqual(mailClean.SocialClaims.Like, true, "a taken social reward survives")
+
+--[[
+	The invite ladder only offers rungs the friend count has actually earned, and never twice.
+]]
+expectEqual(#SocialConfig.claimableInvites(0, {}), 0, "no friends, no invite rewards")
+expectEqual(#SocialConfig.claimableInvites(1, {}), 1, "one friend earns the first rung")
+expectEqual(#SocialConfig.claimableInvites(2, {}), 2, "two friends earn two rungs")
+expectEqual(
+	#SocialConfig.claimableInvites(2, { Invite1 = true }),
+	1,
+	"a claimed rung is not offered again"
+)
+expectEqual(#SocialConfig.claimableInvites(99, {}), 4, "every rung is reachable")
+expectEqual(SocialConfig.canClaim("Like", {}), true, "an unclaimed social reward is claimable")
+expectEqual(SocialConfig.canClaim("Like", { Like = true }), false, "a claimed one is not")
+expectEqual(SocialConfig.canClaim("Nonsense", {}), false, "an unknown reward is never claimable")
+
+--[[
+	NO SOCIAL REWARD MAY PAY GEARS -- same rule as achievements. Gears are rebirth currency.
+]]
+for _, rewardId in SocialConfig.RewardOrder do
+	expectEqual(
+		SocialConfig.Rewards[rewardId].Rewards.Gears == nil,
+		true,
+		`social reward {rewardId} must not pay gears`
+	)
+end
+for index, milestone in SocialConfig.Invite.Milestones do
+	expectEqual(milestone.Rewards.Gears == nil, true, `invite milestone {index} must not pay gears`)
+end
+
+--- The unclaimed count drives the topbar pip, so it has to match the list it describes.
+expectEqual(InboxConfig.unclaimedCount(nil), 0, "no mailbox is no unread mail")
+expectEqual(InboxConfig.unclaimedCount({}), 0, "an empty mailbox is no unread mail")
+expectEqual(
+	InboxConfig.unclaimedCount({ { Claimed = false }, { Claimed = true }, { Claimed = false } }),
+	2,
+	"only unclaimed mail is counted"
+)
 expectEqual(defaultData.ActivePlotTheme, "FrontYard", "default plot theme")
 expectEqual(defaultData.PetSlotUpgradeLevel, 0, "default pet slot upgrade")
 expectEqual(#defaultData.EquippedPets, 0, "default equipped pets")
@@ -143,7 +236,9 @@ local migratedOk, migrated = PlayerDataSchema.validate({
 	LastLoginTimestamp = 800,
 }, 1000)
 expectEqual(migratedOk, true, "version one migration")
-expectEqual(migrated.SchemaVersion, 16, "migrated schema version")
+expectEqual(migrated.SchemaVersion, 17, "migrated schema version")
+--- An ancient save arrives with an empty mailbox rather than a nil one, so the screen never sees nil.
+expectEqual(#migrated.Inbox, 0, "a migrated save has an empty mailbox")
 expectEqual(migrated.ActivePlotTheme, "FrontYard", "migrated plot theme defaults to the scrapyard")
 expectEqual(migrated.Money, 125, "migrated money")
 expectEqual(migrated.UpgradeLevels.MagnetStrength, 3, "migrated upgrade")
@@ -350,7 +445,7 @@ local thirteenOk, thirteen = PlayerDataSchema.validate({
 	ActivePlotTheme = "WorkshopYard",
 }, 3000)
 expectEqual(thirteenOk, true, "version thirteen migration")
-expectEqual(thirteen.SchemaVersion, 16, "migrated to sixteen from thirteen")
+expectEqual(thirteen.SchemaVersion, 17, "migrated to seventeen from thirteen")
 expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
@@ -732,7 +827,7 @@ local fourteenOk, fourteen = PlayerDataSchema.validate({
 	DailyStreak = 4,
 }, 4000)
 expectEqual(fourteenOk, true, "version fourteen migration")
-expectEqual(fourteen.SchemaVersion, 16, "migrated to sixteen")
+expectEqual(fourteen.SchemaVersion, 17, "migrated to seventeen")
 expectEqual(fourteen.DailyStreak, 4, "migration preserves the streak")
 expectEqual(fourteen.EquippedTitle, "", "migrated player wears no title")
 expectEqual(next(fourteen.UnlockedTitles), nil, "migrated player holds no titles")
@@ -761,7 +856,7 @@ local fifteenOk, fifteen = PlayerDataSchema.validate({
 	Money = 400,
 }, 5000)
 expectEqual(fifteenOk, true, "version fifteen migration")
-expectEqual(fifteen.SchemaVersion, 16, "migrated fifteen to sixteen")
+expectEqual(fifteen.SchemaVersion, 17, "migrated fifteen to seventeen")
 expectEqual(fifteen.SecretTickets, 0, "migrated player holds no tickets")
 
 print(`Scrapyard foundation and data tests passed: {passed}`)

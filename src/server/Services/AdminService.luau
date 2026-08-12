@@ -14,6 +14,8 @@ local EventService = require(script.Parent.EventService)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local PlotThemeService = require(script.Parent.PlotThemeService)
 local PlotService = require(script.Parent.PlotService)
+local InboxService = require(script.Parent.InboxService)
+local ServerRestartService = require(script.Parent.ServerRestartService)
 local RemoteService = require(script.Parent.RemoteService)
 local ScrapService = require(script.Parent.ScrapService)
 
@@ -30,6 +32,71 @@ local VALID_TARGETS = {
 }
 
 --[[
+	WHICH ADMIN COMMANDS ARE GIFTS.
+
+	These four map cleanly onto the shared `{ Money?, Gears?, Items?, Spins? }` reward shape, so they are
+	MAILED rather than applied: the player sees who sent it, what it was, and claims it themselves. That is
+	the whole point of the inbox -- a silent grant left nobody able to answer "did you get it?".
+
+	Everything else -- rebirth counts, daily streaks, pets, boosts, profile wipes -- is a state change
+	rather than a gift and is still applied directly. Mailing a rebirth count would mean a claim button
+	that rewrites someone's progression, and there is no honest way to present that as a present.
+]]
+local GIFT_REWARDS: { [string]: (number, string?) -> { [string]: any } } = {
+	AddMoney = function(amount)
+		return { Money = amount }
+	end,
+	AddGears = function(amount)
+		return { Gears = amount }
+	end,
+	AddSpins = function(amount)
+		return { Spins = amount }
+	end,
+	GrantConsumable = function(amount, itemId)
+		return { Items = { [itemId or ""] = math.max(1, amount) } }
+	end,
+}
+
+local GIFT_TITLES: { [string]: string } = {
+	AddMoney = "A gift of scrap cash",
+	AddGears = "A gift of gears",
+	AddSpins = "Free spins",
+	GrantConsumable = "A gift from the team",
+}
+
+--[[
+	Mail a gift to everyone in `targets`. Returns how many mailboxes took it.
+
+	`senderName` rather than a Player, because this path is also reached from the cross-server receiver
+	where the admin is on another machine and only their name travelled.
+]]
+local function mailGift(
+	targets: { Player },
+	command: string,
+	amount: number?,
+	itemId: string?,
+	senderName: string,
+	senderUserId: number
+): number
+	local rewards = GIFT_REWARDS[command](math.floor(amount or 0), itemId)
+	local sent = 0
+	for _, target in targets do
+		local id = InboxService.Send(target, {
+			Kind = "Staff",
+			Title = GIFT_TITLES[command] or "A gift from the team",
+			Body = `Sent to you by {senderName}. Hit claim to collect it.`,
+			FromName = senderName,
+			FromUserId = senderUserId,
+			Rewards = rewards,
+		})
+		if id ~= nil then
+			sent += 1
+		end
+	end
+	return sent
+end
+
+--[[
 	Applies one command to a list of players and refreshes what depends on it.
 
 	Shared by the local path and the broadcast receiver, so a command cannot behave differently
@@ -39,8 +106,22 @@ local function applyToTargets(
 	targets: { Player },
 	command: string,
 	amount: number?,
-	itemId: string?
+	itemId: string?,
+	senderName: string?,
+	senderUserId: number?
 ): number
+	--- Gifts are mailed, never applied. See `GIFT_REWARDS`.
+	if GIFT_REWARDS[command] ~= nil then
+		return mailGift(
+			targets,
+			command,
+			amount,
+			itemId,
+			senderName or "the team",
+			senderUserId or 0
+		)
+	end
+
 	local applied = 0
 	for _, target in targets do
 		if PlayerStateService.AdminMutate(target, command, amount, itemId) then
@@ -74,6 +155,8 @@ local function broadcast(admin: Player, command: string, amount: number?, itemId
 				Amount = amount,
 				ItemId = itemId,
 				FromUserId = admin.UserId,
+				--- So a gift mailed on another server still says who sent it.
+				FromName = admin.DisplayName,
 			})
 		end)
 		if not succeeded then
@@ -139,6 +222,12 @@ local SERVER_COMMANDS = {
 	banner, the world billboard and the announcement all move at once instead of waiting for the poll.
 ]]
 local function applyServerCommand(command: string, minutes: number?, itemId: string?): string?
+	if command == "CancelRestart" then
+		if ServerRestartService.Cancel() then
+			return "restart cancelled"
+		end
+		return nil
+	end
 	if command == "StopEvent" then
 		EventConfig.setOverride(nil, 0)
 		EventService.Republish()
@@ -217,7 +306,14 @@ function AdminService.Start()
 				end
 				local amount = boundedAmount(payload.Command, payload.Amount)
 				local itemId = if typeof(payload.ItemId) == "string" then payload.ItemId else nil
-				applyToTargets(Players:GetPlayers(), payload.Command, amount, itemId)
+				applyToTargets(
+					Players:GetPlayers(),
+					payload.Command,
+					amount,
+					itemId,
+					if typeof(payload.FromName) == "string" then payload.FromName else nil,
+					if typeof(payload.FromUserId) == "number" then payload.FromUserId else nil
+				)
 			end)
 		end)
 		if not succeeded then
@@ -249,6 +345,44 @@ function AdminService.Start()
 				It is NOT Studio-only any more -- that restriction, plus a target check for `Self`, is why
 				resetting somebody appeared to do nothing at all on a live server.
 			]]
+			--[[
+				BROADCAST AND RESTART ARE SERVER-WIDE, so they run once here rather than per target, and both
+				need the admin's identity -- the name and the verified tick are the whole point of a
+				broadcast. `itemId` carries the message text: it is already a validated string on this
+				remote, so this needs no widening of the signature for one command.
+			]]
+			if command == "Broadcast" then
+				local text = if typeof(itemId) == "string"
+					then string.sub(itemId, 1, AdminConfig.MaximumBroadcastLength)
+					else ""
+				if #text == 0 then
+					RemoteService.GetEvent("Notify")
+						:FireClient(admin, "ADMIN: type a message first")
+					return
+				end
+				RemoteService.GetEvent("AdminBroadcast"):FireAllClients({
+					Message = text,
+					FromName = admin.DisplayName,
+					--- Only the server ever sets this, which is what makes the tick worth trusting.
+					Verified = true,
+				})
+				RemoteService.GetEvent("Notify"):FireClient(admin, "ADMIN: broadcast sent")
+				return
+			end
+			if command == "RestartServer" then
+				local seconds = math.clamp(
+					math.floor(amount or 60),
+					AdminConfig.MinimumRestartSeconds,
+					AdminConfig.MaximumRestartSeconds
+				)
+				local started, message = ServerRestartService.Start(seconds, admin.DisplayName)
+				RemoteService.GetEvent("Notify"):FireClient(
+					admin,
+					`ADMIN: {if started then message else "could not start restart"}`
+				)
+				return
+			end
+
 			if command == "ResetProfile" and targetMode ~= "Self" and targetMode ~= "Player" then
 				RemoteService.GetEvent("Notify")
 					:FireClient(admin, "ADMIN: reset one player at a time, not everyone")
@@ -330,7 +464,14 @@ function AdminService.Start()
 				then Players:GetPlayers()
 				elseif selectedPlayer then { selectedPlayer }
 				else { admin }
-			local applied = applyToTargets(targets, command, safeAmount, itemId)
+			local applied = applyToTargets(
+				targets,
+				command,
+				safeAmount,
+				itemId,
+				admin.DisplayName,
+				admin.UserId
+			)
 			RemoteService.GetEvent("Notify"):FireClient(
 				admin,
 				if targetMode == "AllServers"

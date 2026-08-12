@@ -9,6 +9,8 @@ local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
+local InboxConfig = require(ReplicatedStorage.Shared.Config.InboxConfig)
+local SocialConfig = require(ReplicatedStorage.Shared.Config.SocialConfig)
 local AreaRules = require(ReplicatedStorage.Shared.Utility.AreaRules)
 local CollectionRules = require(ReplicatedStorage.Shared.Utility.CollectionRules)
 local GameMath = require(ReplicatedStorage.Shared.Utility.GameMath)
@@ -187,7 +189,13 @@ local function derivedStats(data: { [string]: any })
 		MagnetStrength = strength,
 		MagnetRange = range,
 		StorageCapacity = storageCapacity,
-		MovementSpeed = effect("MovementSpeed") * petEffects.MovementSpeed,
+		--[[
+			The 2x speed pass multiplies here, alongside pets. Applied to the upgrade's OWN effect rather
+			than to a capped result, so the pass is not eaten by a cap the player has already reached.
+		]]
+		MovementSpeed = effect("MovementSpeed")
+			* petEffects.MovementSpeed
+			* (if data.Entitlements.PermanentSpeed == true then 2 else 1),
 		ScrapValue = scrapValue,
 		CollectionSpeed = collectionSpeed,
 		RespawnMultiplier = respawnMultiplier,
@@ -268,6 +276,13 @@ local function publicSnapshot(data: { [string]: any })
 		Gears = data.Gears,
 		StoredWeight = data.StoredWeight,
 		StoredValue = data.StoredValue,
+		--[[
+			THE MAILBOX RIDES THE NORMAL SNAPSHOT rather than a remote of its own. That is deliberate: a
+			claim pays money AND marks the message, and if those arrived on two channels the player could
+			see one without the other. One snapshot, one truth.
+		]]
+		Inbox = data.Inbox,
+		SocialClaims = data.SocialClaims,
 		UpgradeLevels = table.clone(data.UpgradeLevels),
 		UnlockedAreas = table.clone(data.UnlockedAreas),
 		DerivedStats = derivedStats(data),
@@ -365,6 +380,18 @@ local function completePrestige(player: Player, data: { [string]: any }, reward:
 	for _, areaId in AreaConfig.Order do
 		data.UnlockedAreas[areaId] = areaId == "FrontYard"
 	end
+	--[[
+		THE PLOT THEME GOES BACK WITH THE UNLOCKS.
+
+		Without this a rebirth left `ActivePlotTheme` on whatever the player had converted to, so they kept
+		a Vehicle Graveyard yard while owning only the Front Yard unlock -- and `ScrapService` reads this
+		field to decide which scrap to spawn, so they also kept spawning Graveyard scrap they could no
+		longer sell the area for. Resetting the unlocks without resetting the theme is only half a rebirth.
+
+		`PrestigeService` has to rebuild the plot geometry afterwards; changing the field alone leaves the
+		old yard standing in the world. `AdminService` learned the same lesson on profile wipes.
+	]]
+	data.ActivePlotTheme = "FrontYard"
 	data.PlotStage = 1
 	data.PlotUpgradeLevels = {}
 	data.UnlockedScrapTypes = {
@@ -545,6 +572,172 @@ end
 	Transient by design -- it describes the room, not the player -- so it is written onto `data`
 	for `derivedStats` to read, and the schema resets it to 0 on every load.
 ]]
+--[[
+	Put a message in a player's mailbox. Called by `InboxService`, which owns the message shape.
+
+	Newest last. When the mailbox is full the oldest CLAIMED message is dropped -- never an unclaimed one,
+	because that would silently delete a reward the player was owed. A mailbox full of unclaimed mail
+	refuses new mail instead, which is visible and therefore fixable.
+]]
+function PlayerStateService.AddInboxMessage(player: Player, message: { [string]: any }): boolean
+	local session = sessions[player]
+	if session == nil then
+		return false
+	end
+	local data = session.Data
+	if typeof(data.Inbox) ~= "table" then
+		data.Inbox = {}
+	end
+
+	while #data.Inbox >= InboxConfig.MaximumMessages do
+		local dropped = nil
+		for index, existing in data.Inbox do
+			if existing.Claimed == true then
+				dropped = index
+				break
+			end
+		end
+		if dropped == nil then
+			return false
+		end
+		table.remove(data.Inbox, dropped)
+	end
+
+	table.insert(data.Inbox, message)
+	pushState(player, data)
+	return true
+end
+
+--[[
+	Claim one message: pay what it carries, then mark it.
+
+	The reward is read from the SAVE, never from the client -- the remote carries an id and nothing else.
+	Marking happens only if the payment succeeded, so a failed grant leaves the message claimable rather
+	than consuming it.
+]]
+function PlayerStateService.ClaimInboxMessage(player: Player, messageId: string): (boolean, string)
+	local session = sessions[player]
+	if session == nil then
+		return false, "NOT READY"
+	end
+	local data = session.Data
+	if typeof(data.Inbox) ~= "table" then
+		return false, "NOTHING TO CLAIM"
+	end
+
+	for _, message in data.Inbox do
+		if message.Id == messageId then
+			if message.Claimed == true then
+				return false, "ALREADY CLAIMED"
+			end
+			if message.Rewards ~= nil then
+				if not PlayerStateService.GrantRewards(player, message.Rewards) then
+					return false, "COULD NOT CLAIM THAT"
+				end
+			end
+			message.Claimed = true
+			pushState(player, data)
+			return true, `CLAIMED: {message.Title}`
+		end
+	end
+	return false, "MESSAGE NOT FOUND"
+end
+
+--- Sweep up everything claimable. Returns how many were paid.
+function PlayerStateService.ClaimAllInboxMessages(player: Player): (number, string)
+	local session = sessions[player]
+	if session == nil then
+		return 0, "NOT READY"
+	end
+	local claimed = 0
+	for _, message in session.Data.Inbox do
+		if message.Claimed ~= true then
+			local paid = message.Rewards == nil
+				or PlayerStateService.GrantRewards(player, message.Rewards)
+			if paid then
+				message.Claimed = true
+				claimed += 1
+			end
+		end
+	end
+	if claimed > 0 then
+		pushState(player, session.Data)
+	end
+	return claimed, `CLAIMED {claimed} MESSAGE{if claimed == 1 then "" else "S"}`
+end
+
+--[[
+	Take a one-off social reward (the like, the group).
+
+	The eligibility CHECK lives in `SocialRewardService` -- group membership is a web call and does not
+	belong in the state layer. This owns the "only once" half, which is the half that has to be in the save.
+]]
+function PlayerStateService.ClaimSocialReward(player: Player, rewardId: string): (boolean, string)
+	local session = sessions[player]
+	if session == nil then
+		return false, "NOT READY"
+	end
+	local definition = SocialConfig.Rewards[rewardId]
+	if definition == nil then
+		return false, "UNKNOWN REWARD"
+	end
+	local data = session.Data
+	if typeof(data.SocialClaims) ~= "table" then
+		data.SocialClaims = {}
+	end
+	if data.SocialClaims[rewardId] == true then
+		return false, "ALREADY CLAIMED"
+	end
+	if not PlayerStateService.GrantRewards(player, definition.Rewards) then
+		return false, "COULD NOT CLAIM THAT"
+	end
+	data.SocialClaims[rewardId] = true
+	pushState(player, data)
+	return true, `CLAIMED: {definition.Label}`
+end
+
+--[[
+	Take the next friend milestone the live friend count has earned.
+
+	The SERVER picks which milestone, from `FriendBoostCount`. A client that could name its own milestone
+	could claim the top rung on its first join, which is why the remote carries no index.
+]]
+function PlayerStateService.ClaimInviteMilestone(player: Player): (boolean, string)
+	local session = sessions[player]
+	if session == nil then
+		return false, "NOT READY"
+	end
+	local data = session.Data
+	if typeof(data.SocialClaims) ~= "table" then
+		data.SocialClaims = {}
+	end
+	local ready = SocialConfig.claimableInvites(data.FriendBoostCount or 0, data.SocialClaims)
+	if #ready == 0 then
+		return false, "BRING A FRIEND TO CLAIM MORE"
+	end
+	local index = ready[1]
+	local milestone = SocialConfig.Invite.Milestones[index]
+	if not PlayerStateService.GrantRewards(player, milestone.Rewards) then
+		return false, "COULD NOT CLAIM THAT"
+	end
+	data.SocialClaims[`Invite{index}`] = true
+	pushState(player, data)
+	return true, `CLAIMED: {milestone.Friends} FRIEND REWARD`
+end
+
+--[[
+	Save one player right now.
+
+	Exists for the restart countdown, which has to flush before the server goes away. A thin wrapper on the
+	private `saveSession` rather than exposing that, so callers cannot pass the flags it takes.
+]]
+function PlayerStateService.SaveNow(player: Player): boolean
+	if sessions[player] == nil then
+		return false
+	end
+	return saveSession(player, false)
+end
+
 function PlayerStateService.SetFriendCount(player: Player, count: number): boolean
 	local session = sessions[player]
 	if session == nil then

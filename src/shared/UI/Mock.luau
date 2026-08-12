@@ -924,4 +924,47 @@ function Mock.find(list, id)
 	return nil
 end
 
+--[[
+	MAILBOX FIXTURES, so the inbox story has all three states without a server: an unclaimed staff gift, a
+	claimed one, and a system message with no reward at all.
+]]
+Mock.inbox = {
+	{
+		Id = "mock_staff_1",
+		Kind = "Staff",
+		Title = "Sorry about the downtime",
+		Body = "Thanks for sticking with us through the restart. Here is something for the trouble.",
+		FromName = "Makogai",
+		FromUserId = 1,
+		SentAt = 1,
+		Rewards = { Money = 250000, Spins = 2 },
+		Claimed = false,
+	},
+	{
+		Id = "mock_system_1",
+		Kind = "System",
+		Title = "Welcome to the scrapyard",
+		Body = "Pull scrap, sell it at the crusher, and spend it on upgrades. Rebirth when you can afford it.",
+		FromName = "",
+		FromUserId = 0,
+		SentAt = 1,
+		Rewards = nil,
+		Claimed = false,
+	},
+	{
+		Id = "mock_staff_2",
+		Kind = "Staff",
+		Title = "Event winner",
+		Body = "First place in the weekend pull-off.",
+		FromName = "Makogai",
+		FromUserId = 1,
+		SentAt = 1,
+		Rewards = { Money = 1000000, Items = { GodPotion = 1 } },
+		Claimed = true,
+	},
+}
+
+--- One social reward already taken, so the story shows both a claimable and a claimed button.
+Mock.socialClaims = { Like = true }
+
 return Mock

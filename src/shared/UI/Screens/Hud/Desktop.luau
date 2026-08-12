@@ -209,6 +209,27 @@ local function HudDesktop(props)
 
 				`bottomLift` is still respected: on touch, Roblox draws its own controls over that corner.
 			]]
+			--[[
+				Server-wide notices, centred under the top bar: subtle, and out of the way of the travel
+				row. Returns nil when there is nothing to say, so it costs no space in the common case.
+			]]
+			e(Parts.ServerNotice, {
+				key = "ServerNotice",
+				broadcast = state.broadcast,
+				restart = state.restart,
+				position = UDim2.new(0.5, 0, 0, Theme.Safe.Top + 74),
+				anchorPoint = Vector2.new(0.5, 0),
+			}),
+			--- Social rewards down the right edge; disappears as they are claimed.
+			e(Parts.SocialColumn, {
+				key = "Social",
+				socialClaims = state.socialClaims,
+				friendCount = state.friendCount,
+				onClaim = actions.claimSocial,
+				onClaimInvite = actions.claimInvite,
+				position = UDim2.new(1, -MARGIN, 0.42, 0),
+				anchorPoint = Vector2.new(1, 0.5),
+			}),
 			e(Parts.StorageMeter, {
 				key = "Storage",
 				variant = "Slim",

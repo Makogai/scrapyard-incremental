@@ -218,6 +218,31 @@ function Bridge.claimDaily()
 	fire("ClaimDailyReward")
 end
 
+--[[
+	Mailbox intents. A message ID, never a reward: what a message pays is read from the save, so a client
+	that could name its own reward could mail itself anything.
+]]
+function Bridge.claimInbox(messageId: string)
+	fire("InboxAction", "Claim", messageId)
+end
+
+function Bridge.claimAllInbox()
+	fire("InboxAction", "ClaimAll")
+end
+
+--- The reward id is a lookup key. Group membership is re-checked server-side before anything is paid.
+function Bridge.claimSocialReward(rewardId: string)
+	fire("SocialAction", "ClaimReward", rewardId)
+end
+
+--[[
+	No milestone index: the server picks the next claimable rung from the live friend count. A client that
+	could name its own rung could claim the top one on its first join.
+]]
+function Bridge.claimInvite()
+	fire("SocialAction", "ClaimInvite")
+end
+
 --- The milestone index is a lookup key, not a value: the server re-checks the banked seconds.
 function Bridge.claimPlaytime(milestoneIndex: number)
 	fire("ClaimPlaytimeReward", milestoneIndex)

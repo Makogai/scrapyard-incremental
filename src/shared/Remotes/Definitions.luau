@@ -76,6 +76,32 @@ local definitions: { Definition } = {
 		wear the one nobody has earned.
 	]]
 	definition("EquipTitle", "RemoteEvent"),
+
+	--[[
+		THE MAILBOX. Client -> server carries an intent and a message id, never a reward: what a message
+		pays is read from saved data, so a client cannot name its own prize. See `InboxService`.
+
+		There is no server -> client counterpart. The mailbox rides the normal state snapshot, which means
+		it arrives with everything else and cannot be shown out of step with the money it paid.
+	]]
+	definition("InboxAction", "RemoteEvent"),
+
+	--[[
+		Server -> every client: a staff message, with the sender's name and whether to draw the verified
+		tick. Separate from `Announce` because that one is for gameplay moments and this one is a person
+		talking -- and separate from `Notify`, which is a plain string by contract (AGENTS.md rule 13).
+	]]
+	definition("AdminBroadcast", "RemoteEvent"),
+
+	--[[
+		Server -> clients: the restart countdown, as an ABSOLUTE `EndsAt` rather than seconds remaining, so
+		every client ticks its own clock and no two players see different numbers. A nil `EndsAt` is a
+		cancel.
+	]]
+	definition("ServerRestart", "RemoteEvent"),
+
+	--- Client -> server: claim a like/group reward, or the next friend milestone. Intent only.
+	definition("SocialAction", "RemoteEvent"),
 }
 
 return table.freeze(definitions)

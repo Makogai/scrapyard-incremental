@@ -17,6 +17,8 @@ local EventBillboardController = require(script.Controllers.EventBillboardContro
 local TitleController = require(script.Controllers.TitleController)
 local GlobalChatController = require(script.Controllers.GlobalChatController)
 local EggHologramController = require(script.Controllers.EggHologramController)
+local ServerNoticeController = require(script.Controllers.ServerNoticeController)
+local SecretPetVfxController = require(script.Controllers.SecretPetVfxController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -77,5 +79,12 @@ GlobalChatController.Start()
 	only warns.
 ]]
 EggHologramController.Start()
+
+--[[
+	Server-wide notices and the Secret-pull burst. Both are listeners that write atoms or spawn world
+	effects, so they need nothing started before them beyond the remotes folder they wait on.
+]]
+ServerNoticeController.Start()
+SecretPetVfxController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))

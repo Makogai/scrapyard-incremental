@@ -79,6 +79,8 @@ local function seedMock()
 	Atoms.gears(Mock.player.gears)
 	Atoms.storedWeight(Mock.player.storage)
 	Atoms.storedValue(Mock.player.storageValue)
+	Atoms.inbox(Mock.inbox)
+	Atoms.socialClaims(Mock.socialClaims)
 	Atoms.prestigeCount(Mock.player.prestige)
 	Atoms.totalScrapCollected(Mock.player.totalScrap)
 	Atoms.equippedMagnet(Mock.player.equippedMagnet)
@@ -346,6 +348,22 @@ local function liveActions()
 		the day it believed was claimable, and the server must never take a claim target from the
 		client. Any argument passed here is ignored.
 	]]
+	function self.claimInbox(messageId: string)
+		Bridge.claimInbox(messageId)
+	end
+
+	function self.claimAllInbox()
+		Bridge.claimAllInbox()
+	end
+
+	function self.claimSocial(rewardId: string)
+		Bridge.claimSocialReward(rewardId)
+	end
+
+	function self.claimInvite()
+		Bridge.claimInvite()
+	end
+
 	function self.claimDaily()
 		Bridge.claimDaily()
 	end
@@ -734,6 +752,10 @@ function Store.use()
 	local gears = useAtom(Atoms.gears)
 	local storedWeight = useAtom(Atoms.storedWeight)
 	local storedValue = useAtom(Atoms.storedValue)
+	local inbox = useAtom(Atoms.inbox)
+	local socialClaims = useAtom(Atoms.socialClaims)
+	local broadcast = useAtom(Atoms.broadcast)
+	local restart = useAtom(Atoms.restart)
 	local derived = useAtom(Atoms.derived)
 	local upgradeLevels = useAtom(Atoms.upgradeLevels)
 	local unlockedAreas = useAtom(Atoms.unlockedAreas)
@@ -1014,6 +1036,10 @@ function Store.use()
 		prestige = prestigeCount,
 		storage = storedWeight,
 		storageValue = storageProjected,
+		inbox = inbox,
+		socialClaims = socialClaims,
+		broadcast = broadcast,
+		restart = restart,
 		capacity = derived.StorageCapacity,
 		derived = derived,
 

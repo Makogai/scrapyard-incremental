@@ -27,6 +27,7 @@ local P = require(UI.Primitives)
 local Icon = require(UI.Icon)
 local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
+local SocialConfig = require(ReplicatedStorage.Shared.Config.SocialConfig)
 local Overlays = require(UI.Components.Overlays)
 local FadeBanner = require(UI.Components.FadeBanner)
 
@@ -351,6 +352,210 @@ Parts.BOOSTS = {
 	extent = 62,
 	variant = "Fade",
 }
+
+--------------------------------------------------------------------------------
+-- ServerNotice
+--------------------------------------------------------------------------------
+
+--[[
+	THE TWO SERVER-WIDE NOTICES, stacked under the top bar: a staff broadcast and a restart countdown.
+
+	One component for both because they occupy the same slot and never compete for it in practice -- and
+	when they do coincide, the countdown belongs UNDER the message rather than beside it, which a single
+	component gets right for free.
+
+	The countdown is computed from an absolute `endsAt` the server sent, so this ticks its own clock. It
+	re-renders once a second from a state hook rather than every frame: a seconds readout that updates 60
+	times a second is 59 wasted renders.
+]]
+function Parts.ServerNotice(props)
+	local broadcast = props.broadcast
+	local restart = props.restart
+
+	local now, setNow = React.useState(os.time())
+	React.useEffect(function()
+		if restart == nil then
+			return nil
+		end
+		local running = true
+		task.spawn(function()
+			while running do
+				task.wait(1)
+				if running then
+					setNow(os.time())
+				end
+			end
+		end)
+		return function()
+			running = false
+		end
+	end, { restart })
+
+	if broadcast == nil and restart == nil then
+		return nil
+	end
+
+	local children = {}
+
+	if broadcast ~= nil then
+		children[#children + 1] = e(P.Panel, {
+			key = "Broadcast",
+			size = UDim2.new(1, 0, 0, 46),
+			layoutOrder = 1,
+			radius = Theme.Radius.Card,
+			color = Theme.Color.Card,
+			gradient = Theme.Gradient.Cyan,
+			strokeThickness = Theme.Stroke.Card,
+			studs = false,
+			children = P.compact(
+				P.padding({ x = 12, y = 8 }, "Inset"),
+				--[[
+					THE VERIFIED TICK. Only the server sets `verified`, so a message wearing it really is
+					from staff -- that is the entire reason to draw a badge rather than just a name.
+				]]
+				if broadcast.verified
+					then e(Icon, {
+						key = "Tick",
+						glyph = "check",
+						gradient = Theme.Gradient.Gold,
+						size = UDim2.fromOffset(26, 26),
+						position = UDim2.fromScale(0, 0.5),
+						anchorPoint = Vector2.new(0, 0.5),
+						radius = Theme.Radius.Small,
+						zIndex = 4,
+					})
+					else nil,
+				e(P.Label, {
+					key = "Text",
+					--- "Name: message", the shape a person talking has in every chat window ever made.
+					text = `{broadcast.fromName}:  {broadcast.message}`,
+					textSize = Theme.TextSize.Small,
+					font = Theme.Font.Bold,
+					color = Theme.Color.White,
+					align = Enum.TextXAlignment.Left,
+					size = UDim2.new(1, if broadcast.verified then -34 else 0, 1, 0),
+					position = UDim2.fromOffset(if broadcast.verified then 34 else 0, 0),
+					truncate = Enum.TextTruncate.AtEnd,
+					zIndex = 4,
+				})
+			),
+		})
+	end
+
+	if restart ~= nil then
+		local remaining = math.max(0, (restart.endsAt or 0) - now)
+		children[#children + 1] = e(P.Panel, {
+			key = "Restart",
+			--- Narrow and centred: this is a warning strip, not a window.
+			size = UDim2.fromOffset(260, 34),
+			layoutOrder = 2,
+			radius = Theme.Radius.Chip,
+			color = Theme.Color.Card,
+			--- Red inside the last ten seconds, so the deadline is felt rather than read.
+			gradient = if remaining <= 10 then Theme.Gradient.Red else Theme.Gradient.Orange,
+			strokeThickness = Theme.Stroke.Thin,
+			studs = false,
+			children = {
+				e(P.Label, {
+					key = "Text",
+					text = `SERVER RESTART IN {Format.timer(remaining)}`,
+					textSize = Theme.TextSize.Tiny,
+					font = Theme.Font.Bold,
+					color = Theme.Color.White,
+					size = UDim2.fromScale(1, 1),
+					zIndex = 4,
+				}),
+			},
+		})
+	end
+
+	return e(P.Group, {
+		key = props.key or "ServerNotice",
+		size = props.size or UDim2.fromOffset(520, 90),
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		zIndex = props.zIndex or 6,
+		layout = P.list({
+			direction = Enum.FillDirection.Vertical,
+			padding = 6,
+			hAlign = Enum.HorizontalAlignment.Center,
+		}),
+		children = children,
+	})
+end
+
+--------------------------------------------------------------------------------
+-- SocialColumn
+--------------------------------------------------------------------------------
+
+--[[
+	THE SOCIAL REWARD BUTTONS, stacked down the right edge.
+
+	Only claimable rewards are drawn. A permanently greyed-out "already claimed" button is chrome that
+	never becomes useful again, and this column sits over the play area -- so once a reward is taken, its
+	button leaves and the column shrinks.
+
+	`friendCount` drives the invite button, which is claimable in rungs; `SocialConfig` owns which rung is
+	next so the button and the server cannot disagree about what is on offer.
+]]
+function Parts.SocialColumn(props)
+	local claims = props.socialClaims or {}
+	local children = {}
+	local order = 0
+
+	for _, rewardId in SocialConfig.RewardOrder do
+		if SocialConfig.canClaim(rewardId, claims) then
+			local definition = SocialConfig.Rewards[rewardId]
+			order += 1
+			children[#children + 1] = e(Buttons.Button, {
+				key = rewardId,
+				text = definition.Label,
+				subtext = definition.Detail,
+				subtextSize = Theme.TextSize.Micro,
+				glyph = definition.Glyph,
+				variant = "Secondary",
+				textSize = Theme.TextSize.Tiny,
+				size = UDim2.fromOffset(186, 46),
+				layoutOrder = order,
+				onClick = function()
+					props.onClaim(rewardId)
+				end,
+			})
+		end
+	end
+
+	local ready = SocialConfig.claimableInvites(props.friendCount or 0, claims)
+	if #ready > 0 then
+		local milestone = SocialConfig.Invite.Milestones[ready[1]]
+		order += 1
+		children[#children + 1] = e(Buttons.Button, {
+			key = "Invite",
+			text = "FRIEND REWARD",
+			subtext = `{milestone.Friends} friend{if milestone.Friends == 1 then "" else "s"} here`,
+			subtextSize = Theme.TextSize.Micro,
+			glyph = SocialConfig.Invite.Glyph,
+			variant = "Purchase",
+			textSize = Theme.TextSize.Tiny,
+			size = UDim2.fromOffset(186, 46),
+			layoutOrder = order,
+			onClick = props.onClaimInvite,
+		})
+	end
+
+	if #children == 0 then
+		return nil
+	end
+
+	return e(P.Group, {
+		key = props.key or "SocialColumn",
+		size = UDim2.fromOffset(186, #children * 52),
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		zIndex = props.zIndex or 5,
+		layout = P.list({ direction = Enum.FillDirection.Vertical, padding = 6 }),
+		children = children,
+	})
+end
 
 --------------------------------------------------------------------------------
 -- StorageMeter

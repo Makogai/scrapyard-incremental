@@ -2,7 +2,7 @@
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.CurrentVersion = 16
+PlayerDataSchema.CurrentVersion = 17
 
 local PET_IDS = {
 	"Pup",
@@ -72,6 +72,9 @@ local MAXIMUM_GEARS = 1000000
 local MAXIMUM_STORED_WEIGHT = 1e9
 local MAXIMUM_STORED_VALUE = 1e12
 local MAXIMUM_COLLECTED = 1e15
+--- Mirrors `InboxConfig.MaximumMessages`. Duplicated rather than required: this module stays
+--- dependency-free so it can be driven by a plain table under Lune.
+local INBOX_MAXIMUM = 40
 local MAXIMUM_TIMESTAMP = 32503680000
 local MAXIMUM_PLOT_STAGE = 4
 local MAXIMUM_CRUSHER_LEVEL = 100
@@ -209,6 +212,17 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		CreatedTimestamp = timestamp,
 		LastLoginTimestamp = timestamp,
 		LastSaveTimestamp = 0,
+		--[[
+			THE MAILBOX, newest last: arrival order, which is the order that makes sense in a save. The
+			inbox screen sorts unclaimed-first for display.
+
+			No migration function is needed for this or `SocialClaims`. `validate` rebuilds every save from
+			`createDefault` and copies fields across defensively, so a v14 save simply arrives with an empty
+			mailbox -- the same way 15 and 16 added fields.
+		]]
+		Inbox = {},
+		--- Which one-off social rewards have been taken: `Like`, `Community`, `Invite1`..`Invite4`.
+		SocialClaims = {},
 		PlotStage = 1,
 		--[[
 			Which area theme the plot is currently built as. Unlocking an area no longer opens
@@ -683,6 +697,65 @@ function PlayerDataSchema.validate(
 		if savedTheme == areaId then
 			clean.ActivePlotTheme = areaId
 			break
+		end
+	end
+	--[[
+		THE MAILBOX, sanitised message by message.
+
+		Anything malformed is dropped rather than repaired: a message is a display object with a reward
+		attached, and a half-readable one is worse than none. Rewards go through the same bounds the rest of
+		the save uses, so a tampered save cannot mail itself a billion dollars.
+	]]
+	clean.Inbox = {}
+	if typeof(raw.Inbox) == "table" then
+		for _, entry in raw.Inbox do
+			if #clean.Inbox >= INBOX_MAXIMUM then
+				break
+			end
+			if
+				typeof(entry) == "table"
+				and typeof(entry.Id) == "string"
+				and #entry.Id <= 60
+				and typeof(entry.Title) == "string"
+				and typeof(entry.Body) == "string"
+			then
+				local rewards = nil
+				if typeof(entry.Rewards) == "table" then
+					rewards = {}
+					rewards.Money = boundedInteger(entry.Rewards.Money, 0, 0, MAXIMUM_MONEY)
+					rewards.Gears = boundedInteger(entry.Rewards.Gears, 0, 0, MAXIMUM_GEARS)
+					rewards.Spins = boundedInteger(entry.Rewards.Spins, 0, 0, 1000)
+					if typeof(entry.Rewards.Items) == "table" then
+						rewards.Items = {}
+						for itemId, count in entry.Rewards.Items do
+							if typeof(itemId) == "string" and #itemId <= 40 then
+								rewards.Items[itemId] = boundedInteger(count, 0, 0, 9999)
+							end
+						end
+					end
+				end
+				table.insert(clean.Inbox, {
+					Id = entry.Id,
+					Kind = if entry.Kind == "Staff" then "Staff" else "System",
+					Title = string.sub(entry.Title, 1, 60),
+					Body = string.sub(entry.Body, 1, 280),
+					FromName = if typeof(entry.FromName) == "string"
+						then string.sub(entry.FromName, 1, 40)
+						else "",
+					FromUserId = boundedInteger(entry.FromUserId, 0, 0, 1e12),
+					SentAt = boundedInteger(entry.SentAt, 0, 0, 1e12),
+					Rewards = rewards,
+					Claimed = boolean(entry.Claimed, false),
+				})
+			end
+		end
+	end
+	clean.SocialClaims = {}
+	if typeof(raw.SocialClaims) == "table" then
+		for key, value in raw.SocialClaims do
+			if typeof(key) == "string" and #key <= 40 then
+				clean.SocialClaims[key] = boolean(value, false)
+			end
 		end
 	end
 	clean.PlotUpgradeLevels = {}

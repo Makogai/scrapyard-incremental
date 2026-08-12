@@ -76,6 +76,23 @@ Atoms.money = Charm.atom(0)
 Atoms.gears = Charm.atom(0)
 Atoms.storedWeight = Charm.atom(0)
 Atoms.storedValue = Charm.atom(0)
+--[[
+	THE MAILBOX AND THE SOCIAL CLAIMS, both server-owned and arriving in the normal snapshot.
+
+	Not client-predicted: a claim pays money and marks a message, and those two have to land together or
+	the player sees one without the other.
+]]
+Atoms.inbox = Charm.atom({} :: { { [string]: any } })
+Atoms.socialClaims = Charm.atom({} :: { [string]: boolean })
+--[[
+	The two server-wide notices, written by `ServerNoticeController` rather than by a snapshot: they are
+	moments, not state, and they belong to the SERVER rather than to this player's save.
+
+	`broadcast` is `{ message, fromName, verified, receivedAt }` or nil.
+	`restart` is `{ endsAt, startedBy }` or nil -- an ABSOLUTE deadline, so the HUD ticks its own clock.
+]]
+Atoms.broadcast = Charm.atom(nil :: { [string]: any }?)
+Atoms.restart = Charm.atom(nil :: { [string]: any }?)
 Atoms.derived = Charm.atom(emptyDerived())
 Atoms.upgradeLevels = Charm.atom({} :: { [GameTypes.UpgradeId]: number })
 Atoms.upgradeMaximums = Charm.atom({} :: { [GameTypes.UpgradeId]: number })
@@ -230,6 +247,12 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.StoredValue) == "number" then
 		Atoms.storedValue(snapshot.StoredValue)
+	end
+	if type(snapshot.Inbox) == "table" then
+		Atoms.inbox(snapshot.Inbox)
+	end
+	if type(snapshot.SocialClaims) == "table" then
+		Atoms.socialClaims(snapshot.SocialClaims)
 	end
 	if type(snapshot.DerivedStats) == "table" then
 		Atoms.derived(snapshot.DerivedStats)

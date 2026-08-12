@@ -9,6 +9,16 @@ local adminUserIds: { [number]: boolean } = {
 local AdminConfig = {}
 AdminConfig.MaximumGrantMoney = 1e12
 AdminConfig.MaximumGrantGears = 100000
+--[[
+	Broadcast and restart bounds.
+
+	The message cap is short on purpose: a broadcast is a banner over gameplay, and anything longer than a
+	sentence belongs in the inbox where it can be read at leisure. The restart floor is long enough to read
+	and act on; the ceiling is long enough to finish a rebirth.
+]]
+AdminConfig.MaximumBroadcastLength = 180
+AdminConfig.MinimumRestartSeconds = 10
+AdminConfig.MaximumRestartSeconds = 600
 
 --[[
 	How long a server-wide boost or event may be run for, in minutes.

@@ -35,6 +35,21 @@ local passes = {
 		DisplayPrice = 399,
 		Color = Color3.fromRGB(255, 76, 167),
 	}),
+	--[[
+		PERMANENT DOUBLE WALK SPEED, applied in `derivedStats` alongside the MovementSpeed upgrade.
+
+		A multiplier rather than a flat bonus, so it keeps mattering as the upgrade climbs -- and it is
+		applied BEFORE the upgrade's `EffectCap`, which is what stops the pass from being silently eaten by
+		a cap the player has already reached.
+	]]
+	PermanentSpeed = table.freeze({
+		Id = "PermanentSpeed",
+		MarketplaceId = 0,
+		DisplayName = "2x Walk Speed",
+		Description = "Move twice as fast, permanently. Stacks with your speed upgrade.",
+		DisplayPrice = 199,
+		Color = Color3.fromRGB(105, 232, 92),
+	}),
 	ExtraPetSlots = table.freeze({
 		Id = "ExtraPetSlots",
 		MarketplaceId = 0,
@@ -75,6 +90,15 @@ local passes = {
 		Description = "Copies twice the effects of your strongest equipped normal pet.",
 		DisplayPrice = 499,
 		Color = Color3.fromRGB(49, 224, 255),
+		--[[
+			LIMITED TO 500 COPIES, GLOBALLY.
+
+			`LimitedStockService` owns the count -- a DataStore `UpdateAsync`, because a per-server counter
+			would sell the last copy on every server at once. The reserve happens BEFORE the grant, and a
+			failed reserve refuses the sale: overselling a limited item cannot be undone, while a refused
+			purchase is retried by Roblox and costs the player nothing.
+		]]
+		StockLimit = 500,
 	}),
 	DemonicGhostPet = table.freeze({
 		Id = "DemonicGhostPet",

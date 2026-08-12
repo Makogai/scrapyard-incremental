@@ -36,6 +36,8 @@ export type PlayerData = {
 	PlotStage: number,
 	--- Area id the plot is built as; see docs/PLOT_UPGRADES.md.
 	ActivePlotTheme: string,
+	Inbox: { { [string]: any } },
+	SocialClaims: { [string]: boolean },
 	PlotUpgradeLevels: { [string]: number },
 	UnlockedScrapTypes: { [GameTypes.ScrapId]: boolean },
 	UnlockedMachines: { [string]: boolean },

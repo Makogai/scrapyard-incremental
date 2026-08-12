@@ -10,6 +10,7 @@ local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationC
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local PlotService = require(script.Parent.PlotService)
+local PlotThemeService = require(script.Parent.PlotThemeService)
 local ScrapService = require(script.Parent.ScrapService)
 local RemoteService = require(script.Parent.RemoteService)
 
@@ -67,8 +68,17 @@ function MonetizationService.Start()
 		local granted = PlayerStateService.GrantDeveloperProduct(player, productId, purchaseId)
 		if granted then
 			if productId == "SkipRebirth" then
+				--[[
+					Skip Rebirth performs a real rebirth, so it needs the plot REBUILT for the same reason
+					`PrestigeService` does: the area unlocks are gone and the old yard is still standing.
+				]]
 				PlotService.RefreshAppearance(player)
-				ScrapService.RefreshPlayer(player)
+				local plot = PlotService.GetPlot(player)
+				if plot ~= nil then
+					PlotThemeService.Rebuild(player, plot)
+				else
+					ScrapService.RefreshPlayer(player)
+				end
 			end
 			if not alreadyProcessed then
 				local configuredPrice = MonetizationConfig.Products[productId].DisplayPrice
@@ -139,7 +149,12 @@ function MonetizationService.Start()
 					PlayerStateService.GrantDeveloperProduct(player, catalogId, purchaseId)
 				if success and catalogId == "SkipRebirth" then
 					PlotService.RefreshAppearance(player)
-					ScrapService.RefreshPlayer(player)
+					local plot = PlotService.GetPlot(player)
+					if plot ~= nil then
+						PlotThemeService.Rebuild(player, plot)
+					else
+						ScrapService.RefreshPlayer(player)
+					end
 				end
 				notify(player, success, `STUDIO TEST: {message}`)
 			end

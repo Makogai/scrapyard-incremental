@@ -40,6 +40,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ChangelogConfig = require(ReplicatedStorage.Shared.Config.ChangelogConfig)
+local InboxConfig = require(ReplicatedStorage.Shared.Config.InboxConfig)
 local UI = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"))
 local Atoms = UI.Atoms
 
@@ -69,6 +70,21 @@ local ICONS = {
 		order = 1,
 		caption = "Scrap index",
 	},
+	--[[
+		THE MAILBOX. Right side, before Settings, because it carries a count and a cog does not.
+
+		`InboxConfig.unclaimedCount` drives the pip below rather than a stored "unread" flag, so the badge
+		cannot disagree with the list it describes.
+	]]
+	{
+		name = "Inbox",
+		label = "INBOX",
+		screen = "inbox",
+		align = "Right",
+		glyph = "crate",
+		order = 2,
+		caption = "Gifts and staff messages",
+	},
 	{
 		-- Icon only: the flat cog reads on its own, and a label next to it just
 		-- widens the topbar for no information.
@@ -76,7 +92,7 @@ local ICONS = {
 		screen = "settings",
 		align = "Right",
 		glyph = "sliders",
-		order = 2,
+		order = 3,
 		caption = "Settings",
 	},
 }
@@ -170,6 +186,27 @@ function TopbarController.Start()
 			pcall(function()
 				built:notify()
 			end)
+		end
+
+		--[[
+			THE MAILBOX PIP, driven by the atom rather than set once.
+
+			Mail arrives while the player is standing there -- an admin gift is the whole point -- so this
+			subscribes for the session instead of reading the count at build time. `notify` is idempotent
+			enough that re-notifying an already-flagged icon is harmless, and TopbarPlus clears it when the
+			icon is opened.
+		]]
+		if entry.screen == "inbox" then
+			local function syncPip()
+				local unclaimed = InboxConfig.unclaimedCount(Atoms.inbox())
+				pcall(function()
+					if unclaimed > 0 then
+						built:notify()
+					end
+				end)
+			end
+			syncPip()
+			Atoms.inbox:subscribe(syncPip)
 		end
 
 		--[[

@@ -38,6 +38,30 @@ return table.freeze({
 			Changes = table.freeze({
 				table.freeze({
 					Kind = "New" :: ChangeKind,
+					Text = "INBOX, top right. Everything the team sends you now arrives as mail you claim, showing who sent it and a verified tick so you know it is really staff.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Rewards for liking the game, joining the group, and for every friend playing alongside you. Buttons on the right of the screen.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "2X WALK SPEED pass: permanent, and it stacks with your speed upgrade.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The Singularity pet is now limited to 500 across the whole game. Once they are gone, they are gone.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Pulling a Secret pet now sets off a burst of light everyone on the server can see.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Staff can broadcast a message to the server and start a visible restart countdown, so a restart no longer looks like a crash.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
 					Text = "The egg on the summon podium is a hologram now: see-through, rim-lit, a shaft of light rising through it and floating gently in place.",
 				}),
 				table.freeze({
@@ -63,6 +87,10 @@ return table.freeze({
 				table.freeze({
 					Kind = "New" :: ChangeKind,
 					Text = "SALVAGE MAGNET: the strongest magnet scrap cash can buy, $3,000,000, unlocked once you have reached the Vehicle Graveyard. Magnets survive rebirth.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Rebirthing now puts your plot back to the Front Yard. It used to take the area unlocks away but leave the old yard standing, so you kept a Vehicle Graveyard you no longer owned.",
 				}),
 				table.freeze({
 					Kind = "Fix" :: ChangeKind,

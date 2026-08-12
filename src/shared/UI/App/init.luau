@@ -33,6 +33,7 @@ local SettingsScreen = require(UI.Screens.SettingsScreen)
 local CollectionScreen = require(UI.Screens.CollectionScreen)
 local MagnetShopScreen = require(UI.Screens.MagnetShopScreen)
 local ChangelogScreen = require(UI.Screens.ChangelogScreen)
+local InboxScreen = require(UI.Screens.InboxScreen)
 local DailyRewardsScreen = require(UI.Screens.DailyRewardsScreen)
 local SpinScreen = require(UI.Screens.SpinScreen)
 local AdminScreen = require(UI.Screens.AdminScreen)
@@ -68,6 +69,8 @@ local SCREENS = {
 	magnetshop = MagnetShopScreen,
 	-- Opened by the far-left TopbarPlus icon.
 	changelog = ChangelogScreen,
+	--- Opened by the top-right INBOX icon; everything an admin gifts arrives here.
+	inbox = InboxScreen,
 	--[[
 		Both of these have real servers behind them now -- `DailyRewardService` and `SpinService`.
 		`daily` used to be in the "deliberately absent" list below because the game had no

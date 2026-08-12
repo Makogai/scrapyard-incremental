@@ -127,6 +127,48 @@ function AdminCatalogue.build(): { AdminSection }
 		Resources use the amount box. Money and gears are the only two grantables where the number is
 		the point rather than the item.
 	]]
+	--[[
+		SERVER-WIDE STAFF TOOLS. Owner-gated: a broadcast speaks for the game, and a restart ends everyone's
+		session, so neither belongs behind the same permission as handing out a potion.
+
+		`Broadcast` takes its text from the panel's message field; `RESTART` takes seconds from the amount
+		stepper. Both are handled once per press rather than per target -- see `AdminService`.
+	]]
+	table.insert(sections, {
+		Id = "server",
+		Label = "SERVER",
+		Glyph = "admin",
+		Accent = "Red",
+		Entries = {
+			{
+				Id = "Broadcast",
+				Label = "BROADCAST",
+				Command = "Broadcast",
+				Text = true,
+				Owner = true,
+				Glyph = "note",
+				Accent = "Cyan",
+			},
+			{
+				Id = "RestartServer",
+				Label = "RESTART",
+				Command = "RestartServer",
+				Amount = true,
+				Owner = true,
+				Glyph = "clock",
+				Accent = "Red",
+			},
+			{
+				Id = "CancelRestart",
+				Label = "CANCEL RESTART",
+				Command = "CancelRestart",
+				Owner = true,
+				Glyph = "cross",
+				Accent = "Gray",
+			},
+		},
+	})
+
 	table.insert(sections, {
 		Id = "resources",
 		Label = "RESOURCES",

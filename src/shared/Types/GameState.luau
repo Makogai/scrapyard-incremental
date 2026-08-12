@@ -19,6 +19,8 @@ export type PublicPlayerState = {
 	Gears: number,
 	StoredWeight: number,
 	StoredValue: number,
+	Inbox: { { [string]: any } },
+	SocialClaims: { [string]: boolean },
 	UpgradeLevels: { [GameTypes.UpgradeId]: number },
 	UnlockedAreas: { [GameTypes.AreaId]: boolean },
 	DerivedStats: DerivedStats,
