@@ -210,15 +210,27 @@ local function HudDesktop(props)
 				`bottomLift` is still respected: on touch, Roblox draws its own controls over that corner.
 			]]
 			--[[
-				Server-wide notices, centred under the top bar: subtle, and out of the way of the travel
-				row. Returns nil when there is nothing to say, so it costs no space in the common case.
+				A staff message or a gift, in the middle of the screen. Both return nil when there is nothing
+				to say, so neither costs any space in the common case.
 			]]
-			e(Parts.ServerNotice, {
-				key = "ServerNotice",
-				broadcast = state.broadcast,
+			e(Parts.BroadcastNotice, {
+				key = "Broadcast",
+				notice = state.broadcast,
+				onDismiss = actions.dismissBroadcast,
+			}),
+			--[[
+				The restart countdown, in the event banner's slot -- and UNDER a live event rather than on top
+				of it, because an event that is already running should not be shoved aside by a clock.
+			]]
+			e(Parts.RestartCountdown, {
+				key = "Restart",
 				restart = state.restart,
-				position = UDim2.new(0.5, 0, 0, Theme.Safe.Top + 74),
-				anchorPoint = Vector2.new(0.5, 0),
+				position = UDim2.new(
+					0.5,
+					0,
+					0,
+					topbarStripTop + topbarStripHeight + 8 + (if state.event then 66 else 0)
+				),
 			}),
 			--- Social rewards down the right edge; disappears as they are claimed.
 			e(Parts.SocialColumn, {

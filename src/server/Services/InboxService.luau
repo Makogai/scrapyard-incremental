@@ -80,10 +80,21 @@ function InboxService.Send(
 	end
 
 	--[[
-		Tell them it arrived. Without this the mailbox is a place you have to think to check, and an admin
-		gift that nobody notices is the same as no gift.
+		Tell them it arrived, IN THE MIDDLE OF THE SCREEN.
+
+		Deliberately not `Notify`: that is the right-hand toast stack, which is where "sold for $400" goes.
+		A staff gift arriving in the same place as routine income is a gift nobody notices, and the mailbox
+		is a place you otherwise have to think to check.
+
+		Reuses the `AdminBroadcast` remote, fired to ONE client, because the centre notice is already the
+		thing that renders it -- `Kind` is what makes it read as a present rather than as an announcement.
 	]]
-	RemoteService.GetEvent("Notify"):FireClient(player, `NEW MAIL: {message.Title}`)
+	RemoteService.GetEvent("AdminBroadcast"):FireClient(player, {
+		Kind = "Gift",
+		Message = message.Title,
+		FromName = message.FromName,
+		Verified = kind.Verified,
+	})
 	return message.Id
 end
 

@@ -348,6 +348,11 @@ local function liveActions()
 		the day it believed was claimable, and the server must never take a claim target from the
 		client. Any argument passed here is ignored.
 	]]
+	--- Read and done: a message you have finished with should leave when you say so.
+	function self.dismissBroadcast()
+		Atoms.broadcast(nil)
+	end
+
 	function self.claimInbox(messageId: string)
 		Bridge.claimInbox(messageId)
 	end

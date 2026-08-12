@@ -55,6 +55,8 @@ function ServerNoticeController.Start()
 			message = text,
 			fromName = if typeof(payload.FromName) == "string" then payload.FromName else "STAFF",
 			verified = payload.Verified == true,
+			--- "Gift" or nil. Decides whether this reads as a present or as somebody talking.
+			kind = if typeof(payload.Kind) == "string" then payload.Kind else nil,
 			receivedAt = os.clock(),
 		})
 

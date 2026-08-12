@@ -57,8 +57,24 @@ local TAB_WIDTH = 104
 local TAB_GAP = 6
 
 --- Sized to whatever the catalogue produced, with room for the amount box under it.
+--[[
+	TWO ROWS OF TABS, so the column stays a sensible shape as sections are added.
+
+	One row meant the panel widened every time `AdminCatalogue` grew -- seven sections already forced it
+	past 620, and SERVER made it eight. A window that gets wider than the screen to fit its own navigation
+	is the same bug as one whose tabs hang off the edge; wrapping fixes the class instead of the instance.
+
+	The width is still DERIVED, just from the longer of the two rows rather than from all of them.
+]]
+local TAB_ROWS = 2
+
+local function tabsPerRow(sectionCount: number): number
+	return math.max(1, math.ceil(sectionCount / TAB_ROWS))
+end
+
 local function rightWidth(sectionCount: number): number
-	local strip = sectionCount * TAB_WIDTH + math.max(0, sectionCount - 1) * TAB_GAP
+	local perRow = tabsPerRow(sectionCount)
+	local strip = perRow * TAB_WIDTH + math.max(0, perRow - 1) * TAB_GAP
 	return math.max(620, strip + 8)
 end
 local GAP = 16
@@ -230,9 +246,17 @@ local function AdminScreen(props)
 	--- Section tabs down the right column.
 	local RIGHT_WIDTH = rightWidth(#sections)
 
-	local sectionTabs = {}
+	--[[
+		Tabs are built into per-row buckets rather than one flat list, so the layout is two plain horizontal
+		lists instead of a wrapping one -- `UIListLayout` wrapping is newer than the rest of this kit and
+		behaves differently across the two directions.
+	]]
+	local perRow = tabsPerRow(#sections)
+	local tabRows = { {}, {} }
 	for index, section in ipairs(sections) do
-		sectionTabs[#sectionTabs + 1] = e(Buttons.TabButton, {
+		local row = math.min(TAB_ROWS, math.floor((index - 1) / perRow) + 1)
+		local bucket = tabRows[row]
+		bucket[#bucket + 1] = e(Buttons.TabButton, {
 			key = section.Id,
 			text = section.Label,
 			glyph = section.Glyph,
@@ -247,6 +271,23 @@ local function AdminScreen(props)
 				setActiveSection(section.Id)
 			end,
 		})
+	end
+
+	local sectionTabs = {}
+	for row = 1, TAB_ROWS do
+		if #tabRows[row] > 0 then
+			sectionTabs[#sectionTabs + 1] = e(P.Group, {
+				key = `TabRow{row}`,
+				size = UDim2.new(1, 0, 0, 38),
+				layoutOrder = row,
+				layout = P.list({
+					direction = Enum.FillDirection.Horizontal,
+					padding = TAB_GAP,
+					hAlign = Enum.HorizontalAlignment.Left,
+				}),
+				children = tabRows[row],
+			})
+		end
 	end
 
 	local entryRows = {}
@@ -405,9 +446,10 @@ local function AdminScreen(props)
 				children = {
 					e(P.Group, {
 						key = "SectionTabs",
-						size = UDim2.new(1, 0, 0, 38),
+						--- Two rows of 38, plus the gap between them.
+						size = UDim2.new(1, 0, 0, 38 * TAB_ROWS + TAB_GAP),
 						layout = P.list({
-							direction = Enum.FillDirection.Horizontal,
+							direction = Enum.FillDirection.Vertical,
 							padding = TAB_GAP,
 							hAlign = Enum.HorizontalAlignment.Left,
 						}),
@@ -420,7 +462,8 @@ local function AdminScreen(props)
 					e(P.Group, {
 						key = "AmountRow",
 						size = UDim2.new(1, 0, 0, 44),
-						position = UDim2.fromOffset(0, 46),
+						--- Below TWO rows of tabs (38 each plus the gap) rather than one.
+						position = UDim2.fromOffset(0, 46 + 38 + TAB_GAP),
 						children = {
 							e(P.Label, {
 								key = "AmountLabel",
