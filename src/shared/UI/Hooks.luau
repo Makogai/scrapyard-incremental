@@ -57,14 +57,16 @@ function Hooks.useScale(): number
 	return React.useMemo(function()
 		local byHeight = viewport.Y / Theme.Reference.Y
 		local byWidth = viewport.X / Theme.Reference.X
-		local scale = math.min(byHeight, byWidth * 1.25)
+		local scale = math.min(byHeight, byWidth * 1.25) * Theme.ScaleBoost
 		--[[
-			The floor used to be 0.55, which on a landscape phone (about 750x361)
-			forced the design canvas down to ~1364x656 -- too short to hold the
-			left column, the bottom row and Roblox's touch controls at once. 0.42
-			buys back the vertical room while keeping buttons big enough to hit.
+			The floor is NOT boosted, and the ceiling is.
+
+			The floor exists for a landscape phone (about 750x361), where the constraint is that the design
+			canvas has to stay tall enough to hold the left column, the bottom row and Roblox's own touch
+			controls at once. Boosting it would undo exactly that. The ceiling is a fraction of the
+			authored size, so it moves with the boost or it would silently cancel it on a big monitor.
 		]]
-		return math.clamp(scale, 0.42, 1.35)
+		return math.clamp(scale, 0.42, 1.35 * Theme.ScaleBoost)
 	end, { viewport })
 end
 

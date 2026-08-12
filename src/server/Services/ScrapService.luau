@@ -15,13 +15,37 @@ local RemoteService = require(script.Parent.RemoteService)
 
 type ScrapRecord = {
 	Instance: Instance,
-	Marker: BasePart,
-	Plot: Model,
+	--[[
+		The marker it stands on, and the plot that owns it. BOTH nil for arena scrap, which has neither: it
+		is placed at a rolled point inside a circle and belongs to nobody.
+	]]
+	Marker: BasePart?,
+	Plot: Model?,
+	--[[
+		Who may take it. `0` means ANYONE -- see `ArenaConfig` for why that exists and what it changes.
+
+		`ReservedUserId` still does the rest: first magnet to reserve a piece gets it and the others find
+		nothing there, which is the race the Pit is built around.
+	]]
 	OwnerUserId: number,
 	ScrapId: string,
 	AreaId: string,
 	VariantId: string,
 	ReservedUserId: number?,
+	--[[
+		Half the piece's widest horizontal measurement, so the scatter can keep pieces out of each
+		other. Stored per record rather than measured on demand: the check runs against every other
+		piece on the plot on every spawn, and re-measuring 60 bounding boxes each time would be silly.
+	]]
+	FootprintRadius: number,
+	--[[
+		When each player was last told THIS piece is out of reach, keyed by user id.
+
+		On the record rather than in a table keyed by player, so it dies with the piece and cannot leak.
+		The magnet query runs several times a second; without this the piece would be shaking constantly
+		for as long as anyone stood near it.
+	]]
+	RejectedAt: { [number]: number },
 }
 
 local ScrapVariants = require(script.Parent.ScrapVariants)
@@ -29,27 +53,38 @@ local ScrapVariants = require(script.Parent.ScrapVariants)
 local ScrapService = {}
 local activeByInstance: { [Instance]: ScrapRecord } = {}
 local foldersByPlot: { [Model]: Folder } = {}
+--[[
+	Where arena scrap lives: one folder belonging to no plot.
+
+	`ArenaService` owns the arena's CONTENTS -- it places pieces and tops the count back up. What has to
+	live here is the part the magnet touches: this folder in the query filter, the ownership exemption, and
+	the collect path that skips every plot check.
+]]
+local publicFolder: Folder? = nil
 local templates: Folder
 local gameplayEffect: RemoteEvent
 local notifyRemote: RemoteEvent
 --[[
-	Nothing spawns larger than this on its longest axis.
+	A sanity net, NOT a design knob -- nothing this big can be intentional.
 
-	A default R15 character is about 5 studs tall, and the rule is simply that scrap must never be
-	bigger than the player: anything larger reads as a bug, blocks the yard, and cannot be walked
-	around. One piece scaled to roughly the size of the map, parked itself inside the collection
-	radius, and spammed the magnet warning on every query.
+	Scrap size is authored in Studio: the spawner never resizes art to a target, so this is the only
+	number that can ever change how big a piece of scrap is. It exists because Roblox rewrites a
+	`MeshPart`'s `Size` when its mesh asset resolves, and when that goes wrong the result is absurd
+	rather than merely wrong. Measured from the generic templates: `CopperWire` came back 966 studs
+	across, others 414, 745, 1130 and 1739. A piece that size parks itself inside every collection
+	radius and spams the magnet warning across the screen.
 
-	Raise this if a deliberately oversized piece is wanted later -- it is one number on purpose.
+	It is set far above any deliberate size -- a car door at 4 studs, a whole scrap car at 12, are all
+	left exactly as authored -- so it only ever catches the runaway case, and it warns by name when it
+	does, because the fix belongs in Studio.
 ]]
-local MAXIMUM_SCRAP_STUDS = 5
+local RUNAWAY_SCRAP_STUDS = 24
 
 --[[
-	Below this a measured bounding box is not worth dividing by.
+	Below this a measured bounding box is not a box at all.
 
-	Normalisation is `declaredSize / measuredSize`, so a model that measures near zero -- an empty
-	container, a model whose parts have not replicated, a mis-exported asset -- produces a
-	multiplier in the thousands. Refusing to normalise and warning is right; guessing is not.
+	An empty container, a model whose parts have not replicated, a mis-exported asset. Nothing is
+	scaled off this measurement any more, so it is purely a "that model is broken" signal.
 ]]
 local MINIMUM_MEASURABLE_STUDS = 0.05
 
@@ -59,16 +94,47 @@ local REJECTION_SAME_REASON_SECONDS = 10
 --- Minimum spacing between ANY two rejection notices, so alternating reasons cannot ping-pong.
 local REJECTION_ANY_REASON_SECONDS = 4
 
+--[[
+	How often ONE PIECE may flash at ONE PLAYER.
+
+	Separate from the toast throttles above and much shorter, because it answers a different question.
+	The toast says WHY, once, quietly. This says WHICH, on the piece itself -- and the whole point is that
+	it keeps saying it while you are stood there, so the tint reads as a property of that object rather
+	than as a one-off animation you might have missed.
+
+	Tuned against the client's hold time: `SCRAP_REJECT_SECONDS` there is slightly longer than this, so a
+	player who does not move sees an unbroken red rather than a flicker.
+]]
+local REJECTION_FLASH_SECONDS = 1.2
+
 local lastRejectionNotice: { [Player]: { [string]: number } } = {}
 local lastRejectionAt: { [Player]: number } = {}
 local overlap = OverlapParams.new()
+
+--[[
+	The downward cast that finds the floor under a jittered spawn point.
+
+	EXCLUDE, not include: it has to hit whatever the author actually built there -- plot floor, ramp,
+	pallet -- and the one thing it must never hit is the scrap already standing on that floor, which
+	would stack the yard into towers. Players are handled at the hit instead of on this list, because a
+	list of characters goes stale the moment somebody respawns.
+]]
+local groundRay = RaycastParams.new()
+groundRay.FilterType = Enum.RaycastFilterType.Exclude
+groundRay.IgnoreWater = true
+groundRay.RespectCanCollide = false
 
 local function refreshOverlapFilter()
 	local folders = {}
 	for _, folder in foldersByPlot do
 		table.insert(folders, folder)
 	end
+	--- The arena's folder is not under any plot, so it has to be added by hand or the magnet misses it.
+	if publicFolder ~= nil then
+		table.insert(folders, publicFolder)
+	end
 	overlap.FilterDescendantsInstances = folders
+	groundRay.FilterDescendantsInstances = folders
 end
 
 local function weightedScrap(areaId: string): string
@@ -167,6 +233,16 @@ local function setInstanceCFrame(instance: Instance, target: CFrame)
 	end
 end
 
+--- The counterpart read, so a re-ground can keep the rotation a piece was already given.
+local function instanceCFrame(instance: Instance): CFrame
+	if instance:IsA("Model") then
+		return instance:GetPivot()
+	elseif instance:IsA("BasePart") then
+		return instance.CFrame
+	end
+	return CFrame.identity
+end
+
 --[[
 	How far a piece of scrap rests above the marker it spawned on.
 
@@ -175,14 +251,86 @@ end
 ]]
 local SCRAP_HOVER = 0.06
 
+--[[
+	The WORLD-ALIGNED box of a piece of scrap: its centre, and its size along the world axes.
+
+	Computed from the parts' own corners rather than from `Model:GetBoundingBox()` or
+	`GetExtentsSize()`, and that is the whole point. BOTH of those Roblox functions return a box
+	aligned to the model's PrimaryPart when it has one -- a LOCAL box, not a world one. Grounding needs
+	the world height, and models are now stood up at whatever angle they were authored at, so using
+	either put scrap at the wrong altitude the moment a model was rotated:
+
+		SmallMetalPlate  floated 1.11 studs, because the local box is 2.35 tall while the plate, lying
+		                 flat, is really 0.13 tall in the world
+		CrushedBucket    sank 0.16 studs, because its PrimaryPart is turned relative to its geometry
+
+	Both were invisible in a local measurement -- I measured them that way first and read the wrong
+	answer, which is exactly the trap this function now closes for every caller.
+
+	Eight corners per part is the honest way to do it: a part contributes its rotated extremes, so a
+	tilted or spun model reports the box it actually occupies.
+]]
 local function boundsOf(instance: Instance): (Vector3, Vector3)
-	if instance:IsA("Model") then
-		local cframe, size = instance:GetBoundingBox()
-		return cframe.Position, size
-	elseif instance:IsA("BasePart") then
-		return instance.Position, instance.Size
+	if instance:IsA("BasePart") then
+		--- A lone part still has to be measured rotated: its `Size` is local, its corners are not.
+		local minimum, maximum = nil, nil
+		local half = instance.Size / 2
+		for x = -1, 1, 2 do
+			for y = -1, 1, 2 do
+				for z = -1, 1, 2 do
+					local corner = instance.CFrame * Vector3.new(half.X * x, half.Y * y, half.Z * z)
+					minimum = if minimum then minimum:Min(corner) else corner
+					maximum = if maximum then maximum:Max(corner) else corner
+				end
+			end
+		end
+		if minimum == nil or maximum == nil then
+			return instance.Position, instance.Size
+		end
+		return (minimum + maximum) / 2, maximum - minimum
 	end
-	return Vector3.zero, Vector3.zero
+
+	if not instance:IsA("Model") then
+		return Vector3.zero, Vector3.zero
+	end
+
+	local minimum, maximum = nil, nil
+	for _, part in instance:GetDescendants() do
+		if part:IsA("BasePart") then
+			local half = part.Size / 2
+			for x = -1, 1, 2 do
+				for y = -1, 1, 2 do
+					for z = -1, 1, 2 do
+						local corner = part.CFrame * Vector3.new(half.X * x, half.Y * y, half.Z * z)
+						minimum = if minimum then minimum:Min(corner) else corner
+						maximum = if maximum then maximum:Max(corner) else corner
+					end
+				end
+			end
+		end
+	end
+	if minimum == nil or maximum == nil then
+		--- No parts at all. `placeOnMarker` warns about this; here it just means "no box".
+		return instance:GetPivot().Position, Vector3.zero
+	end
+	return (minimum + maximum) / 2, maximum - minimum
+end
+
+--[[
+	Is this part somebody's body?
+
+	A player standing on a spawn point must not be mistaken for the floor. Checked at the hit rather
+	than filtered out up front, because a list of characters goes stale the moment anyone respawns.
+]]
+local function isCharacterPart(part: BasePart): boolean
+	local model = part:FindFirstAncestorWhichIsA("Model")
+	while model ~= nil do
+		if model:FindFirstChildOfClass("Humanoid") ~= nil then
+			return true
+		end
+		model = model:FindFirstAncestorWhichIsA("Model")
+	end
+	return false
 end
 
 --- The true world-space top of a marker, corners included, so a tilted pad still works.
@@ -201,22 +349,213 @@ local function markerTopY(marker: BasePart): number
 end
 
 --[[
-	Stand an instance on the marker, measured rather than computed.
+	WHERE AND HOW A SINGLE PIECE OF SCRAP SITS. Rolled once at spawn, then kept.
 
-	Placing it in one shot does not work: `PivotTo` positions the PIVOT, and on an imported model
-	the pivot is wherever the exporter left it rather than the centre of the geometry. Measuring
-	after placing and shifting by the difference lands the underside on the marker whatever the
-	pivot is -- the same reason the richest-player statue is positioned by measurement.
-
-	Shared, because anything that changes a scrap's scale has to re-ground it afterwards.
+	Kept, rather than re-rolled, because a piece has to be re-grounded when its mesh resolves a few
+	frames later -- and re-rolling there would make scrap visibly hop and spin as the yard loaded.
 ]]
-local function groundOnMarker(instance: Instance, marker: BasePart)
-	local flat = marker.CFrame - marker.CFrame.Position
-	setInstanceCFrame(instance, flat + marker.CFrame.Position)
+type Placement = {
+	--- Where the piece stands, jittered off the marker. Y is the surface its underside lands on.
+	Position: Vector3,
+	--- Its FINAL world rotation: the random turn already composed with the model's authored angle.
+	Rotation: CFrame,
+}
+
+--[[
+	How far a piece may tip out of true, in degrees.
+
+	Small on purpose. A piece of scrap resting on rubble is never perfectly level, and a few degrees
+	reads as exactly that -- but the model's authored angle is what says whether the thing is standing
+	up or lying on its side, and a big tilt would throw that away.
+]]
+local SCRAP_TILT_DEGREES = 7
+
+--[[
+	How high a tilt is allowed to lift a piece's far edge off the floor, in studs.
+
+	The tilt is an ANGLE, so what it does to a piece depends entirely on how wide that piece is: 7
+	degrees lifts a metal can's corner by a couple of centimetres and the end of a 12-stud scrap car
+	by three quarters of a stud. The first reads as "resting on gravel", the second as "floating".
+
+	So the angle is capped per piece by this distance instead. Small objects still get the full tilt;
+	long ones get however much keeps them visibly on the ground.
+]]
+local MAXIMUM_TILT_LIFT_STUDS = 0.28
+
+--[[
+	The turn a piece of scrap spawns with: a random yaw, and a lean capped by how wide the piece is.
+
+	Shared by both placements. `rollPlacement` picks a spot in a marker's disc; `rollPlacementAt` is handed
+	one. Neither should have its own idea of how scrap is angled, or arena scrap would visibly sit
+	differently from plot scrap.
+
+	ONE LEAN OF AN EXACT SIZE, about a random horizontal axis. Tilting independently on X and Z was the
+	obvious way to write it and is not bounded: the two combine, so a 7-degree cap on each produced a
+	10-degree lean in the corner direction. A single angle about a random axis looks just as random and its
+	size is exactly what it says.
+
+	The cap is measured across the piece's FULL width, because what reads as floating is the far edge
+	against the floor -- not the middle. A brake disc, being flat and wide, is what this binds on.
+]]
+local function scatterRotation(authored: CFrame, ownRadius: number): CFrame
+	local widest = math.max(ownRadius * 2, 0.01)
+	local allowed = math.min(
+		math.rad(SCRAP_TILT_DEGREES),
+		math.asin(math.min(1, MAXIMUM_TILT_LIFT_STUDS / widest))
+	)
+	local axis = math.random() * math.pi * 2
+	local lean = CFrame.fromAxisAngle(
+		Vector3.new(math.cos(axis), 0, math.sin(axis)),
+		allowed * math.random()
+	)
+	return lean * CFrame.Angles(0, math.random() * math.pi * 2, 0) * authored
+end
+
+--[[
+	Roll a placement for one piece: somewhere in the marker's disc, turned to face anywhere.
+
+	SCATTER, NOT A GRID. Every marker used to hold exactly one piece at its exact centre and exact
+	angle, so a yard read as rows of objects at regular intervals -- and because the marker never
+	moved, clearing an area and waiting rebuilt the identical formation piece for piece. Now the
+	marker is a pile ANCHOR: position is jittered inside its own disc and the turn is random, so no
+	two respawns look the same.
+
+	`radius` comes from the marker's distance to its nearest neighbour (see `PlotConfig`), so a piece
+	can never wander into the next pile however far apart the author spaced them.
+
+	THE YAW IS APPLIED ON TOP OF THE AUTHORED ROTATION, and the tilt is small. That is what keeps this
+	compatible with sizing and posing models in Studio: a can authored lying on its side stays lying on
+	its side, it just points somewhere different each time.
+
+	IT ALSO REFUSES TO PUT TWO PIECES INSIDE EACH OTHER. Scatter alone produced pairs 0.74 studs apart
+	-- touching is what a scrapyard looks like, but intersecting is what a bug looks like -- so each
+	candidate spot is scored against the pieces already on the plot and the best of a handful wins.
+	Best-of-N rather than retry-until-clear on purpose: a crowded pile has no clear spot left, and a
+	loop that insists on one would never end.
+
+	AND IT WIDENS ITS SEARCH WHEN CROWDED. Best-of-8 inside a fixed disc still left 9 intersecting pairs
+	out of 60 pieces, because in the Workshop -- where the tightest markers are 5.7 studs apart, so the
+	disc is only 2.4 studs wide -- there was genuinely nowhere clear to put the second piece. Later
+	attempts reach progressively further out, which is safe precisely because the clearance test is
+	against real pieces rather than against the disc: wandering towards a neighbouring pile is only
+	allowed if that pile has room.
+]]
+local SCATTER_ATTEMPTS = 16
+
+--- How much further than its own disc a crowded piece may reach by the last attempt.
+local SCATTER_REACH = 2.2
+
+local function rollPlacement(
+	marker: BasePart,
+	radius: number,
+	authored: CFrame,
+	ownRadius: number,
+	occupied: { ScrapRecord }
+): Placement
+	--- The spot furthest from its neighbours out of several tries, unless one is simply clear.
+	local offset = Vector3.zero
+	local bestClearance = -math.huge
+	for attempt = 1, SCATTER_ATTEMPTS do
+		--- Each failed attempt reaches a little further out, so a crowded pile can still find space.
+		local reach = 1 + (attempt - 1) / (SCATTER_ATTEMPTS - 1) * (SCATTER_REACH - 1)
+		--- sqrt keeps the scatter even across the disc; without it everything crowds the centre
+		local distance = radius * reach * math.sqrt(math.random())
+		local angle = math.random() * math.pi * 2
+		local candidate = Vector3.new(math.cos(angle) * distance, 0, math.sin(angle) * distance)
+		local point = marker.CFrame.Position + candidate
+
+		--[[
+			Clearance is the gap left AFTER both footprints are accounted for, so a big car door needs
+			more room than a bolt and the test is symmetric between the two pieces.
+		]]
+		local clearance = math.huge
+		for _, record in occupied do
+			local other = instanceCFrame(record.Instance).Position
+			local flat = (Vector3.new(point.X, 0, point.Z) - Vector3.new(other.X, 0, other.Z)).Magnitude
+			clearance = math.min(clearance, flat - ownRadius - record.FootprintRadius)
+		end
+
+		if clearance > bestClearance then
+			bestClearance = clearance
+			offset = candidate
+		end
+		--- Already clear of everything: no reason to keep rolling.
+		if clearance >= 0 then
+			break
+		end
+		--- Nothing to avoid at all, so the first roll is as good as any.
+		if attempt == 1 and clearance == math.huge then
+			break
+		end
+	end
+
+	local surfaceY = markerTopY(marker)
+	--[[
+		FIND THE REAL FLOOR UNDER THE JITTERED POINT, and refuse the jitter if there isn't one.
+
+		The marker's own height is only the right answer directly above the marker. Jitter a piece
+		sideways and it can end up over a kerb, a pallet or the lip of the plot, where using the
+		marker's height would leave it floating or buried. So the surface is measured, and a hit
+		further than `SURFACE_TOLERANCE` from the marker's own height means the piece has wandered
+		somewhere structurally different -- onto a container roof, into a pit -- and it goes back to
+		the marker instead.
+	]]
+	local SURFACE_TOLERANCE = 3
+	local origin = marker.CFrame.Position + offset + Vector3.new(0, 8, 0)
+	local hit = workspace:Raycast(origin, Vector3.new(0, -24, 0), groundRay)
+	local position
+	if
+		hit ~= nil
+		and not isCharacterPart(hit.Instance)
+		and math.abs(hit.Position.Y - surfaceY) <= SURFACE_TOLERANCE
+	then
+		position = Vector3.new(origin.X, hit.Position.Y, origin.Z)
+	else
+		position = Vector3.new(marker.CFrame.Position.X, surfaceY, marker.CFrame.Position.Z)
+	end
+
+	return { Position = position, Rotation = scatterRotation(authored, ownRadius) }
+end
+
+--[[
+	A placement at a KNOWN point, for scrap that has no marker.
+
+	The arena chooses its own points -- it is a circle, not a set of authored pads -- so the only work left
+	is the two things a marker would otherwise have supplied: the floor height under that point, and the
+	turn. Both are the same rules a plot uses, which is why arena scrap sits and leans identically.
+
+	No surface tolerance to check against here. On a plot the tolerance guards against a jittered piece
+	wandering onto a container roof; the arena is a flat disc with walls, so whatever the ray hits IS the
+	floor, and a miss can only mean the geometry has not been built yet.
+]]
+local function rollPlacementAt(point: Vector3, authored: CFrame, ownRadius: number): Placement
+	local hit = workspace:Raycast(point + Vector3.new(0, 10, 0), Vector3.new(0, -30, 0), groundRay)
+	local surfaceY = if hit ~= nil and not isCharacterPart(hit.Instance)
+		then hit.Position.Y
+		else point.Y
+	return {
+		Position = Vector3.new(point.X, surfaceY, point.Z),
+		Rotation = scatterRotation(authored, ownRadius),
+	}
+end
+
+--[[
+	Stand an instance on its placement, measured rather than computed.
+
+	Setting the CFrame in one shot does not work: `PivotTo` positions the PIVOT, and on an imported
+	model the pivot is wherever the exporter left it rather than the centre of the geometry. Measuring
+	after placing and shifting by the difference lands the underside on the surface whatever the pivot
+	is -- the same reason the richest-player statue is positioned by measurement.
+
+	Shared, because anything that moves or re-scales a scrap has to re-ground it afterwards. Idempotent
+	on purpose: called again with the same placement, a piece lands in exactly the same spot.
+]]
+local function standAt(instance: Instance, placement: Placement)
+	setInstanceCFrame(instance, placement.Rotation + placement.Position)
 
 	-- measured at the instance's CURRENT scale, which is the whole point of doing it here
 	local centre, box = boundsOf(instance)
-	local lift = (markerTopY(marker) + box.Y / 2 + SCRAP_HOVER) - centre.Y
+	local lift = (placement.Position.Y + box.Y / 2 + SCRAP_HOVER) - centre.Y
 	if instance:IsA("Model") then
 		instance:PivotTo(instance:GetPivot() + Vector3.new(0, lift, 0))
 	elseif instance:IsA("BasePart") then
@@ -241,137 +580,104 @@ local function warnOnceForScrap(definition: GameTypes.ScrapDefinition, detail: s
 end
 
 --[[
-	Size the model to its declared footprint and stand it on the marker.
+	Pull a runaway model back to something the game can survive, or leave it completely alone.
 
-	Two separate bugs this replaces. Scale: authored models arrive at whatever the
-	exporter produced -- the metal can was 3.08 studs tall against a declared 1.7, the
-	loose bolt 2.4 against 0.8 -- so they are normalised by their longest axis against
-	`definition.Size`. Uniform, so proportions and orientation survive; a model standing
-	on the wrong axis is a Studio fix, not something to squash out here. Generic models
-	were authored to match `Size` already and are left alone.
-
-	Position: the old code lifted every model a flat 1.5 studs from the marker's centre,
-	which floats a bolt and buries a car door. Measuring the model's own box and putting
-	its underside on the marker's top surface is right for anything, at any scale.
+	Not a fit and not a design decision: the ONLY case this acts on is a model so large it breaks
+	collection, and it says so in the output rather than quietly making the art a different size.
+	See `RUNAWAY_SCRAP_STUDS` for why the case exists at all.
 ]]
---[[
-	How long a piece of scrap's longest axis should end up, in studs.
+local function clampIfRunaway(instance: Instance, definition: GameTypes.ScrapDefinition)
+	local _, box = boundsOf(instance)
+	local longest = math.max(box.X, box.Y, box.Z)
+	if longest <= RUNAWAY_SCRAP_STUDS then
+		return
+	end
 
-	`definition.Size` is documented as "the one place that decides how big a piece of scrap looks
-	in the world", and this makes that true -- for authored AND generic art. Generic models used to
-	be exempt, on the stated grounds that they were already authored to match. They are not: five
-	of them measured 11, 414, 745, 1130 and 1739 studs, which is what produced map-sized scrap.
-
-	The ceiling is last and absolute: nothing is ever bigger than the player. It also bites two
-	legitimate definitions whose declared `Size` exceeds it (`ScrapCar` at 8, `RustyPipe` at 5.5);
-	raise `MAXIMUM_SCRAP_STUDS` if that is the wrong trade.
-]]
-local function desiredLongestAxis(definition: GameTypes.ScrapDefinition): number
-	local declared = math.max(definition.Size[1], definition.Size[2], definition.Size[3])
-	return math.min(declared * (definition.ModelScale or 1), MAXIMUM_SCRAP_STUDS)
+	local correction = RUNAWAY_SCRAP_STUDS / longest
+	if instance:IsA("Model") then
+		instance:ScaleTo(instance:GetScale() * correction)
+	elseif instance:IsA("BasePart") then
+		-- the net has to cover a single-part scrap too, which `ScaleTo` cannot
+		instance.Size *= correction
+	end
+	warnOnceForScrap(
+		definition,
+		`measures {string.format("%.0f", longest)} studs across -- clamped to `
+			.. `{RUNAWAY_SCRAP_STUDS} so it does not break collection. Fix the model's size in Studio; `
+			.. `the spawner does not resize art.`
+	)
 end
 
-local function fitToMarker(
+--[[
+	Put a piece of scrap on its marker EXACTLY as it was authored: same size, same rotation.
+
+	THIS IS THE WHOLE CONTRACT. Whatever a model looks like in Studio is what appears in the yard, so
+	scale and rotate the template and the game follows. Nothing here scales art to fit a number.
+
+	What this replaces, and why it went: every model used to be normalised against a declared
+	`ScrapConfig.Size`, then turned by a `ModelRotation` to correct art exported on the wrong axis,
+	then spun by a random yaw. It worked, but it made the art untunable -- the only way to change how a
+	piece of scrap looked was to edit config numbers, restart, and go and look at it -- and it threw
+	away whatever an artist had done in Studio. Sizing a model in Studio, where you can see it, is
+	simply a better loop.
+
+	The one thing still computed is HEIGHT, because the placement decides where a piece stands and only
+	the model knows how tall it is. `standAt` measures the box and lands the underside on the surface at
+	whatever angle the model is saved at, plus the scatter turn from `rollPlacement`.
+]]
+local function placeScrap(
 	instance: Instance,
 	definition: GameTypes.ScrapDefinition,
-	marker: BasePart
+	placement: Placement
 )
-	--[[
-		Measured ONCE, up front, and the scale resolves to a single factor applied once.
-
-		Deliberate: chaining a second `ScaleTo` off a re-measured box makes the result depend on
-		when the first one settles. The grounding pass does re-measure, because it needs the
-		final box.
-	]]
-	local _, unscaledBox = boundsOf(instance)
-	local longest = math.max(unscaledBox.X, unscaledBox.Y, unscaledBox.Z)
-
-	local scale = definition.ModelScale or 1
+	local _, box = boundsOf(instance)
+	local longest = math.max(box.X, box.Y, box.Z)
 	if longest < MINIMUM_MEASURABLE_STUDS then
-		--[[
-			Refuse to divide by a box this small. `target / longest` with a near-zero `longest` is
-			an astronomic multiplier, and guessing here would create the very bug being fixed.
-		]]
 		warnOnceForScrap(
 			definition,
-			`measures only {string.format("%.4f", longest)} studs -- not resized, `
-				.. `check the model has parts and is not an empty container`
+			`measures only {string.format("%.4f", longest)} studs -- check the model has parts `
+				.. `and is not an empty container`
 		)
-	else
-		scale = desiredLongestAxis(definition) / longest
 	end
 
-	if math.abs(scale - 1) > 0.001 then
-		if instance:IsA("Model") then
-			instance:ScaleTo(scale)
-		elseif instance:IsA("BasePart") then
-			-- the net has to cover a single-part scrap too, which `ScaleTo` cannot
-			instance.Size *= scale
-		end
-	end
-
-	groundOnMarker(instance, marker)
+	clampIfRunaway(instance, definition)
+	standAt(instance, placement)
 end
 
 --[[
-	Keep a piece of scrap inside the cap even after its art finishes loading.
+	Re-stand a piece of scrap once its art has finished loading.
 
-	THIS IS THE ONE THAT ACTUALLY MATTERS. Roblox rewrites a `MeshPart`'s `Size` when its mesh
-	asset resolves, which can land several frames after the clone is placed -- so the spawn-time
-	fit measures a small placeholder box, finds nothing to clamp, and then the mesh snaps to its
-	native size. A generic BrakeDisc arrived 413 studs across exactly that way, with its model
-	scale left at the untouched `ModelScale` of 1.08, proving the clamp had seen a small box. It
-	then sat inside the collection radius being rejected on every query, which is what spammed the
-	magnet warning across the whole screen.
+	Roblox rewrites a `MeshPart`'s `Size` when its mesh asset resolves, which can land several frames
+	after the clone is placed. Nothing re-sizes art to a target any more, but a box that changes AFTER
+	placement leaves the piece floating above its spot or sunk into it, so it has to be re-grounded --
+	and a mesh that snaps to a native 966 studs still has to be caught.
 
-	So the cap is re-applied whenever a MeshPart under this scrap changes size, plus once on the
-	next frame for art that resolved during the clone. Event-driven, no polling.
+	It re-uses the SAME placement, which is why placements are rolled once and kept: re-rolling here
+	would make every piece of scrap hop to a new spot and spin as the yard finished loading.
+
+	Driven by the size change itself, plus once on the next frame for art that resolved during the
+	clone. Event-driven, no polling.
 ]]
-local function enforceScrapSize(
+local function restandAfterLoad(
 	instance: Instance,
 	definition: GameTypes.ScrapDefinition,
-	marker: BasePart
+	placement: Placement
 )
 	if instance.Parent == nil then
 		return
 	end
-	local _, box = boundsOf(instance)
-	local longest = math.max(box.X, box.Y, box.Z)
-	local desired = desiredLongestAxis(definition)
-	if longest < MINIMUM_MEASURABLE_STUDS or desired <= 0 then
-		return
-	end
-	-- a fraction of a stud is not worth a re-scale and a re-ground every time a mesh settles
-	if math.abs(longest - desired) <= 0.02 then
-		return
-	end
-
-	local correction = desired / longest
-	if instance:IsA("Model") then
-		instance:ScaleTo(instance:GetScale() * correction)
-	elseif instance:IsA("BasePart") then
-		instance.Size *= correction
-	end
-	-- scaling moved the box, so it has to be stood back on the marker
-	groundOnMarker(instance, marker)
-
-	if longest > MAXIMUM_SCRAP_STUDS then
-		warnOnceForScrap(
-			definition,
-			`resolved to {string.format("%.0f", longest)} studs, far past the `
-				.. `{MAXIMUM_SCRAP_STUDS}-stud ceiling -- the model itself wants fixing`
-		)
-	end
+	clampIfRunaway(instance, definition)
+	standAt(instance, placement)
 end
 
 local function guardSizeAfterLoad(
 	instance: Instance,
 	definition: GameTypes.ScrapDefinition,
-	marker: BasePart
+	placement: Placement
 )
 	local connections: { RBXScriptConnection } = {}
 	local function recheck()
-		enforceScrapSize(instance, definition, marker)
+		restandAfterLoad(instance, definition, placement)
 	end
 	for _, descendant in instance:GetDescendants() do
 		if descendant:IsA("MeshPart") then
@@ -384,6 +690,195 @@ local function guardSizeAfterLoad(
 		end
 	end)
 	task.defer(recheck)
+end
+
+--[[
+	HOW MUCH ROOM A MARKER HAS, cached on the marker itself.
+
+	Both the pile size and the scatter radius come from a marker's distance to its nearest neighbour,
+	which is a property of the LAYOUT rather than of any one spawn -- so it is measured once when the
+	plot activates and written to the marker as an attribute.
+
+	On the marker deliberately, not in a table keyed by marker: `PlotThemeService.Rebuild` destroys and
+	replaces `ScrapSpawnLocations` wholesale, and a table would quietly accumulate dead markers for the
+	life of the server. An attribute dies with the instance it is on.
+]]
+local NEIGHBOUR_ATTRIBUTE = "ScrapNeighbourStuds"
+
+local function measureMarkerSpacing(markers: Instance)
+	local parts = {}
+	for _, marker in markers:GetChildren() do
+		if marker:IsA("BasePart") then
+			table.insert(parts, marker)
+		end
+	end
+	for index, marker in parts do
+		local nearest = math.huge
+		for other, candidate in parts do
+			if other ~= index then
+				nearest = math.min(nearest, (marker.Position - candidate.Position).Magnitude)
+			end
+		end
+		--- A lone marker has no neighbour to crowd, so it gets the widest scatter allowed.
+		if nearest == math.huge then
+			nearest = PlotConfig.ScrapJitterMaximumStuds / PlotConfig.ScrapJitterFraction
+		end
+		marker:SetAttribute(NEIGHBOUR_ATTRIBUTE, nearest)
+	end
+end
+
+local function neighbourStudsOf(marker: BasePart): number
+	local measured = marker:GetAttribute(NEIGHBOUR_ATTRIBUTE)
+	if typeof(measured) == "number" and measured > 0 then
+		return measured
+	end
+	--- Never measured -- a respawn onto a marker from a rebuild that raced us. A middling guess is fine.
+	return 12
+end
+
+local function jitterRadiusOf(marker: BasePart): number
+	return math.min(
+		neighbourStudsOf(marker) * PlotConfig.ScrapJitterFraction,
+		PlotConfig.ScrapJitterMaximumStuds
+	)
+end
+
+--- How many pieces this marker's pile holds: the more room it has, the more scrap it gets.
+local function pileSizeOf(marker: BasePart): number
+	local pieces = math.round(neighbourStudsOf(marker) / PlotConfig.ScrapPerMarkerDivisor)
+	return math.clamp(pieces, PlotConfig.ScrapPerMarkerMinimum, PlotConfig.ScrapPerMarkerMaximum)
+end
+
+--- Every piece already standing on this plot, which is what a new one has to avoid.
+local function plotRecords(plot: Model): { ScrapRecord }
+	local records = {}
+	for _, record in activeByInstance do
+		if record.Plot == plot and record.Instance.Parent ~= nil then
+			table.insert(records, record)
+		end
+	end
+	return records
+end
+
+--[[
+	Put one piece of arena scrap at a world point. Returns the instance, or nil if it could not be made.
+
+	Deliberately NOT a variant of `spawnAt`: that function is about a plot -- it reads the plot's theme,
+	counts the plot's scrap against a per-plot cap, and hands the record a marker to respawn on. None of
+	that applies here, and threading four "unless it is the arena" branches through it would have made the
+	plot path harder to read to save duplicating the twenty lines below.
+
+	What it DOES share is everything that decides how scrap looks and sits: the same templates, the same
+	rarity roll, the same authored-art fallback, `placeScrap` for the size and the lean, and
+	`guardSizeAfterLoad` for the late mesh resolve. So arena scrap is the same art, standing the same way.
+]]
+function ScrapService.SpawnPublic(
+	scrapId: string,
+	position: Vector3,
+	luckMultiplier: number
+): Instance?
+	local folder = publicFolder
+	local definition = ScrapConfig.ById[scrapId]
+	if folder == nil or definition == nil then
+		return nil
+	end
+
+	local variantId = weightedVariant(luckMultiplier)
+	local authored = ScrapVariants.Get(scrapId, variantId)
+	local baseArt = authored or ScrapVariants.Get(scrapId, "Normal")
+	local template = baseArt or templates:FindFirstChild(definition.ModelName)
+	if template == nil then
+		return nil
+	end
+
+	local instance = template:Clone()
+	instance.Name = `Pit_{scrapId}`
+	instance:SetAttribute("ScrapId", scrapId)
+	instance:SetAttribute("VariantId", variantId)
+	--[[
+		The area is recorded as the one this scrap actually comes from, not as the arena. Collection
+		bypasses the area LOCK (see `TryCollect`), but the discovery it files should still say a scrap car
+		is Vehicle Graveyard scrap -- that is what the index reads.
+	]]
+	instance:SetAttribute("AreaId", definition.AreaIds[1])
+	instance:SetAttribute("OwnerUserId", 0)
+	instance:SetAttribute("ReservedUserId", 0)
+
+	local flattenColour = baseArt == nil
+	for _, descendant in instance:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = true
+			descendant.CanCollide = false
+			if flattenColour then
+				descendant.Color = ScrapConfig.Variants[variantId].Color
+			end
+		end
+	end
+	if instance:IsA("BasePart") then
+		instance.Anchored = true
+		instance.CanCollide = false
+		if flattenColour then
+			instance.Color = ScrapConfig.Variants[variantId].Color
+		end
+	end
+	if authored == nil then
+		addVariantEffects(instance, variantId)
+	end
+
+	--- Same scatter rules as a plot: authored rotation, a random yaw, a capped lean, stood on the floor.
+	local authoredCFrame = instanceCFrame(instance)
+	local _, ownBox = boundsOf(instance)
+	local placement = rollPlacementAt(
+		position,
+		authoredCFrame - authoredCFrame.Position,
+		math.max(ownBox.X, ownBox.Z) / 2
+	)
+	placeScrap(instance, definition, placement)
+	instance.Parent = folder
+	guardSizeAfterLoad(instance, definition, placement)
+
+	activeByInstance[instance] = {
+		Instance = instance,
+		Marker = nil,
+		Plot = nil,
+		OwnerUserId = 0,
+		ScrapId = scrapId,
+		AreaId = definition.AreaIds[1],
+		VariantId = variantId,
+		ReservedUserId = nil,
+		FootprintRadius = math.max(ownBox.X, ownBox.Z) / 2,
+		RejectedAt = {},
+	}
+	return instance
+end
+
+--- Where arena scrap is parented, and what the magnet query has to include to find it.
+function ScrapService.SetPublicFolder(folder: Folder?)
+	publicFolder = folder
+	refreshOverlapFilter()
+end
+
+--- Every public piece currently standing, so `ArenaService` can count and top up.
+function ScrapService.CountPublic(): number
+	local count = 0
+	for _, record in activeByInstance do
+		if record.OwnerUserId == 0 and record.Instance.Parent ~= nil then
+			count += 1
+		end
+	end
+	return count
+end
+
+--- Drop every public piece. Called when the arena closes.
+function ScrapService.ClearPublic()
+	for instance, record in activeByInstance do
+		if record.OwnerUserId == 0 then
+			activeByInstance[instance] = nil
+			if instance.Parent ~= nil then
+				instance:Destroy()
+			end
+		end
+	end
 end
 
 local function countPlotScrap(plot: Model): number
@@ -440,7 +935,20 @@ local function spawnAt(player: Player, plot: Model, marker: BasePart)
 		treatment below.
 	]]
 	local authored = ScrapVariants.Get(scrapId, variantId)
-	local template = authored or templates:FindFirstChild(ScrapConfig.ById[scrapId].ModelName)
+	--[[
+		FALL BACK TO THE NORMAL ART BEFORE FALLING BACK TO A BOX.
+
+		Only three scrap types have art for all five rarities; the other fifteen have a Normal model and
+		nothing else. Those used to drop straight to the generic template, which for most types is a plain
+		`Part` with a name label on it -- so a Rare appliance spawned as a blue cube reading "APPLIANCE"
+		next to fifteen hand-made ones. At roughly 4% of spawns that is two or three boxes visible in the
+		yard at any moment.
+
+		The hand-made Normal model wearing the rarity highlight and emitter is better in every way: it
+		still reads as rare at a glance, and it reads as an appliance.
+	]]
+	local baseArt = authored or ScrapVariants.Get(scrapId, "Normal")
+	local template = baseArt or templates:FindFirstChild(ScrapConfig.ById[scrapId].ModelName)
 	if template == nil then
 		warn(`[ScrapService] Missing template {scrapId}`)
 		return
@@ -455,15 +963,19 @@ local function spawnAt(player: Player, plot: Model, marker: BasePart)
 	instance:SetAttribute("OwnerUserId", player.UserId)
 	instance:SetAttribute("ReservedUserId", 0)
 	--[[
-		Anchoring and collision apply either way -- scrap is a static prop the magnet
-		queries, not something physics should own. The COLOUR does not: an authored model
-		is already the right colour, and overwriting it would throw the art away.
+		Anchoring and collision apply either way -- scrap is a static prop the magnet queries, not
+		something physics should own.
+
+		The COLOUR is only flattened on the generic box, which has no art to lose. Hand-made art keeps its
+		own colours whether or not it was made for this rarity, because a flat rarity wash over a detailed
+		model looks worse than the model does.
 	]]
+	local flattenColour = baseArt == nil
 	for _, descendant in instance:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = true
 			descendant.CanCollide = false
-			if authored == nil then
+			if flattenColour then
 				descendant.Color = ScrapConfig.Variants[variantId].Color
 			end
 		end
@@ -471,17 +983,47 @@ local function spawnAt(player: Player, plot: Model, marker: BasePart)
 	if instance:IsA("BasePart") then
 		instance.Anchored = true
 		instance.CanCollide = false
-		if authored == nil then
+		if flattenColour then
 			instance.Color = ScrapConfig.Variants[variantId].Color
 		end
 	end
+	--- The rarity glow goes on anything that is not purpose-made for this rarity, art included.
 	if authored == nil then
 		addVariantEffects(instance, variantId)
 	end
-	fitToMarker(instance, ScrapConfig.ById[scrapId], marker)
+	--[[
+		The placement is rolled ONCE, here, and read off the clone BEFORE it is moved -- at this point
+		its rotation is still the one the model was authored with, which is what the scatter turn has to
+		be composed on top of. Reading it after `placeScrap` would compound the previous roll.
+	]]
+	local authoredCFrame = instanceCFrame(instance)
+	--[[
+		KNOCKED OVER, sometimes. A `TumbleChance` attribute on the model says how often a piece spawns
+		on its side instead of the way it was posed -- 0.4 means roughly two cans in five are lying down.
+
+		An attribute on the MODEL rather than a field in `ScrapConfig`, so posing a piece of scrap stays
+		one job in one place: you pose it in Studio, and you say there how reliably it stays posed. A
+		yard of cans all standing perfectly upright is the tell that nothing ever knocked them over.
+	]]
+	local tumbleChance = template:GetAttribute("TumbleChance")
+	if typeof(tumbleChance) == "number" and math.random() < tumbleChance then
+		authoredCFrame = CFrame.Angles(math.rad(90), 0, 0)
+			* (authoredCFrame - authoredCFrame.Position)
+	end
+	local _, ownBox = boundsOf(instance)
+	--- Widest horizontal half-measure: what the piece takes up on the floor, whichever way it is turned.
+	local footprintRadius = math.max(ownBox.X, ownBox.Z) / 2
+	local placement = rollPlacement(
+		marker,
+		jitterRadiusOf(marker),
+		authoredCFrame - authoredCFrame.Position,
+		footprintRadius,
+		plotRecords(plot)
+	)
+	placeScrap(instance, ScrapConfig.ById[scrapId], placement)
 	instance.Parent = folder
 	-- parented first: the guard bails on an unparented instance, and mesh sizes resolve after this
-	guardSizeAfterLoad(instance, ScrapConfig.ById[scrapId], marker)
+	guardSizeAfterLoad(instance, ScrapConfig.ById[scrapId], placement)
 	if variantId == "Nebula" then
 		notifyRemote:FireAllClients(
 			`NEBULA SPAWN! {player.DisplayName} found a {ScrapConfig.ById[scrapId].DisplayName} on their plot!`
@@ -497,6 +1039,8 @@ local function spawnAt(player: Player, plot: Model, marker: BasePart)
 		AreaId = areaId,
 		VariantId = variantId,
 		ReservedUserId = nil,
+		FootprintRadius = footprintRadius,
+		RejectedAt = {},
 	}
 end
 
@@ -518,7 +1062,9 @@ local function reserve(
 	speed: number,
 	respawnMultiplier: number
 )
-	if record.ReservedUserId ~= nil or record.OwnerUserId ~= player.UserId then
+	--- `OwnerUserId == 0` is arena scrap: anyone may take it, first to reserve wins.
+	local public = record.OwnerUserId == 0
+	if record.ReservedUserId ~= nil or not (public or record.OwnerUserId == player.UserId) then
 		return
 	end
 	record.ReservedUserId = player.UserId
@@ -526,15 +1072,26 @@ local function reserve(
 	local duration = math.clamp(distance / math.max(speed, 1), 0.12, 0.75)
 	gameplayEffect:FireClient(player, "AttractScrap", record.Instance, duration)
 	task.delay(duration, function()
+		--[[
+			The plot-ownership re-check is skipped for arena scrap, which has no plot to own. Everything else
+			still holds: the record must still be live and still reserved by this player, so a piece somebody
+			else took in the meantime cannot be collected twice.
+		]]
+		local plot = record.Plot
 		if
 			activeByInstance[record.Instance] ~= record
 			or record.ReservedUserId ~= player.UserId
-			or not PlotService.IsOwner(player, record.Plot)
+			or (not public and (plot == nil or not PlotService.IsOwner(player, plot)))
 		then
 			return
 		end
-		local collected =
-			PlayerStateService.TryCollect(player, record.ScrapId, record.VariantId, record.AreaId)
+		local collected = PlayerStateService.TryCollect(
+			player,
+			record.ScrapId,
+			record.VariantId,
+			record.AreaId,
+			public
+		)
 		if not collected then
 			record.ReservedUserId = nil
 			record.Instance:SetAttribute("ReservedUserId", 0)
@@ -543,11 +1100,34 @@ local function reserve(
 		activeByInstance[record.Instance] = nil
 		gameplayEffect:FireClient(player, "Collected", record.ScrapId, record.VariantId)
 		record.Instance:Destroy()
-		local respawnSeconds =
-			math.max(0.45, ScrapConfig.ById[record.ScrapId].RespawnSeconds * respawnMultiplier)
+		--[[
+			Arena scrap does not respawn where it fell. `ArenaService` tops the arena back up to a target
+			count instead, so a crowd stripping one side does not leave that side permanently bare -- see
+			`ArenaConfig`.
+		]]
+		if public then
+			return
+		end
+		--[[
+			DESYNCHRONISED ON PURPOSE. A fixed delay means a pile cleared in one sweep comes back in one
+			sweep, all together, in the same formation -- which is the "it appears as a grid" complaint.
+			A spread of +/-30% staggers a pile back into existence piece by piece instead.
+		]]
+		local spread = 0.7 + math.random() * 0.6
+		local respawnSeconds = math.max(
+			0.45,
+			ScrapConfig.ById[record.ScrapId].RespawnSeconds * respawnMultiplier * spread
+		)
 		task.delay(respawnSeconds, function()
-			if record.Marker.Parent and PlotService.IsOwner(player, record.Plot) then
-				spawnAt(player, record.Plot, record.Marker)
+			local marker = record.Marker
+			local ownerPlot = record.Plot
+			if
+				marker ~= nil
+				and marker.Parent ~= nil
+				and ownerPlot ~= nil
+				and PlotService.IsOwner(player, ownerPlot)
+			then
+				spawnAt(player, ownerPlot, marker)
 			end
 		end)
 	end)
@@ -569,15 +1149,21 @@ local function queryPlayer(player: Player)
 		end
 		local scrapRoot = scrapRootFromPart(part)
 		local record = if scrapRoot then activeByInstance[scrapRoot] else nil
+		--[[
+			Two ways a piece can be yours to take: it is on your plot, or it belongs to nobody.
+
+			The arena case skips the plot comparison entirely -- arena records have no plot -- and skips the
+			area lock further down, which is what lets a new player pull a scrap car in there.
+		]]
+		local public = record ~= nil and record.OwnerUserId == 0
 		if
 			record
-			and record.Plot == plot
-			and record.OwnerUserId == player.UserId
 			and record.ReservedUserId == nil
+			and (public or (record.Plot == plot and record.OwnerUserId == player.UserId))
 		then
 			checked += 1
 			local eligible, reason =
-				PlayerStateService.CanCollect(player, record.ScrapId, record.AreaId)
+				PlayerStateService.CanCollect(player, record.ScrapId, record.AreaId, public)
 			if eligible then
 				reserve(
 					player,
@@ -587,6 +1173,24 @@ local function queryPlayer(player: Player)
 					stats.RespawnMultiplier
 				)
 			elseif reason == "StorageFull" or reason == "TooHeavy" then
+				--[[
+					POINT AT THE PIECE, not just at the player.
+
+					The toast below says why, and it is throttled to seconds because repeating it is
+					noise. What it could never say is WHICH piece -- so a player standing in a pile with
+					one too-heavy radiator in it was told "magnet too weak" with nothing to look at, and
+					the only way to find out which one was to walk away and come back.
+
+					Sent per piece per player on its own short throttle, and the client turns it into a
+					tint and a shake on that exact model. Two reasons, two colours -- see
+					`ScrapController`.
+				]]
+				local flashNow = os.clock()
+				local lastFlash = record.RejectedAt[player.UserId]
+				if lastFlash == nil or flashNow - lastFlash >= REJECTION_FLASH_SECONDS then
+					record.RejectedAt[player.UserId] = flashNow
+					gameplayEffect:FireClient(player, "RejectScrap", record.Instance, reason)
+				end
 				--[[
 					Throttled per reason AND per player.
 
@@ -673,9 +1277,17 @@ function ScrapService.ActivatePlot(player: Player, plot: Model)
 	active.Parent = runtime
 	foldersByPlot[plot] = active
 	refreshOverlapFilter()
+	--- Spacing first: both the pile size and the scatter radius are read from it.
+	measureMarkerSpacing(markers)
 	for _, marker in markers:GetChildren() do
 		if marker:IsA("BasePart") and marker:GetAttribute("Enabled") ~= false then
-			spawnAt(player, plot, marker)
+			--[[
+				A PILE, not a piece. One piece per marker put 8 objects on a Front Yard whose markers sit
+				21-27 studs apart, which is what made the yard read as an empty field -- see `pileSizeOf`.
+			]]
+			for _ = 1, pileSizeOf(marker) do
+				spawnAt(player, plot, marker)
+			end
 		end
 	end
 end

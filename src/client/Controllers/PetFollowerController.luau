@@ -92,8 +92,29 @@ local function rebuild(player: Player)
 	for index, petId in ids do
 		local definition = if typeof(petId) == "string" then PetConfig.Pets[petId] else nil
 		if definition then
+			--[[
+				KEYED BY PET ID, NOT BY `ModelName`.
+
+				`PetService.publishPetModels` finds each source model by its `ModelName` and then renames the
+				clone to the PET ID -- so the repository's children are ids. Looking up by `ModelName` here
+				therefore only found the pets whose two names happen to be identical, and every pet whose
+				model name has a space in it silently fell back to the placeholder ball:
+
+					QueenKitty          "Queen Kitty"
+					PastelAngel         "Pastel Angel"
+					AutumnDragon        "Autumn Dragon"
+					MythicAutumnDragon  "Mythic Autumn Dragon"
+
+				Which is why equipping those four gave you coloured balloons while their cards -- which ask
+				`ModelView` for the same models BY ID -- looked right.
+
+				`ModelName` is kept as a fallback so a repository populated by hand, under the source names,
+				still resolves.
+			]]
 			local source = if repository
-				then repository:FindFirstChild(definition.ModelName)
+				then repository:FindFirstChild(petId) or repository:FindFirstChild(
+					definition.ModelName
+				)
 				else nil
 			local model = if source and source:IsA("Model")
 				then source:Clone()

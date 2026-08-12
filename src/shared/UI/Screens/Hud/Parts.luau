@@ -282,14 +282,9 @@ function Parts.CurrencyStack(props)
 end
 
 --------------------------------------------------------------------------------
--- TeleportBar
+-- Shop slab
 --------------------------------------------------------------------------------
 
---[[
-	The three places `TeleportService.destinationFor` will actually send you. Ids
-	are passed to the server verbatim, so they must match that function -- adding
-	an entry here without adding a destination there is a button that does nothing.
-]]
 --[[
 	The wide SHOP slab. Everything you are likely to want to flip on it lives
 	here rather than buried in `MenuGrid` below:
@@ -357,95 +352,90 @@ Parts.BOOSTS = {
 	variant = "Fade",
 }
 
-Parts.TELEPORT_ITEMS = {
-	{ id = "Shop", text = "SHOP", glyph = "basket", variant = "Purchase" },
-	{ id = "MyPlot", text = "MY PLOT", glyph = "home", variant = "Primary" },
-	{ id = "Leaderboards", text = "LEADERBOARD", glyph = "trophy", variant = "Secondary" },
-}
-
---[[
-	One travel button. Deliberately a plain kit button rather than the authored
-	plate art: those plates carry their own baked-in label and outline, which
-	fights everything else on the HUD.
-]]
-local function TeleportButton(props)
-	return e(Buttons.Button, {
-		key = props.key,
-		text = props.text,
-		glyph = props.glyph,
-		variant = props.variant or "Secondary",
-		textSize = Theme.TextSize.Small,
-		size = UDim2.fromOffset(props.width, props.height),
-		lip = 4,
-		layoutOrder = props.layoutOrder,
-		onClick = props.onClick,
-	})
-end
-
-Parts.TeleportButton = TeleportButton
-
---[[
-	Top-centre travel row. It deliberately sits *in* the topbar strip rather than
-	below it: Roblox's own chrome only occupies the left of that strip, the middle
-	is free, and the event banner then hangs directly underneath.
-
-	props: onTeleport(destinationId), width, height, gap
-]]
-function Parts.TeleportBar(props)
-	local width = props.width or 150
-	local height = props.height or 44
-	local gap = props.gap or 8
-	local items = props.items or Parts.TELEPORT_ITEMS
-
-	local children = {
-		P.list({
-			direction = Enum.FillDirection.Horizontal,
-			padding = gap,
-			hAlign = Enum.HorizontalAlignment.Center,
-			vAlign = Enum.VerticalAlignment.Center,
-		}),
-	}
-
-	for index, item in ipairs(items) do
-		children[#children + 1] = e(TeleportButton, {
-			key = item.id,
-			text = item.text,
-			glyph = item.glyph,
-			variant = item.variant,
-			width = width,
-			height = height,
-			layoutOrder = index,
-			onClick = function()
-				if props.onTeleport then
-					props.onTeleport(item.id)
-				end
-			end,
-		})
-	end
-
-	return e(P.Group, {
-		key = props.key or "TeleportBar",
-		size = UDim2.fromOffset(#items * width + (#items - 1) * gap, height),
-		position = props.position,
-		anchorPoint = props.anchorPoint,
-		zIndex = props.zIndex,
-		children = children,
-	})
-end
-
 --------------------------------------------------------------------------------
 -- StorageMeter
 --------------------------------------------------------------------------------
 
 --[[
-	props: storage, capacity, value (estimated cash), onSell (adds an inline
-	sell button, used on mobile), compact
+	THREE SIZES OF THE SAME READOUT. `variant`:
+
+		Panel     the original: a studded window with a title line, an estimate and a fat bar
+		Compact   the same window, tighter -- what mobile used via the old `compact` flag
+		Slim      one bar and nothing else. No panel, no separate title line.
+
+	`Slim` exists because the HUD is drawn 25% larger than it is authored (`Theme.ScaleBoost`), and at
+	that size the panel version is a slab: 560x96 authored is 700x120 real pixels across the bottom of
+	the screen, for two numbers. Slim folds the title, the fraction and the estimate INTO the bar and
+	drops the chrome, so the same information takes a third of the room.
+
+	`compact = true` is still honoured and maps to `Compact`, because callers outside this file pass it.
+
+	props: storage, capacity, value (estimated cash), onSell (adds an inline sell button, used on
+	mobile), variant, compact
 ]]
+Parts.STORAGE_VARIANTS = table.freeze({ "Panel", "Compact", "Slim" })
+
 function Parts.StorageMeter(props)
 	local storage = props.storage or 0
 	local capacity = props.capacity or 1
 	local full = storage >= capacity
-	local compact = props.compact == true
+	local variant = props.variant or (if props.compact == true then "Compact" else "Panel")
+	local compact = variant == "Compact"
+
+	if variant == "Slim" then
+		--[[
+			ONE BAR, LABELLED INSIDE ITSELF.
+
+			The bar already draws its own value text, so the fraction comes free; the caption goes to its
+			left and the cash estimate to its right, both inside the same track. Nothing here is a panel,
+			which is the point -- a bar reads as a gauge, and a gauge does not need a box around it to be
+			understood.
+		]]
+		local height = props.height or 30
+		return e(P.Group, {
+			key = props.key or "Storage",
+			size = props.size or UDim2.fromOffset(360, height),
+			position = props.position,
+			anchorPoint = props.anchorPoint,
+			zIndex = props.zIndex,
+			children = {
+				e(Indicators.ProgressBar, {
+					key = "Bar",
+					value = storage,
+					max = capacity,
+					height = height,
+					gradient = if full then Theme.Gradient.Red else Theme.Gradient.Cyan,
+					fullText = "FULL",
+					size = UDim2.fromScale(1, 1),
+					zIndex = 2,
+				}),
+				--- Over the track, not beside it: the label is part of the gauge.
+				e(P.Label, {
+					key = "Caption",
+					text = if full then "FULL" else "SCRAP",
+					textSize = Theme.TextSize.Tiny,
+					font = Theme.Font.Bold,
+					color = if full then Theme.Color.White else Theme.Color.Gray,
+					align = Enum.TextXAlignment.Left,
+					size = UDim2.new(0.4, -12, 1, 0),
+					position = UDim2.fromOffset(12, 0),
+					zIndex = 4,
+				}),
+				e(P.Label, {
+					key = "Estimate",
+					text = Format.money(props.value or 0),
+					textSize = Theme.TextSize.Tiny,
+					font = Theme.Font.Bold,
+					color = Theme.Color.Gold,
+					align = Enum.TextXAlignment.Right,
+					size = UDim2.new(0.4, -12, 1, 0),
+					position = UDim2.new(1, -12, 0, 0),
+					anchorPoint = Vector2.new(1, 0),
+					zIndex = 4,
+				}),
+			},
+		})
+	end
 
 	local barHeight = if compact then 26 else 34
 	local hasSell = props.onSell ~= nil

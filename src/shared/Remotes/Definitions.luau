@@ -39,6 +39,18 @@ local definitions: { Definition } = {
 		per-player channel for anything routine.
 	]]
 	definition("Announce", "RemoteEvent"),
+	--[[
+		Server -> one client: a cross-server chat line, already filtered FOR THAT PLAYER.
+
+		One fire per recipient rather than a broadcast, and that is the whole point: the same words are
+		allowed between two adults and blocked for a child, so `GlobalChatService` filters the text once
+		per person and each client gets their own version. A `FireAllClients` here would mean one filtered
+		result standing in for everybody, which is exactly what the filter exists to prevent.
+
+		Also carries the server's own refusals -- a cooldown, a busy topic -- as a `System` string, so the
+		player finds out why their message did not appear.
+	]]
+	definition("GlobalChat", "RemoteEvent"),
 	--- Server -> one client: the egg podium was used, open the summon window.
 	definition("OpenEggSummon", "RemoteEvent"),
 

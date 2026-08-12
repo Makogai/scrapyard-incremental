@@ -55,32 +55,34 @@ local function InventoryScreen(props)
 	local grid = {}
 	local ownedCount, totalCount = 0, 0
 
+	--[[
+		OWNED ONLY, IN BOTH ITEM TABS.
+
+		This window used to list every magnet and every potion in the game, with the unowned ones wearing a
+		"BUY 25,000" or "GAME PASS" plate that opened a purchase -- so the inventory was a second shop, and
+		the answer to "what do I actually have" was buried among things the player does not. Buying lives in
+		the Shop and the magnet shop; this window answers ownership.
+
+		The footer bar still counts against the FULL set, because "3 of 8 magnets" is collection progress
+		rather than a sales pitch, and it is the one thing here worth knowing about what you do not own.
+	]]
 	if tab == "MAGNETS" then
 		for index, magnet in ipairs(GameData.magnets()) do
-			local owned = state.ownedMagnets[magnet.id] == true
 			totalCount += 1
-			if owned then
+			if state.ownedMagnets[magnet.id] == true then
 				ownedCount += 1
+				grid[#grid + 1] = e(Cards.MagnetCard, {
+					key = magnet.id,
+					name = magnet.name,
+					rarity = magnet.rarity,
+					image = magnet.image,
+					equipped = state.equippedMagnet == magnet.id,
+					layoutOrder = index,
+					onClick = function()
+						actions.openDetail("magnet", magnet.id)
+					end,
+				})
 			end
-
-			-- An unowned magnet with a shop price is buyable, not a dead end.
-			local lockText = if magnet.shopPrice
-				then ("BUY " .. Format.money(magnet.shopPrice))
-				else "GAME PASS"
-
-			grid[#grid + 1] = e(Cards.MagnetCard, {
-				key = magnet.id,
-				name = magnet.name,
-				rarity = magnet.rarity,
-				image = magnet.image,
-				equipped = state.equippedMagnet == magnet.id,
-				locked = not owned,
-				lockText = if owned then nil else lockText,
-				layoutOrder = index,
-				onClick = function()
-					actions.openDetail("magnet", magnet.id)
-				end,
-			})
 		end
 	--[[
 		`elseif`, not `else`. With a third tab in play an open `else` meant the potion list was also built
@@ -92,19 +94,18 @@ local function InventoryScreen(props)
 			totalCount += 1
 			if count > 0 then
 				ownedCount += 1
+				grid[#grid + 1] = e(Cards.PotionCard, {
+					key = potion.id,
+					name = potion.name,
+					rarity = potion.rarity,
+					image = potion.image,
+					owned = count,
+					layoutOrder = index,
+					onClick = function()
+						actions.openDetail("potion", potion.id)
+					end,
+				})
 			end
-
-			grid[#grid + 1] = e(Cards.PotionCard, {
-				key = potion.id,
-				name = potion.name,
-				rarity = potion.rarity,
-				image = potion.image,
-				owned = count,
-				layoutOrder = index,
-				onClick = function()
-					actions.openDetail("potion", potion.id)
-				end,
-			})
 		end
 	end
 
@@ -132,6 +133,24 @@ local function InventoryScreen(props)
 				onEquip = actions.equipTitle,
 			})
 		end
+	end
+
+	--[[
+		An empty grid has to say something. Filtering to owned items means a new player opens POTIONS to
+		nothing at all, and a blank panel reads as a bug rather than as "you have none yet".
+	]]
+	if #grid == 0 then
+		grid[1] = e(P.Label, {
+			key = "Empty",
+			text = if tab == "MAGNETS"
+				then "NO MAGNETS YET -- BUY ONE FROM THE MAGNET SHOP"
+				elseif tab == "POTIONS" then "NO POTIONS YET -- BUY THEM IN THE SHOP"
+				else "NO TITLES YET",
+			textSize = Theme.TextSize.Small,
+			font = Theme.Font.Bold,
+			color = Theme.Color.GrayDark,
+			size = UDim2.new(1, 0, 0, 120),
+		})
 	end
 
 	local titlesTab = tab == "TITLES"

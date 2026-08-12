@@ -40,10 +40,12 @@ function FoundationValidator.validate()
 		positive(scrap.SpawnWeight, `{scrapId}.SpawnWeight`)
 		positive(scrap.RespawnSeconds, `{scrapId}.RespawnSeconds`)
 		assert(#scrap.AreaIds > 0, `{scrapId} must belong to an area`)
-		assert(#scrap.Size == 3, `{scrapId}.Size must have three dimensions`)
-		for _, dimension in scrap.Size do
-			positive(dimension, `{scrapId}.Size dimension`)
-		end
+		--[[
+			There is no size or rotation to validate here: both come from the model in Studio now. What
+			is still worth asserting is that a model is named at all, because a blank name spawns
+			nothing and the failure shows up as an empty yard rather than as an error.
+		]]
+		assert(#scrap.ModelName > 0, `{scrapId}.ModelName must not be empty`)
 		for _, areaId in scrap.AreaIds do
 			assert(AreaConfig.ById[areaId] ~= nil, `{scrapId} references unknown area {areaId}`)
 		end

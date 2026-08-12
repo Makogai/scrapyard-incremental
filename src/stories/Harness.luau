@@ -49,6 +49,12 @@ local function Connected(props)
 		touch = props.touch,
 		-- Opens a tabbed screen straight onto one category.
 		tab = props.tab,
+		--[[
+			Forces the admin panel's tier. A story has no real user, so `state.isOwner` is always false and
+			the owner half of that panel would be unreviewable outside a live session -- which is the half
+			most worth looking at, because it is the one with the destructive buttons in it.
+		]]
+		isOwner = props.isOwner,
 	})
 end
 

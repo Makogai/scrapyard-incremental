@@ -350,87 +350,141 @@ Two consequences worth knowing:
   story has no server, so the cells degrade to their glyph there. Review the 3D framing
   in Play.
 
-### How big a scrap model is, and where it sits
+### How big a scrap model is, and which way it faces
 
-Both of these are decided by `ScrapService` at spawn, from data — you should not have to
-resize a model in Studio to make it fit.
+**Studio decides. Both of them, completely.** `ScrapService` clones the template and stands it on
+its marker at exactly the size and rotation it was saved at. So the loop is: select the model in
+`Workspace.Scraps` (above — one folder per scrap type, one model per rarity), scale it, rotate it,
+and that is what spawns. Nothing in code or config normalises it.
 
-**Size comes from `ScrapConfig`'s `Size` field.** It was declared for every scrap and
-never read; now it is the footprint an authored model is normalised to. The model is
-scaled uniformly so its longest axis matches the longest axis of that box, so it keeps its
-own proportions. Measured before and after on the current art:
+Verified live: all five scrap types on a running plot came out identical to their templates in both
+size and rotation, and every underside landed at exactly the same height.
 
-| scrap | authored longest | declared | after |
-| --- | --- | --- | --- |
-| MetalCan | 3.08 | 1.70 | 1.70 |
-| LooseBolt | 2.42 | 0.80 | 0.80 |
+This replaced a data-driven scheme, and the swap is worth understanding so nobody rebuilds it.
+`ScrapConfig` used to carry a `Size` footprint that every model was uniformly scaled to, a
+`ModelScale` multiplier on top, and a `ModelRotation` correction for art exported on the wrong axis.
+It worked, and it was still the wrong shape: the only way to change how a piece of scrap looked was
+to edit a number, restart, and go and look at it — and because the spawner flattened every model
+onto its marker's orientation, rotating a model in Studio did nothing at all. **All three fields are
+deleted, not deprecated.** If you go looking for a size field, there isn't one, and that is the
+point: two things claiming to control the same size is how art ends up wrong with no obvious culprit.
 
-So a model exported at any scale lands at the right size. If a piece should read a little
-bigger or smaller than its footprint, set `ModelScale` on its `ScrapConfig` entry — that
-multiplies on top, and defaults to 1.
+**Anchor every part of a template.** This is not a style note, it is the difference between the model
+you made and the model that spawns. An unanchored template part falls the instant Play starts —
+`ScrapVariants.Load` anchors them, but only once it runs, and by then a multi-part model has already
+collapsed. `NormalBrokenAppliance` is 65 loose MeshParts with no welds: it measured 3.79 × 6.22 × 2.95
+in Studio and 1.97 × 3.22 × 1.53 in game, as a heap on the floor. That was the "broken appliance is too
+small" report. Worse, the falling pieces shoved the *neighbouring* `NormalEnginePart` apart even though
+that model was itself fully anchored, so it spawned at 56% of its authored size. 108 parts across
+`Workspace.Scraps` and `ServerStorage.ScrapModels` were unanchored and now are not.
 
-**Every model is normalised now, generic included.** Generic models used to be exempt, on the
-stated grounds that they already matched `Size`. They do not — see the table below. `Size` is now
-authoritative for all scrap art, so `ScrapConfig` is the single place that decides how big a piece
-of scrap looks.
+### Scatter, piles and poses
 
-### Nothing is ever bigger than the player
+**A marker is a pile anchor, not a spawn point.** Each one holds several pieces, scattered inside a
+disc, each turned to face anywhere and leaning a few degrees. All of it is derived from the marker's
+distance to its nearest neighbour, so density follows the room you left when you placed them — see
+`PlotConfig.ScrapPerMarkerDivisor` and `ScrapJitterFraction`. The Front Yard's markers sit 21–27 studs
+apart and get 5 pieces each; the Workshop's tightest pair is 5.7 studs apart and gets the floor of 2.
 
-`MAXIMUM_SCRAP_STUDS = 5` in `ScrapService` is a hard ceiling on the longest axis, applied after
-the declared size and after `ModelScale`. A default R15 character is about 7 studs tall, so 5 keeps
-scrap comfortably under it. It is one number on purpose — raise it if a deliberately oversized
-piece is ever wanted.
+Placement refuses to put two pieces inside each other: a candidate spot is scored against every piece
+already on the plot using both footprints, and a crowded pile reaches progressively further out until it
+finds room. It also raycasts for the real floor under the jittered point, so a piece can rest on a
+pallet or a welding table rather than hovering at the marker's height — and if it has wandered somewhere
+structurally different (a container roof, a pit) it goes back to the marker instead.
 
-It also caps two definitions whose declared `Size` exceeds it: `ScrapCar` at 8 and `RustyPipe`
-at 5.5.
+The lean is capped by a distance, not an angle: `MAXIMUM_TILT_LIFT_STUDS` (0.28) limits how far a
+piece's far edge may come off the floor, so a small can gets the full 7° and a 12-stud scrap car gets
+almost none. Measured live, the worst height a lean added to any piece was +0.29 studs.
 
-### The ceiling has to be re-applied after the art loads
+**`TumbleChance` is an attribute on the model.** Set it in Studio, per model, and that fraction of
+spawns arrive knocked onto their side instead of the way you posed them — 0.45 on cans, 0.35 on bolts
+and exhaust pipes, 0.4 on buckets, 0.3 on toolboxes, 0.25 on fuel tanks. Nothing lists these in code:
+posing a piece of scrap and saying how reliably it stays posed are the same job, done in the same place.
+A yard of cans all perfectly upright is the tell that nothing ever knocked one over.
 
-**Roblox rewrites a `MeshPart`'s `Size` when its mesh asset resolves**, which can land several
-frames after the clone is placed. So a spawn-time measurement sees a small placeholder box, finds
-nothing to correct, and then the mesh snaps to its native size. A generic BrakeDisc arrived 413
-studs across exactly that way — its model scale was still the untouched `ModelScale` of 1.08,
-which is how we know the clamp had measured something small.
+**Rarity variants fall back to the Normal art, not to a box.** Only three scrap types have art for all
+five rarities. The other fifteen used to drop to the generic template for a Rare or Epic roll, which for
+most types is a plain `Part` with a name label — a blue cube reading "APPLIANCE" in a yard of hand-made
+models, at roughly 4% of spawns. Now they clone the Normal model and wear the rarity highlight and
+emitter over it.
 
-That piece then sat inside the collection radius being rejected on every magnet query, which is
-what spammed the magnet warning across the entire screen.
+**What the art measures today**, longest axis in studs, measured live off the `Normal` models. A
+default R15 character is about 5 studs tall, so the six at the top are the ones that read as
+oversized in the yard — they are the resize list:
 
-So `ScrapService` connects to `GetPropertyChangedSignal("Size")` on every `MeshPart` under a piece
-of scrap and re-applies the size whenever one changes, plus once on the next frame. Event-driven,
-no polling, and the connections are dropped on `Destroying`.
-
-**Six generic models are badly wrong and want fixing in Studio.** They work — they are resized to
-their declared footprint on spawn — but the source art is nonsense, and every spawn pays for a
-re-scale and a re-ground:
-
-| scrap | generic model resolves to | declared |
+| model | authored size | longest |
 | --- | --- | --- |
-| ToolBox | **1739 studs** | 2.8 |
-| BrokenAppliance | 1130 | 3.4 |
-| CarDoor | 1125 | 4.5 |
-| CopperWire | 966 | 2.1 |
-| Radiator | 745 | 3.4 |
-| BrakeDisc | 414 | 2.5 |
-| Tire | 11 | 3.0 |
+| NormalScrapCar | 12.14 × 2.75 × 4.85 | **12.14** |
+| NormalFuelTank | 10.03 × 3.43 × 3.80 | **10.03** |
+| NormalAxle | 3.49 × 2.62 × 9.38 | **9.38** |
+| NormalMotorCoil | 2.00 × 5.30 × 2.00 | **5.30** |
+| NormalRustyPipe | 1.00 × 5.21 × 1.92 | **5.21** |
+| NormalRadiator | 0.94 × 3.22 × 5.01 | **5.01** |
+| NormalCopperWire | 2.94 × 0.63 × 4.30 | 4.30 |
+| NormalMetalSheet | 4.05 × 0.23 × 3.25 | 4.05 |
+| NormalCarDoor | 1.93 × 3.49 × 3.24 | 3.49 |
+| NormalToolBox | 1.32 × 1.19 × 3.30 | 3.30 |
+| NormalBrokenAppliance | 1.97 × 3.22 × 1.53 | 3.22 |
+| NormalMetalCan | 1.39 × 3.08 × 1.40 | 3.08 |
+| NormalTire | 3.00 × 1.03 × 3.01 | 3.01 |
+| NormalExhaustPipe | 1.44 × 0.77 × 2.99 | 2.99 |
+| NormalCrushedBucket | 2.69 × 2.14 × 2.44 | 2.69 |
+| NormalLooseBolt | 2.12 × 2.42 × 1.84 | 2.42 |
+| NormalBrakeDisc | 2.31 × 0.45 × 2.31 | 2.31 |
+| NormalEnginePart | 1.96 × 1.30 × 1.27 | 1.96 |
 
-`ScrapService` warns once per scrap id at startup with the measured figure, so this table is
-regenerated for free every session — check the output window after a Play test.
+Nothing in the list is *wrong* any more — it is just art, and the numbers are what you are now free
+to change directly. The rarity variants of a scrap are separate models, so resizing `NormalMetalCan`
+does not resize `EpicMetalCan`; scale the whole type folder's contents together.
 
-**Position is measured, not guessed.** The model's bounding box is measured after scaling
-and its underside placed on the spawn marker's top surface, plus `SCRAP_HOVER` (0.06
-studs, enough to stop a flat model z-fighting the plot floor). The old code added a flat
-1.5 studs to the marker's centre, which floated a bolt and buried a car door. Verified at
-exactly +0.0600 on every live piece.
+**Height is the one thing still computed**, because the marker decides where a piece stands and only
+the model knows how tall it is. The model's box is measured and its underside placed on the marker's
+top surface, plus `SCRAP_HOVER` (0.06 studs, enough to stop a flat model z-fighting the plot floor).
+The old code added a flat 1.5 studs to the marker's centre, which floated a bolt and buried a car
+door. Verified at exactly +0.0600 on every live piece.
 
-This is measured rather than computed for the same reason the richest-player statue is:
-`PivotTo` positions the *pivot*, and on an imported model the pivot is wherever the
-exporter left it, not the centre of the geometry.
+That measurement is a **world** box built from every part's eight rotated corners, not
+`Model:GetBoundingBox()` or `GetExtentsSize()`. Both of those align to the model's `PrimaryPart` when
+it has one — a *local* box — so the moment a model is saved at an angle they report the wrong height:
+the metal plate floated 1.11 studs and the crushed bucket sank 0.16 before this was fixed. This
+matters much more now that models keep their authored rotation.
 
-**One thing the code will not do is rotate your models.** Several of the current ones are
-modelled edge-on — the metal sheet is 0.23 studs thick in X and 4.05 tall in Y, the car
-door likewise — so they stand up like a wall rather than lying flat. Scaling is safe to
-automate; deciding which way is down for arbitrary art is not, so that one is a Studio
-fix.
+Position is measured rather than computed for the same reason the richest-player statue is:
+`PivotTo` positions the *pivot*, and on an imported model the pivot is wherever the exporter left it,
+not the centre of the geometry.
+
+### The one number that can still override your art
+
+`RUNAWAY_SCRAP_STUDS = 24` in `ScrapService`. It is a sanity net, not a knob: a piece measuring more
+than 24 studs on any axis is scaled down and warned about by name.
+
+It exists because **Roblox rewrites a `MeshPart`'s `Size` when its mesh asset resolves**, which can
+land several frames after the clone is placed — so what a model measures at spawn is not always what
+it measures a moment later. When that goes wrong the numbers are absurd rather than merely wrong, and
+a piece that size parks itself inside every collection radius and gets rejected on every magnet
+query, which is what once spammed the magnet warning across the whole screen.
+
+24 is far above anything deliberate — a car door at 4 studs, a whole scrap car at 12, are untouched —
+so in practice it only ever fires on broken art. **Seven generic models fire it today and want fixing
+in Studio:**
+
+| scrap | generic model resolves to |
+| --- | --- |
+| ToolBox | **1739 studs** |
+| BrokenAppliance | 1130 |
+| CarDoor | 1125 |
+| CopperWire | 966 |
+| Radiator | 745 |
+| BrakeDisc | 414 |
+| Tire | 11 |
+
+`ScrapService` warns once per scrap id with the measured figure, so this table regenerates itself
+every session — check the output window after a Play test. (Tire at 11 studs is under the net, so it
+spawns at 11 studs. That is the new contract working as designed: fix it in Studio.)
+
+`ScrapService` also connects to `GetPropertyChangedSignal("Size")` on every `MeshPart` under a piece
+of scrap and re-grounds it whenever one changes, plus once on the next frame, so late-resolving art
+does not end up hovering. Event-driven, no polling, and the connections are dropped on `Destroying`.
 
 ## Plot owner signs
 

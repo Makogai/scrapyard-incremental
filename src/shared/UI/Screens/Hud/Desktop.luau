@@ -25,8 +25,10 @@
 		                          it only places `Parts`.
 		Hud/Parts.luau            what is in each cluster. `MENU_ITEMS` is the
 		                          left-hand grid (add/remove/reorder a tile, or
-		                          flag one `isNew`), `TELEPORT_ITEMS` the travel
-		                          row, `SHOP` the wide slab's flag and wiggle.
+		                          flag one `isNew`), `SHOP` the wide slab's flag
+		                          and wiggle. The centre travel buttons are NOT
+		                          here -- they are TopbarPlus icons, in
+		                          `client/Controllers/TopbarController`.
 		Hud/Mobile.luau           the portrait layout. Not routed to: the game is
 		                          landscape-locked, so phones use this file scaled.
 		../../Theme.luau          every colour, gradient, font, text size, corner
@@ -87,11 +89,16 @@ local function HudDesktop(props)
 	]]
 	local bottomLift = if touch then Theme.Safe.BottomBand else 0
 
-	-- The travel row sits *inside* the topbar strip. Roblox's chrome only takes
-	-- the left of that strip, so the middle is ours and the bar can hug the top
-	-- edge. The event banner then hangs directly beneath it.
-	local travelTop = 6
-	local travelHeight = 44
+	--[[
+		Where the event banner hangs, just under the topbar strip.
+
+		These two numbers used to position the travel row that lived here; the row is now three
+		TopbarPlus icons (see `TopbarController`), so all that is left is the height to clear. Kept as
+		named numbers rather than folded into one, because what the banner is dodging is the strip
+		TopbarPlus draws in, and that is worth saying.
+	]]
+	local topbarStripTop = 6
+	local topbarStripHeight = 44
 
 	--[[
 		The UPGRADE tile's rectangle, for the tutorial spotlight.
@@ -160,13 +167,6 @@ local function HudDesktop(props)
 					end,
 				})
 				else nil,
-			e(Parts.TeleportBar, {
-				key = "Travel",
-				height = travelHeight,
-				position = UDim2.new(0.5, 0, 0, travelTop),
-				anchorPoint = Vector2.new(0.5, 0),
-				onTeleport = actions.teleport,
-			}),
 			e(Parts.CurrencyStack, {
 				key = "Currencies",
 				cash = state.cash,
@@ -198,12 +198,24 @@ local function HudDesktop(props)
 					actions.openScreen("spin")
 				end,
 			}),
+			--[[
+				The slim gauge, sitting LOWER than the panel version did.
+
+				Two changes for one complaint. The panel version is 560x96 authored, which at the HUD's 1.25
+				scale is 700x120 real pixels of studded window across the bottom of the screen -- for two
+				numbers. It also sat a full `MARGIN` up from the edge, so it read as a slab floating in the
+				play area rather than as chrome. `Slim` folds its labels into the bar, and half the margin
+				puts it where a status readout belongs.
+
+				`bottomLift` is still respected: on touch, Roblox draws its own controls over that corner.
+			]]
 			e(Parts.StorageMeter, {
 				key = "Storage",
+				variant = "Slim",
 				storage = state.storage,
 				capacity = state.capacity,
 				value = math.floor(state.storage * 19.15),
-				position = UDim2.new(0.5, 0, 1, -(MARGIN + bottomLift)),
+				position = UDim2.new(0.5, 0, 1, -(math.floor(MARGIN / 2) + bottomLift)),
 				anchorPoint = Vector2.new(0.5, 1),
 			}),
 			--[[
@@ -221,8 +233,37 @@ local function HudDesktop(props)
 					accent = state.event.accent,
 					seconds = state.event.seconds,
 					live = state.event.live,
-					position = UDim2.new(0.5, 0, 0, travelTop + travelHeight + 8),
+					position = UDim2.new(0.5, 0, 0, topbarStripTop + topbarStripHeight + 8),
 					anchorPoint = Vector2.new(0.5, 0),
+				})
+				else nil,
+			--[[
+				THE WAY INTO THE PIT, and the only one.
+
+				Directly under the event banner that announced it, because that banner is where the player
+				just read the words "a shared arena outside" -- and an arena you are told about but cannot
+				find is worse than no arena.
+
+				It exists ONLY while an arena event is live: `state.event` is nil when nothing is on, and
+				`arena` is false for the events that are just multipliers. The server refuses the teleport
+				when the Pit is shut anyway (see `TeleportService`), so this is the honest half of a check
+				that is enforced on both sides.
+			]]
+			if state.event and state.event.arena
+				then e(Buttons.Button, {
+					key = "EnterPit",
+					text = "ENTER THE PIT",
+					glyph = "crate",
+					variant = "Danger",
+					textSize = Theme.TextSize.Small,
+					size = UDim2.fromOffset(210, 46),
+					lip = 5,
+					wiggle = { every = 5, angle = 3 },
+					position = UDim2.new(0.5, 0, 0, topbarStripTop + topbarStripHeight + 78),
+					anchorPoint = Vector2.new(0.5, 0),
+					onClick = function()
+						actions.teleport("Pit")
+					end,
 				})
 				else nil,
 			e(Parts.BoostTimers, {

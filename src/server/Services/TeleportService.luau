@@ -4,6 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
+local ArenaConfig = require(game:GetService("ReplicatedStorage").Shared.Config.ArenaConfig)
+local ArenaService = require(script.Parent.ArenaService)
 local PlotService = require(script.Parent.PlotService)
 local RemoteService = require(script.Parent.RemoteService)
 
@@ -26,6 +28,16 @@ local function destinationFor(player: Player, destinationId: string): BasePart?
 		local plot = PlotService.GetPlot(player)
 		local zone = if plot then plot:FindFirstChild("CrusherSellZone") else nil
 		return if zone and zone:IsA("BasePart") then zone else nil
+	end
+	--[[
+		THE PIT, and only while it is open.
+
+		Checked here rather than trusted from the client: the destination id arrives over a remote, and
+		"send me to the arena" is worth lying about the moment the arena stops existing -- the floor is
+		destroyed when the event ends, so a stale request would drop somebody into empty space.
+	]]
+	if destinationId == ArenaConfig.DestinationId then
+		return ArenaService.SpawnPart()
 	end
 	if destinationId ~= "Leaderboards" and destinationId ~= "Shop" then
 		return nil

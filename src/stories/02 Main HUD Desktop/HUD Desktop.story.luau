@@ -1,5 +1,16 @@
 --[[
 	Full gameplay HUD at 1920x1080: menu grid, currencies, storage meter, boosts and contextual actions.
+
+	THE TOP OF THE SCREEN IS EMPTY HERE, AND THAT IS CORRECT. Six things live in that strip in game --
+	UPDATES on the left, SHOP / MY PLOT / LEADERBOARD in the centre, INDEX and SETTINGS on the right --
+	and all six are TopbarPlus icons registered by `client/Controllers/TopbarController`. A story has no
+	client controllers, so none of them render. The travel three used to be a React row visible here;
+	they moved so they would stop competing for a strip TopbarPlus already arranges, and so that phones
+	get them too. Review that strip in Play, not here.
+
+	This story is still the place of truth for everything else: the left menu grid, the currency stack,
+	the storage meter, the boost tiles, the status cluster, and where the event banner hangs under the
+	strip.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -3,21 +3,19 @@
 local GameTypes = require(script.Parent.Parent.Types.GameTypes)
 
 --[[
-	`Size` is the footprint a piece of scrap should occupy in studs, and it is no longer
-	decoration: `ScrapService` scales an authored model so its longest axis matches the
-	longest axis of this box. That keeps a hand-modelled can the same size as the rest of
-	the yard whatever it was exported at -- the authored can arrived 3.08 studs tall
-	against a declared 1.7, which is why it looked oversized.
+	NOTHING HERE DECIDES HOW BIG A PIECE OF SCRAP IS, OR WHICH WAY IT FACES. That is the model's own
+	business: `ScrapService` clones the template and stands it on its marker at the size and rotation it
+	was saved at in Studio, so scaling or rotating a model there is all it takes.
 
-	Uniform scaling, so a model keeps its own proportions and orientation. If a model is
-	standing on the wrong axis that is a Studio fix, not something to squash out here.
+	There used to be `Size`, `ModelScale` and `ModelRotation` fields doing that job, and they are gone
+	rather than deprecated. Two numbers that both claim to control the same thing is how art ends up
+	the wrong size with no obvious culprit, and tuning by editing a number and restarting is a much
+	worse loop than dragging a handle and looking at it.
 
-	`ModelScale` is the per-scrap art multiplier on top, for when the normalisation is
-	right but the thing still wants to read a little bigger or smaller.
+	What is left is gameplay: value, weight, how often it spawns, how strong a magnet it needs.
 ]]
 local function scrap(definition: GameTypes.ScrapDefinition): GameTypes.ScrapDefinition
 	table.freeze(definition.AreaIds)
-	table.freeze(definition.Size)
 	return table.freeze(definition)
 end
 
@@ -30,8 +28,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 1,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 30,
-		RespawnSeconds = 3,
-		Size = { 1.2, 1.7, 1.2 },
+		RespawnSeconds = 2.5,
 		ModelName = "MetalCan",
 	}),
 	LooseBolt = scrap({
@@ -42,8 +39,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 1,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 26,
-		RespawnSeconds = 2.5,
-		Size = { 0.8, 0.8, 0.8 },
+		RespawnSeconds = 2,
 		ModelName = "LooseBolt",
 	}),
 	SmallMetalPlate = scrap({
@@ -54,8 +50,12 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 3,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 20,
-		RespawnSeconds = 4,
-		Size = { 2.4, 0.35, 1.8 },
+		RespawnSeconds = 3,
+		--[[
+			The art is a sheet standing on its EDGE: measured 0.23 x 4.05 x 3.25, so its thin axis is X
+			while this declaration says a plate lying down (thin on Y). Ninety degrees about Z brings X
+			up to vertical and the sheet lies flat, which is what a dropped plate does.
+		]]
 		ModelName = "SmallMetalPlate",
 	}),
 	RustyPipe = scrap({
@@ -66,8 +66,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 2,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 22,
-		RespawnSeconds = 3.5,
-		Size = { 2.8, 0.7, 0.7 },
+		RespawnSeconds = 3,
 		ModelName = "RustyPipe",
 	}),
 	CrushedBucket = scrap({
@@ -78,8 +77,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 4,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 16,
-		RespawnSeconds = 4.5,
-		Size = { 2, 1.5, 2 },
+		RespawnSeconds = 3.5,
 		ModelName = "CrushedBucket",
 	}),
 	CopperWire = scrap({
@@ -90,8 +88,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 5,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 12,
-		RespawnSeconds = 5,
-		Size = { 2.1, 0.8, 2.1 },
+		RespawnSeconds = 4,
 		ModelName = "CopperWire",
 	}),
 	Tire = scrap({
@@ -102,8 +99,12 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 6,
 		AreaIds = { "FrontYard", "WorkshopYard" },
 		SpawnWeight = 10,
-		RespawnSeconds = 6,
-		Size = { 2.5, 2.5, 1.1 },
+		RespawnSeconds = 5,
+		--[[
+			Measured 1.03 x 3.00 x 3.01: thin on X, so the tyre is balanced on its rim like a wheel about
+			to roll. Ninety degrees about Y lays it down with the hole facing up, matching this
+			declaration's thin Z.
+		]]
 		ModelName = "Tire",
 	}),
 	BrokenAppliance = scrap({
@@ -114,8 +115,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 10,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 26,
-		RespawnSeconds = 8,
-		Size = { 3.4, 3, 2.8 },
+		RespawnSeconds = 5,
 		ModelName = "BrokenAppliance",
 	}),
 	ToolBox = scrap({
@@ -126,8 +126,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 9,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 24,
-		RespawnSeconds = 7,
-		Size = { 2.8, 1.4, 1.5 },
+		RespawnSeconds = 4.5,
 		ModelName = "ToolBox",
 	}),
 	BrakeDisc = scrap({
@@ -138,8 +137,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 12,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 20,
-		RespawnSeconds = 8.5,
-		Size = { 2.5, 0.55, 2.5 },
+		RespawnSeconds = 5.5,
 		ModelName = "BrakeDisc",
 	}),
 	Radiator = scrap({
@@ -150,8 +148,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 15,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 16,
-		RespawnSeconds = 10,
-		Size = { 3.4, 2.6, 0.8 },
+		RespawnSeconds = 6.5,
 		ModelName = "Radiator",
 	}),
 	MotorCoil = scrap({
@@ -162,8 +159,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 16,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 13,
-		RespawnSeconds = 10.5,
-		Size = { 2.4, 2.1, 2.4 },
+		RespawnSeconds = 7,
 		ModelName = "MotorCoil",
 	}),
 	EnginePart = scrap({
@@ -174,8 +170,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 16,
 		AreaIds = { "WorkshopYard", "VehicleGraveyard" },
 		SpawnWeight = 18,
-		RespawnSeconds = 11,
-		Size = { 3.2, 2.4, 2.8 },
+		RespawnSeconds = 7,
 		ModelName = "EnginePart",
 	}),
 	CarDoor = scrap({
@@ -186,8 +181,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 24,
 		AreaIds = { "WorkshopYard", "VehicleGraveyard" },
 		SpawnWeight = 9,
-		RespawnSeconds = 14,
-		Size = { 4.5, 0.5, 3.4 },
+		RespawnSeconds = 8,
 		ModelName = "CarDoor",
 	}),
 	ExhaustPipe = scrap({
@@ -198,8 +192,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 21,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 22,
-		RespawnSeconds = 13,
-		Size = { 4.8, 1.3, 2.2 },
+		RespawnSeconds = 7.5,
 		ModelName = "ExhaustPipe",
 	}),
 	Axle = scrap({
@@ -210,8 +203,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 29,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 16,
-		RespawnSeconds = 16,
-		Size = { 5.5, 1.2, 1.2 },
+		RespawnSeconds = 9,
 		ModelName = "Axle",
 	}),
 	FuelTank = scrap({
@@ -222,8 +214,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 35,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 11,
-		RespawnSeconds = 19,
-		Size = { 4.2, 2.3, 2.8 },
+		RespawnSeconds = 10,
 		ModelName = "FuelTank",
 	}),
 	ScrapCar = scrap({
@@ -234,8 +225,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RequiredMagnetStrength = 45,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 5,
-		RespawnSeconds = 24,
-		Size = { 8, 3.5, 5 },
+		RespawnSeconds = 12,
 		ModelName = "ScrapCar",
 	}),
 }

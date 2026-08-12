@@ -107,6 +107,29 @@ local function announce(definition: EventConfig.EventDefinition?)
 	})
 end
 
+--[[
+	Push the current event out NOW, instead of waiting up to `POLL_SECONDS` for the loop to notice.
+
+	For an event an admin started by hand. The multipliers go live the instant the override is set --
+	`derivedStats` reads the same function -- so the only thing lagging is what anyone can SEE, and an
+	admin who presses start and watches nothing happen for five seconds reasonably concludes it is broken.
+
+	It announces too, deliberately: a hand-started event is an occasion, and the announcement is most of
+	the reason for starting one. `lastEventId` is updated so the poll does not announce the same event
+	again seconds later.
+]]
+function EventService.Republish()
+	local definition = EventConfig.activeAt(os.time())
+	local id = if definition then definition.Id else nil
+	local changed = id ~= lastEventId
+	lastEventId = id
+	publish()
+	PlayerStateService.PushAll()
+	if changed then
+		announce(definition)
+	end
+end
+
 function EventService.Start()
 	if started then
 		return

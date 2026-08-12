@@ -49,6 +49,14 @@ export type EventDefinition = {
 	StartDay: number,
 	StartHour: number,
 	DurationHours: number,
+	--[[
+		Opens THE PIT for as long as the window lasts. See `ArenaConfig`.
+
+		The only event flag that does something other than multiply a number. `ArenaService` watches for
+		it; nothing else in the event system cares, so a second arena event would work by setting this
+		and nothing else.
+	]]
+	Arena: boolean?,
 }
 
 local SECONDS_PER_HOUR = 3600
@@ -103,9 +111,48 @@ local events: { EventDefinition } = {
 		StartHour = 18,
 		DurationHours = 2,
 	}),
+	--[[
+		THE PIT. The one event that changes WHERE you play rather than what the numbers are.
+
+		Its multipliers are small on purpose: the draw is a shared hoard with late-game scrap in it and
+		other players racing you for it, and stacking a big multiplier on top would make the Pit the only
+		correct place to be for two hours rather than somewhere you choose to go. Scrap value is left
+		alone entirely -- the arena already pays better simply because it holds scrap cars.
+
+		FRIDAY EVENING, and the slot is not a free choice. Windows may not overlap -- `tests/` asserts it,
+		because two live multipliers stack into numbers the economy was never balanced for -- and Scrap
+		Rush already owns all of Saturday and Sunday. Friday 18:00 is the busiest hour left, which matters
+		more for this event than for any other: a shared arena with nobody else in it is just a worse plot.
+	]]
+	table.freeze({
+		Id = "ScrapPit",
+		Title = "THE PIT",
+		Detail = "A shared arena outside -- race everyone for it",
+		Glyph = "crate",
+		Accent = "Red",
+		Effects = table.freeze({ CollectionSpeed = 1.25 }),
+		--- Friday 18:00-22:00 UTC, in the gap before Scrap Rush opens at Saturday midnight.
+		StartDay = 6,
+		StartHour = 18,
+		DurationHours = 4,
+		Arena = true,
+	}),
 }
 
 EventConfig.Events = table.freeze(events)
+
+--[[
+	The same events keyed by id.
+
+	Added because three separate places were walking `Events` with a `for` loop to answer "which event is
+	this id" -- the store, the world billboard, and now the override below. A linear scan over three
+	entries costs nothing; three copies of the same scan is how one of them ends up subtly different.
+]]
+local eventsById: { [string]: EventDefinition } = {}
+for _, definition in events do
+	eventsById[definition.Id] = definition
+end
+EventConfig.ById = table.freeze(eventsById)
 
 --- Seconds from the start of the UTC week (Sunday 00:00) that this event's window opens.
 local function windowStart(definition: EventDefinition): number
@@ -122,13 +169,69 @@ local function weekOffset(now: number): number
 end
 
 --[[
+	AN EVENT AN ADMIN STARTED BY HAND, which outranks the schedule while it lasts.
+
+	SERVER-SIDE RUNTIME STATE living in a config module, which wants justifying. Everything that asks
+	"what event is live" already goes through `activeAt` -- `derivedStats` for the multipliers, the player
+	snapshot for the HUD banner, `EventService` for the world billboard and the announcement. Putting the
+	override anywhere else would mean editing all of those call sites, or having two answers to one
+	question -- and two answers is exactly how a banner ends up claiming 3x while the payouts disagree.
+
+	Only the server ever sets it. The client computes nothing about events: it is handed the live one in
+	its snapshot and looks the title and colour up by id, so there is nothing to replicate.
+
+	It expires by time rather than by being cleared, so a server that stops running its poll still falls
+	back to the schedule on its own.
+]]
+local override: { Id: string, EndsAt: number }? = nil
+
+--[[
+	Start an event by hand, or stop one. `seconds <= 0` clears it.
+
+	Returns false for an unknown id, so nobody can start an event with no definition behind it -- which
+	would show a banner promising effects that do not exist.
+]]
+function EventConfig.setOverride(eventId: string?, seconds: number): boolean
+	if eventId == nil or seconds <= 0 then
+		override = nil
+		return true
+	end
+	if EventConfig.ById[eventId] == nil then
+		return false
+	end
+	override = { Id = eventId, EndsAt = os.time() + seconds }
+	return true
+end
+
+--- The hand-started event and its remaining seconds, or nil. An expired override clears itself here.
+function EventConfig.overrideAt(now: number): (EventDefinition?, number)
+	local current = override
+	if current == nil then
+		return nil, 0
+	end
+	if now >= current.EndsAt then
+		override = nil
+		return nil, 0
+	end
+	return EventConfig.ById[current.Id], current.EndsAt - now
+end
+
+--[[
 	The live event, and how long is left of it.
 
 	Returns `(definition, secondsRemaining)` or `nil`. Windows are half-open -- `[start, start+duration)`
 	-- so an event that ends exactly as another begins hands over cleanly with no frame where both are
 	live and no frame where neither is.
+
+	A hand-started event is checked FIRST and wins outright. An admin who starts one during a scheduled
+	window expects to see the one they started, not to be told the schedule had other ideas.
 ]]
 function EventConfig.activeAt(now: number): (EventDefinition?, number)
+	local forced, forcedRemaining = EventConfig.overrideAt(now)
+	if forced ~= nil then
+		return forced, forcedRemaining
+	end
+
 	local offset = weekOffset(now)
 	for _, definition in events do
 		local start = windowStart(definition)

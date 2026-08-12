@@ -769,7 +769,33 @@ function GameData.scrapOrder(): { string }
 	return order
 end
 
-function GameData.scrapIndex(discovered: { [string]: any }): { any }
+--[[
+	WHERE EACH SCRAP COMES FROM: the first area in progression order that spawns it.
+
+	The index lists all eighteen scrap types from the moment a player joins, so eleven of them are
+	things the Front Yard will never produce -- which reads as "the index shows scrap that is not in
+	the game". They ARE in the game; they are behind an area. First-area-wins because a few types
+	appear in two (a tyre turns up in the Front Yard and the Workshop), and the earliest one is the
+	answer to "where do I get this".
+]]
+function GameData.scrapSourceArea(): { [string]: string }
+	local source = {}
+	for _, areaId in ipairs(AreaConfig.Order) do
+		for _, scrapId in ipairs(AreaConfig.ById[areaId].ScrapIds) do
+			if source[scrapId] == nil then
+				source[scrapId] = areaId
+			end
+		end
+	end
+	return source
+end
+
+function GameData.scrapIndex(
+	discovered: { [string]: any },
+	unlockedAreas: { [string]: boolean }?
+): { any }
+	local sourceArea = GameData.scrapSourceArea()
+	local unlocked = unlockedAreas or {}
 	local list = {}
 	for _, scrapId in ipairs(GameData.scrapOrder()) do
 		local definition = ScrapConfig.ById[scrapId]
@@ -788,9 +814,15 @@ function GameData.scrapIndex(discovered: { [string]: any }): { any }
 			local bestVariant = if found and record.HighestVariant
 				then record.HighestVariant
 				else "Normal"
+			local areaId = sourceArea[scrapId]
+			local area = if areaId then AreaConfig.ById[areaId] else nil
 			table.insert(list, {
 				id = scrapId,
 				name = definition.DisplayName,
+				--- Where it comes from, and whether the player can get there yet.
+				areaId = areaId,
+				areaName = if area then area.DisplayName else nil,
+				available = areaId == nil or unlocked[areaId] == true,
 				rarity = if found and record.HighestVariant
 					then (GameData.variantRarity[record.HighestVariant] or "Normal")
 					else "Normal",

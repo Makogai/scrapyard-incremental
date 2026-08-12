@@ -374,14 +374,24 @@ expectEqual(EventConfig.multiplierAt("Luck", sundayNoon), 1, "weekend does not t
 expectEqual(EventConfig.multiplierAt("ScrapValue", fridayNoon), 1, "no event means no multiplier")
 expectEqual(EventConfig.multiplierAt("Luck", wednesdayEvening), 2, "lucky hour doubles luck")
 
---- What is next, which is what the banner shows when nothing is live.
+--[[
+	What is next, which is what the banner shows when nothing is live.
+
+	Friday noon used to look twelve hours ahead to Scrap Rush at Saturday midnight. THE PIT now opens at
+	Friday 18:00, so the nearest window is six hours out -- which is the assertion doing its job: it
+	catches a new event landing between "now" and whatever the banner used to promise.
+]]
 local nextDefinition, nextWait = EventConfig.nextAt(fridayNoon)
 expectEqual(
 	if nextDefinition then nextDefinition.Id else "",
-	"ScrapRush",
-	"friday looks ahead to the weekend"
+	"ScrapPit",
+	"friday noon looks ahead to the evening's arena"
 )
-expectEqual(nextWait, 12 * 3600, "twelve hours from friday noon to saturday")
+expectEqual(nextWait, 6 * 3600, "six hours from friday noon to the pit")
+
+--- The arena flag, since `ArenaService` keys the whole feature off it.
+expectEqual(EventConfig.ById.ScrapPit.Arena, true, "the pit is flagged as an arena event")
+expectEqual(EventConfig.ById.ScrapRush.Arena, nil, "an ordinary event is not")
 
 --[[
 	NO TWO WINDOWS MAY OVERLAP, swept at hourly resolution across a whole week.

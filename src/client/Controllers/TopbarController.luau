@@ -9,17 +9,31 @@
 	fresh sync, so every call here is guarded: no topbar is a missing convenience,
 	not a broken client.
 
-		far left   UPDATES  -> changelog window
-		right      INDEX    -> collection window
-		right      SETTINGS -> settings window
+		far left   UPDATES     -> changelog window
+		centre     SHOP        -> teleport to the shop
+		centre     MY PLOT     -> teleport home
+		centre     LEADERBOARD -> teleport to the board
+		right      INDEX       -> collection window
+		right      SETTINGS    -> settings window
 
-	These three are deliberately *not* in the left-hand menu grid. A window
+	The window icons are deliberately *not* in the left-hand menu grid. A window
 	reachable from two places gets two different selected states, and TopbarPlus
 	owns its own, so the grid would fight it.
 
-	Selection is driven from the `screen` atom rather than from the click, so the
-	icon also lets go when the window is closed by its X, by the backdrop, or by
-	another icon.
+	TWO KINDS OF ICON, and they behave differently on purpose:
+
+	  windows    toggle, and their lit state is driven from the `screen` atom rather than from the
+	             click -- so the icon also lets go when the window is closed by its X or by another
+	             icon
+	  teleports  fire and let go. There is nothing for them to stay lit about: the player is somewhere
+	             else a moment later, and an icon still glowing for a trip that finished reads as a
+	             stuck button.
+
+	The three teleports were a React row (`Parts.TeleportBar`) floating in the middle of the topbar
+	strip, deliberately positioned to sit in the gap Roblox's own chrome leaves. That worked, but it
+	meant hand-placed pixels competing for a strip TopbarPlus already owns and arranges -- and it only
+	existed on the desktop HUD, so a phone player had no travel buttons at all. TopbarPlus centres and
+	spaces them itself, on every device.
 ]]
 
 local Players = game:GetService("Players")
@@ -66,7 +80,32 @@ local ICONS = {
 	},
 }
 
+--[[
+	The centre travel icons.
+
+	`destination` is the id `TeleportService` accepts -- "MyPlot", not "Home", which it silently
+	rejects. Same glyph names the React buttons used, so the topbar wears the art the rest of the UI
+	already associates with these three places.
+
+	LEADERBOARD has no image and that is not an oversight: `trophy` has no asset behind it, so
+	`imageFor` returns nil and TopbarPlus renders it as a label, exactly like UPDATES does. The
+	purpose-made `Assets.Icons.teleportBoard` art is a wide gradient button PLATE rather than an icon,
+	so it cannot stand in.
+]]
+local TELEPORTS = {
+	{ name = "TeleportShop", label = "SHOP", destination = "Shop", glyph = "basket", order = 1 },
+	{ name = "TeleportPlot", label = "MY PLOT", destination = "MyPlot", glyph = "home", order = 2 },
+	{
+		name = "TeleportBoard",
+		label = "LEADERBOARD",
+		destination = "Leaderboards",
+		glyph = "trophy",
+		order = 3,
+	},
+}
+
 local icons: { [string]: any } = {}
+local teleportIcons: { any } = {}
 local connection: RBXScriptConnection? = nil
 local unsubscribe: (() -> ())? = nil
 
@@ -130,6 +169,34 @@ function TopbarController.Start()
 		icons[entry.screen] = built
 	end
 
+	for _, entry in ipairs(TELEPORTS) do
+		local built = Icon.new():setName(entry.name):align("Center")
+		built:setLabel(entry.label)
+
+		local image = imageFor(entry)
+		if image then
+			built:setImage(image)
+		end
+		built:setCaption(`Travel to {string.lower(entry.label)}`)
+		built:setOrder(entry.order)
+
+		--[[
+			Fire and let go. `deselect` is deferred rather than called inline: it runs while TopbarPlus is
+			still inside its own selection handler, and re-entering the state machine from within it is
+			how you get an icon that ends up lit anyway.
+		]]
+		built:bindEvent("selected", function()
+			UI.Bridge.requestTeleport(entry.destination)
+			task.defer(function()
+				pcall(function()
+					built:deselect()
+				end)
+			end)
+		end)
+
+		table.insert(teleportIcons, built)
+	end
+
 	--[[
 		Mirror the atom back onto the icons. Without this, closing a window with
 		its X would leave the icon lit, and opening one from the menu grid would
@@ -171,6 +238,12 @@ function TopbarController.Stop()
 			icon:destroy()
 		end)
 		icons[screenId] = nil
+	end
+	for index, icon in ipairs(teleportIcons) do
+		pcall(function()
+			icon:destroy()
+		end)
+		teleportIcons[index] = nil
 	end
 end
 

@@ -715,14 +715,19 @@ function Cards.CollectionCell(props)
 				position = UDim2.fromOffset(5, 100),
 				zIndex = 4,
 			}),
+			--[[
+				`hint` says WHERE an undiscovered thing comes from -- the scrap index passes the area name.
+				"UNDISCOVERED" is the fallback for grids with nowhere to point at.
+			]]
 			e(P.Label, {
 				key = "Hint",
-				text = "UNDISCOVERED",
+				text = props.hint or "UNDISCOVERED",
 				textSize = Theme.TextSize.Tiny,
 				font = Theme.Font.Bold,
-				color = Theme.Color.GrayDark,
+				color = if props.dimmed then Theme.Color.Gray else Theme.Color.GrayDark,
 				size = UDim2.new(1, -10, 0, 18),
 				position = UDim2.fromOffset(5, 130),
+				truncate = Enum.TextTruncate.AtEnd,
 				zIndex = 4,
 			}),
 		}

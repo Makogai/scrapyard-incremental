@@ -14,6 +14,15 @@
 	`AdminConfig.IsAdmin`, re-validates the command, clamps the amount and refuses `ResetTestProfile`
 	outside Studio. Hiding the entry point from non-admins is a courtesy, not a lock.
 
+	THAT APPLIES TO THE OWNER TIER TOO. Entries and targets flagged `Owner` are filtered out for an admin
+	here, and `AdminService` refuses them regardless of what this file drew -- see `AdminConfig` for where
+	the line sits and why. Filtering is so an admin is not shown buttons that will only tell them no.
+
+	TWO KINDS OF SECTION. Most are a button per entry: pick a target, tap a thing, it happens. A section
+	flagged `Mode = "MultiSelect"` is a tick list with one action button instead, for decisions that are
+	only made together -- "double cash and triple luck for half an hour" is one announcement, not four
+	commands.
+
 	The one thing the UI does enforce is a CONFIRM on anything flagged `Danger`, because a mis-tap that
 	wipes a save is not recoverable from in-game.
 ]]
@@ -77,13 +86,64 @@ local function EntryRow(props)
 	})
 end
 
+--[[
+	One line of a multi-select list: a tick box and a label, as one wide button.
+
+	Deliberately the same `Buttons.Button` the single-shot rows use, in a different variant. A bespoke
+	checkbox row would drift from the rest of the panel's metrics, and the tick is carried by the glyph
+	and the variant rather than by a separate control.
+]]
+local function SelectRow(props)
+	return e(Buttons.Button, {
+		key = props.entry.Id,
+		text = props.entry.Label,
+		glyph = if props.selected then "check" else props.entry.Glyph,
+		variant = if props.selected then "Primary" else "Neutral",
+		textSize = Theme.TextSize.Small,
+		size = UDim2.new(1, 0, 0, ENTRY_HEIGHT),
+		layoutOrder = props.layoutOrder,
+		onClick = function()
+			props.onToggle(props.entry.Id)
+		end,
+	})
+end
+
 local function AdminScreen(props)
 	local state = props.state
 	local actions = props.actions
 
+	--[[
+		The catalogue, filtered to this player's tier.
+
+		Rebuilt when `isOwner` changes rather than once, because the panel is shared code and a story or a
+		dev-panel preview can render it as either tier.
+	]]
+	--- `props.isOwner` is the story override; live, the tier comes from the store.
+	local isOwner = if props.isOwner ~= nil then props.isOwner == true else state.isOwner == true
 	local sections = React.useMemo(function()
-		return AdminCatalogue.build()
-	end, {})
+		local built = AdminCatalogue.build()
+		if isOwner then
+			return built
+		end
+		local allowed = {}
+		for _, section in ipairs(built) do
+			if section.Owner ~= true then
+				local entries = {}
+				for _, entry in ipairs(section.Entries) do
+					if entry.Owner ~= true then
+						table.insert(entries, entry)
+					end
+				end
+				--- A section whose every entry was owner-only has nothing left to show.
+				if #entries > 0 then
+					local copy = table.clone(section)
+					copy.Entries = entries
+					table.insert(allowed, copy)
+				end
+			end
+		end
+		return allowed
+	end, { isOwner })
 
 	local target, setTarget = React.useState("Self")
 	local pickedUserId, setPickedUserId = React.useState(nil :: number?)
@@ -91,6 +151,8 @@ local function AdminScreen(props)
 	local activeSection, setActiveSection = React.useState(sections[1] and sections[1].Id or "")
 	--- Which dangerous entry is one tap from firing, cleared on any other interaction.
 	local armed, setArmed = React.useState(nil :: string?)
+	--- Ticked entries in the active multi-select section, keyed by entry id.
+	local selected, setSelected = React.useState({} :: { [string]: boolean })
 
 	local players = state.players or {}
 	local amount = tonumber(amountText) or 0
@@ -113,6 +175,10 @@ local function AdminScreen(props)
 	--- Target buttons, straight from the catalogue so a new mode needs no edit here.
 	local targetButtons = {}
 	for index, mode in ipairs(AdminCatalogue.Targets) do
+		--- Every-server is owner-only; an admin never sees the button rather than being refused by it.
+		if mode.Owner == true and not isOwner then
+			continue
+		end
 		targetButtons[#targetButtons + 1] = e(Buttons.Button, {
 			key = mode.Id,
 			text = mode.Label,
@@ -176,6 +242,8 @@ local function AdminScreen(props)
 			textSize = Theme.TextSize.Tiny,
 			onClick = function()
 				setArmed(nil)
+				--- A tick list belongs to its section; carrying ticks across tabs would fire the wrong thing.
+				setSelected({})
 				setActiveSection(section.Id)
 			end,
 		})
@@ -183,17 +251,77 @@ local function AdminScreen(props)
 
 	local entryRows = {}
 	for _, section in ipairs(sections) do
-		if section.Id == activeSection then
+		if section.Id ~= activeSection then
+			continue
+		end
+		if section.Mode == "MultiSelect" then
+			local count = 0
+			for _, on in pairs(selected) do
+				if on then
+					count += 1
+				end
+			end
 			for index, entry in ipairs(section.Entries) do
-				entryRows[#entryRows + 1] = e(EntryRow, {
+				entryRows[#entryRows + 1] = e(SelectRow, {
 					key = entry.Id,
 					entry = entry,
-					amount = Format.comma(amount),
-					armed = armed == entry.Id,
+					selected = selected[entry.Id] == true,
 					layoutOrder = index,
-					onFire = fire,
+					onToggle = function(id)
+						local next = table.clone(selected)
+						next[id] = not next[id]
+						setSelected(next)
+					end,
 				})
 			end
+			--[[
+				ONE COMMAND FOR THE WHOLE SELECTION, with the ids comma-joined.
+
+				Not one call per tick: separate calls would stagger the start times by a round trip each
+				and spend a rate-limit slot apiece. The server splits the list -- see `ActivateBoost` in
+				`AdminMutate`.
+			]]
+			entryRows[#entryRows + 1] = e(Buttons.Button, {
+				key = "MultiAction",
+				text = if count == 0
+					then "PICK SOMETHING FIRST"
+					else `{section.ActionLabel} ({count})`,
+				glyph = "check",
+				variant = if count == 0 then "Neutral" else "Purchase",
+				textSize = Theme.TextSize.Small,
+				size = UDim2.new(1, 0, 0, ENTRY_HEIGHT + 8),
+				layoutOrder = #section.Entries + 1,
+				onClick = function()
+					if count == 0 then
+						return
+					end
+					local ids = {}
+					for _, entry in ipairs(section.Entries) do
+						if selected[entry.Id] then
+							table.insert(ids, entry.ItemId or entry.Id)
+						end
+					end
+					actions.adminCommand(
+						section.Command,
+						amount,
+						target,
+						pickedUserId,
+						table.concat(ids, ",")
+					)
+					setSelected({})
+				end,
+			})
+			continue
+		end
+		for index, entry in ipairs(section.Entries) do
+			entryRows[#entryRows + 1] = e(EntryRow, {
+				key = entry.Id,
+				entry = entry,
+				amount = Format.comma(amount),
+				armed = armed == entry.Id,
+				layoutOrder = index,
+				onFire = fire,
+			})
 		end
 	end
 
@@ -210,9 +338,10 @@ local function AdminScreen(props)
 
 	return e(Overlays.Modal, {
 		key = props.key or "AdminScreen",
-		title = "Admin",
+		--- The tier is in the title, because which buttons exist depends on it.
+		title = if isOwner then "Admin - Owner" else "Admin",
 		glyph = "sliders",
-		headerColor = Theme.Gradient.Red,
+		headerColor = if isOwner then Theme.Gradient.Purple else Theme.Gradient.Red,
 		width = LEFT_WIDTH + RIGHT_WIDTH + GAP + 56,
 		contentHeight = 470,
 		onClose = actions.closeScreen,

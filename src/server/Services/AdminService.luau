@@ -6,8 +6,11 @@ local RunService = game:GetService("RunService")
 local MessagingService = game:GetService("MessagingService")
 
 local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
+local AdminCatalogue = require(ReplicatedStorage.Shared.Config.AdminCatalogue)
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
+local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
+local EventService = require(script.Parent.EventService)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local PlotService = require(script.Parent.PlotService)
 local RemoteService = require(script.Parent.RemoteService)
@@ -80,17 +83,66 @@ local function boundedAmount(command: string, value: any): number?
 		and command ~= "SetDailyStreak"
 		and command ~= "AddRebirths"
 		and command ~= "GrantSecretTicket"
+		and command ~= "ActivateBoost"
+		and command ~= "StartEvent"
 	then
 		return nil
 	end
 	if typeof(value) ~= "number" or value ~= value then
 		return nil
 	end
+	--[[
+		`ActivateBoost` and `StartEvent` take MINUTES, and their ceilings are far lower than a grant's.
+		Everything else here hands something to one player; these two change the rules for everybody, so
+		the clamp is the difference between a half-hour boost and a day of it.
+	]]
 	local maximum = if command == "AddMoney"
 		then AdminConfig.MaximumGrantMoney
 		elseif command == "AddGears" then AdminConfig.MaximumGrantGears
+		elseif command == "ActivateBoost" then AdminConfig.MaximumServerBoostMinutes
+		elseif command == "StartEvent" then AdminConfig.MaximumEventMinutes
 		else 9999
 	return math.floor(math.clamp(value, 0, maximum))
+end
+
+--[[
+	Commands that change the SERVER rather than a player, and so never touch `AdminMutate`.
+
+	`AdminMutate` edits one player's saved data; an event is not in anybody's save. Keeping these apart
+	means the target mode still decides REACH -- this server or every server -- without pretending an
+	event is something each player owns a copy of.
+]]
+local SERVER_COMMANDS = {
+	StartEvent = true,
+	StopEvent = true,
+}
+
+--[[
+	Apply a server-level command here. Returns a line for the admin, or nil if it did nothing.
+
+	The event override lives in `EventConfig` because that is what every reader of "what event is live"
+	already calls -- see the comment there. `EventService.Republish` then pushes the change out so the HUD
+	banner, the world billboard and the announcement all move at once instead of waiting for the poll.
+]]
+local function applyServerCommand(command: string, minutes: number?, itemId: string?): string?
+	if command == "StopEvent" then
+		EventConfig.setOverride(nil, 0)
+		EventService.Republish()
+		return "event stopped -- back on the schedule"
+	end
+	if command == "StartEvent" then
+		if itemId == nil then
+			return nil
+		end
+		local length = math.clamp(math.floor(minutes or 0), 1, AdminConfig.MaximumEventMinutes)
+		if not EventConfig.setOverride(itemId, length * 60) then
+			return nil
+		end
+		EventService.Republish()
+		local definition = EventConfig.ById[itemId]
+		return `{if definition then definition.Title else itemId} started for {length} min`
+	end
+	return nil
 end
 
 function AdminService.Start()
@@ -128,6 +180,27 @@ function AdminService.Start()
 				if payload.Command == "ResetTestProfile" or payload.Command == "GrantTestItems" then
 					return
 				end
+				--[[
+					OWNER-ONLY COMMANDS ARE RE-CHECKED HERE TOO. The sending server checked, but a
+					subscription payload is data rather than proof: the only thing saying an owner sent it
+					is a user id inside the message. Trusting that would make the tier a client-side
+					suggestion with extra steps.
+				]]
+				if
+					AdminCatalogue.isOwnerOnlyCommand(payload.Command)
+					and not AdminConfig.IsOwner(payload.FromUserId)
+				then
+					return
+				end
+				--- Server-level commands act once per server, not once per player.
+				if SERVER_COMMANDS[payload.Command] then
+					applyServerCommand(
+						payload.Command,
+						boundedAmount(payload.Command, payload.Amount),
+						if typeof(payload.ItemId) == "string" then payload.ItemId else nil
+					)
+					return
+				end
 				local amount = boundedAmount(payload.Command, payload.Amount)
 				local itemId = if typeof(payload.ItemId) == "string" then payload.ItemId else nil
 				applyToTargets(Players:GetPlayers(), payload.Command, amount, itemId)
@@ -149,6 +222,28 @@ function AdminService.Start()
 				or not limiter:Allow(tostring(admin.UserId))
 			then
 				return
+			end
+
+			--[[
+				THE TIER CHECK, and the only one that counts.
+
+				`AdminScreen` hides owner-only entries from an admin, which is a courtesy -- the remote is
+				reachable regardless of what the panel drew. Two separate things are gated: the COMMAND
+				(granting a paid entitlement, wiping a save) and the REACH (`AllServers`), because
+				"everyone in this server" and "everyone in the game" are different amounts of damage.
+			]]
+			local isOwner = AdminConfig.IsOwner(admin.UserId)
+			if not isOwner then
+				local refusal = if AdminCatalogue.isOwnerOnlyCommand(command)
+					then `ADMIN: {command} is owner-only`
+					elseif
+						AdminCatalogue.isOwnerOnlyTarget(targetMode)
+					then "ADMIN: every-server commands are owner-only"
+					else nil
+				if refusal ~= nil then
+					RemoteService.GetEvent("Notify"):FireClient(admin, refusal)
+					return
+				end
 			end
 			local safeAmount = boundedAmount(command, amount)
 			if
@@ -183,6 +278,21 @@ function AdminService.Start()
 			]]
 			if targetMode == "AllServers" then
 				broadcast(admin, command, safeAmount, itemId)
+			end
+
+			--[[
+				Server-level commands stop here: there is nothing per-player to apply. The target mode still
+				decided reach a moment ago, so "every server" already went out over the topic.
+			]]
+			if SERVER_COMMANDS[command] then
+				local outcome = applyServerCommand(command, safeAmount, itemId)
+				RemoteService.GetEvent("Notify"):FireClient(
+					admin,
+					if outcome ~= nil
+						then `ADMIN: {outcome}`
+						else `ADMIN: {command} did nothing -- check the id`
+				)
+				return
 			end
 
 			local targets = if targetMode == "All" or targetMode == "AllServers"

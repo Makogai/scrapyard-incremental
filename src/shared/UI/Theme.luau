@@ -30,6 +30,20 @@ local Theme = {}
 Theme.Reference = Vector2.new(1920, 1080)
 Theme.ReferenceMobile = Vector2.new(390, 844)
 
+--[[
+	How much bigger the whole interface renders than it is authored.
+
+	ONE NUMBER FOR THE WHOLE HUD. Every screen and component is authored in the 1920x1080 space above and
+	drawn through a single `UIScale`, so this multiplies buttons, icons, panels, text and spacing together
+	and cannot pull anything out of proportion. Playtesting read the HUD as too small and too easy to
+	ignore -- it sat around the edges of the screen rather than framing it.
+
+	Change it here rather than by editing sizes. At 1.25 the widest window (Areas, 1120px authored) comes
+	to 1366px inside a 1920 viewport, so there is still real headroom. `Hooks.useScale` explains how the
+	mobile floor and the large-monitor ceiling interact with it.
+]]
+Theme.ScaleBoost = 1.25
+
 -- Canvas sizes the preview Stage offers.
 --[[
 	Preview canvases for `Stage`. All landscape: the experience is locked to it,

@@ -959,6 +959,14 @@ function Store.use()
 				accent = definition.Accent,
 				live = true,
 				seconds = remaining,
+				--[[
+					Whether this event opens THE PIT, which the HUD turns into a way in.
+
+					Read off the definition rather than sent by the server: the flag is a fact about the
+					event, the client already has the definitions, and an event with no arena must never
+					show a button that teleports into empty space.
+				]]
+				arena = definition.Arena == true,
 			}
 		elseif definition then
 			nextEvent = {
@@ -1044,6 +1052,15 @@ function Store.use()
 			command -- just a reason not to show a button that would refuse everyone who pressed it.
 		]]
 		isAdmin = AdminConfig.IsAdmin(localUserId),
+		--[[
+			WHICH TIER, so the panel can leave out buttons that would only refuse this player.
+
+			Computed here rather than sent by the server, for the same reason `isAdmin` is: `AdminConfig` is
+			shared, so the answer is already on the client, and a round trip would open a window where the
+			panel is drawn at the wrong tier. It is not a permission -- `AdminService` re-checks every
+			command against the same function.
+		]]
+		isOwner = AdminConfig.IsOwner(localUserId),
 
 		dailyStreak = dailyStreak,
 		--[[

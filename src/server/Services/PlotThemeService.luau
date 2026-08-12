@@ -200,11 +200,18 @@ function PlotThemeService.RefreshStructures(plot: Model, plotState: { [string]: 
 	local active = plotState.ActivePlotTheme or DEFAULT_THEME
 	for _, areaId in AreaConfig.Order do
 		--[[
-			Nothing to convert to for the theme you are already on, and nothing to offer for an
-			area you have not bought. The default theme never gets a structure: it is where you
-			start, so there is no unlock to represent.
+			Nothing to convert to for the theme you are already on, and nothing to offer for an area
+			you have not bought.
+
+			THE DEFAULT THEME DOES GET A STRUCTURE once you are not on it. It used to be excluded on
+			the grounds that it is where you start, so there is no unlock to represent -- but this
+			structure is the ONLY way to convert a plot, so leaving it out made the first conversion
+			irreversible: a player who tried the Workshop look could never get their starting yard
+			back. `TryConvert` already exempts the default theme from the unlock check, so the missing
+			structure was the only thing in the way.
 		]]
-		if areaId ~= active and areaId ~= DEFAULT_THEME and unlocked[areaId] == true then
+		local owned = areaId == DEFAULT_THEME or unlocked[areaId] == true
+		if areaId ~= active and owned then
 			placeStructure(plot, areaId)
 		end
 	end

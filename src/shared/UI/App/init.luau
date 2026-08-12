@@ -194,8 +194,17 @@ local function App(props)
 			}),
 
 		--[[
-			Dim wash behind an open window; tapping it closes the window. Skipped for a takeover, which
-			supplies its own -- see `TAKEOVER_SCREENS`.
+			Dim wash behind an open window. Skipped for a takeover, which supplies its own -- see
+			`TAKEOVER_SCREENS`.
+
+			IT DOES NOT CLOSE THE WINDOW, and that is deliberate. Every backdrop here used to pass
+			`onClick = actions.close*`, so any tap that missed a control dismissed what the player was
+			reading -- a misjudged tap on the edge of a card, a drag that started inside the window and
+			ended outside it, a click meant for a button that had already moved. A window closes from its
+			own X button or from an action designed to close it, and nothing else.
+
+			The `TextButton` stays, unclicked: it still has to swallow input so taps do not fall through
+			to the world and the buttons behind it.
 		]]
 		if ScreenComponent
 				and not rolling
@@ -204,7 +213,6 @@ local function App(props)
 				key = "Backdrop",
 				transparency = 0.42,
 				zIndex = Theme.Layer.Screen,
-				onClick = actions.closeScreen,
 			})
 			else nil,
 
@@ -226,7 +234,6 @@ local function App(props)
 				key = "EggBackdrop",
 				transparency = 0.42,
 				zIndex = Theme.Layer.Screen + 20,
-				onClick = actions.closeEggSummon,
 			})
 			else nil,
 		if state.eggSummon and not rolling
@@ -256,7 +263,6 @@ local function App(props)
 				key = "DetailBackdrop",
 				transparency = 0.4,
 				zIndex = Theme.Layer.Modal + 4,
-				onClick = actions.closeDetail,
 			})
 			else nil,
 		if state.detail
@@ -279,7 +285,6 @@ local function App(props)
 				key = "ConfirmBackdrop",
 				transparency = 0.5,
 				zIndex = Theme.Layer.Modal + 8,
-				onClick = actions.closeConfirm,
 			})
 			else nil,
 		if state.confirm

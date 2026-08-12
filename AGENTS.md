@@ -92,9 +92,13 @@ src/shared/UI/
    through `GameData`. `docs/ASSETS_NEEDED.md` is the full map of what art exists,
    what is missing, and which slot each id belongs in -- including which slots are
    not read yet. `docs/ICON_PROMPTS.md` holds the shared art style.
-9. **The topbar is TopbarPlus, not React.** `UPDATES`, `INDEX` and `SETTINGS` are
-   registered by `client/Controllers/TopbarController` and driven off the `screen`
-   atom. Do not also add them to `Parts.MENU_ITEMS`.
+9. **The topbar is TopbarPlus, not React.** `UPDATES`, `INDEX` and `SETTINGS` (windows, driven off the
+   `screen` atom) and the centre `SHOP` / `MY PLOT` / `LEADERBOARD` travel icons (actions, which fire
+   and let go) are all registered by `client/Controllers/TopbarController`. Do not also add them to
+   `Parts.MENU_ITEMS`, and do not rebuild the travel row in React -- it used to be `Parts.TeleportBar`
+   hand-positioned in the gap Roblox's chrome leaves, which meant competing for a strip TopbarPlus
+   already arranges and existed on the desktop HUD only. **None of these six appear in a UI Labs
+   story**, because a story has no client controllers; review them in Play.
 10. **Never call a plugin-security API from shared UI code.** `RunService:IsEdit()`
    answers in UI Labs and *throws* in a LocalScript; one unguarded call took down
    the entire require chain and left the old GUI on screen. `pcall` it.
@@ -150,6 +154,49 @@ src/shared/UI/
    `ActivePlotTheme` for the scrap type; the marker's own tag only decides *whether* that
    spawn point is live yet, which is what makes unlocking an area earn you more of them.
    Reading the marker for the contents is what made a Scrapyard plot spawn Workshop scrap.
+
+19. **A scrap model's size and rotation come from Studio, and only from Studio.** `ScrapService`
+   clones the template and stands it on its marker exactly as saved -- it computes the HEIGHT and
+   nothing else. Do not add a size, scale or rotation field to `ScrapConfig`: there were three
+   (`Size`, `ModelScale`, `ModelRotation`) and they were deleted on purpose, because a number in
+   config that fights the art is how a model ends up the wrong size with no obvious culprit, and
+   because the spawner used to flatten every model onto its marker so rotating art in Studio did
+   nothing. The one exception is `RUNAWAY_SCRAP_STUDS`, a 24-stud sanity net that warns by name --
+   Roblox rewrites a `MeshPart`'s `Size` when its mesh resolves, and seven generic models still
+   resolve past 400 studs.
+
+20. **Scatter and posing are authored too, not configured.** A spawn marker is a PILE ANCHOR: pile size
+   and scatter radius are both derived from the marker's distance to its nearest neighbour, so density
+   follows the layout rather than a flat number. A random yaw and a small lean go on top of the model's
+   authored rotation, never instead of it -- a piece posed lying down stays lying down. How often a
+   piece spawns knocked over is a `TumbleChance` attribute on the MODEL, set in Studio next to the pose
+   it modifies. And **every part of every scrap template must be anchored**: an unanchored one falls
+   before `ScrapVariants.Load` gets to it, which collapsed a 65-part appliance into a heap and shoved
+   the model next to it out of shape.
+
+21. **Cross-server chat is filtered PER RECIPIENT, and that is not a detail to simplify.** Text arriving
+   over the `MessagingService` topic is raw, and Roblox requires what a user sees to have been filtered
+   for *that* user -- so `GlobalChatService` calls `filterFor` once per player and fires `GlobalChat` to
+   each of them, and a filter that fails drops the message rather than falling back to the raw string.
+   Do not turn that into a `FireAllClients`, and do not remove the `RunService:IsStudio()` guard on the
+   `GetNonChatStringForBroadcastAsync` fallback -- that call is not filtered per user and exists only so
+   the feature can be exercised in Studio, where the real filter returns an empty string. See
+   `docs/SOCIAL.md`.
+
+22. **Admin and owner are two tiers of one panel, and the tier is enforced on the SERVER.** `AdminScreen`
+   filters entries and targets flagged `Owner` out for an admin, which is only so nobody is shown a
+   button that will refuse them -- `AdminService` checks `AdminConfig.IsOwner` on every command AND on
+   every inbound cross-server broadcast, because a subscription payload is data rather than proof. The
+   line is "what cannot be undone from inside the game": paid entitlements and save wipes are owner-only,
+   as is the `AllServers` reach. Events and server-wide boosts are NOT -- they expire on their own and are
+   clamped by `AdminConfig`. An owner is always an admin, by implication rather than by a duplicated id.
+
+23. **`OwnerUserId = 0` on a scrap record means ANYONE may take it.** That is THE PIT -- the arena event's
+   shared hoard -- and it is why `ScrapRecord.Plot` and `.Marker` are optional. A public record has no
+   plot to own, skips the plot-ownership checks in `queryPlayer` and `reserve`, skips the area lock via
+   `TryCollect(..., ignoreAreaLock)`, and does NOT respawn where it fell: `ArenaService` tops the arena
+   back up to a target count instead. Magnet strength still gates it, deliberately. Do not "simplify" any
+   of those branches away by giving arena scrap a fake plot -- see `ArenaConfig` and `docs/EVENTS.md`.
 
 ## Architecture
 

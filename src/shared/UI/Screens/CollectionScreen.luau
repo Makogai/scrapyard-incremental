@@ -49,11 +49,24 @@ local function CollectionScreen(props)
 	local found, total = 0, 0
 
 	if tab == "SCRAP" then
-		for index, entry in ipairs(GameData.scrapIndex(state.discoveredScrap)) do
+		for index, entry in ipairs(GameData.scrapIndex(state.discoveredScrap, state.unlockedAreas)) do
 			total += 1
 			if entry.discovered then
 				found += 1
 			end
+			--[[
+				An undiscovered entry names its area instead of saying "UNDISCOVERED" at everything.
+
+				Every scrap in this list can be found, but eleven of the eighteen need an area the player
+				may not have bought yet -- and a wall of identical "UNDISCOVERED" cards is what made the
+				index look like it was advertising scrap that does not exist. Naming the area turns each
+				card into a pointer: this one is in the Workshop Yard, which you have; that one is in the
+				Vehicle Graveyard, which you do not.
+			]]
+			local hint = if entry.areaName == nil
+				then nil
+				elseif entry.available then string.upper(entry.areaName)
+				else `LOCKED: {string.upper(entry.areaName)}`
 			cells[#cells + 1] = e(Cards.CollectionCell, {
 				key = entry.id,
 				name = entry.name,
@@ -63,6 +76,8 @@ local function CollectionScreen(props)
 				discovered = entry.discovered,
 				best = entry.best,
 				collected = entry.collected,
+				hint = hint,
+				dimmed = not entry.available,
 				layoutOrder = index,
 			})
 		end

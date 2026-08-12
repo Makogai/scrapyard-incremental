@@ -44,14 +44,12 @@ export type ScrapDefinition = {
 	SpawnWeight: number,
 	RespawnSeconds: number,
 	--[[
-		The footprint this scrap is meant to occupy, {x, y, z}. Authored models are
-		normalised to it, so it is the one place that decides how big a piece of scrap
-		looks in the world.
+		The name of the model to clone, and the ONLY thing this config says about how a piece of
+		scrap looks. Size and rotation come from the model itself, exactly as saved in Studio -- see
+		`ScrapService.placeOnMarker`. There is deliberately no size or rotation field here to disagree
+		with the art.
 	]]
-	Size: { number },
 	ModelName: string,
-	--- Art multiplier on top of that normalisation. Default 1.
-	ModelScale: number?,
 }
 
 export type VariantDefinition = {

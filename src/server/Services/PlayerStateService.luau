@@ -23,6 +23,11 @@ local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PlayerDataSchema = require(ReplicatedStorage.Shared.Utility.PlayerDataSchema)
 local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
 local DataService = require(script.Parent.DataService)
+--[[
+	One-way on purpose: `LeaderstatsService.Publish` is handed the data it needs, so it requires nothing
+	back from here and the two cannot form a require cycle.
+]]
+local LeaderstatsService = require(script.Parent.LeaderstatsService)
 local RemoteService = require(script.Parent.RemoteService)
 
 type Session = {
@@ -674,6 +679,13 @@ end
 
 pushState = function(player: Player, data: { [string]: any })
 	player:SetAttribute("EquippedPets", HttpService:JSONEncode(data.EquippedPets))
+	--[[
+		Roblox's own player list, updated from the same funnel as everything else.
+
+		Here rather than on a timer because this is already the one place every money and prestige change
+		passes through, so the Tab columns cannot lag behind the HUD.
+	]]
+	LeaderstatsService.Publish(player, data)
 	if stateChanged then
 		stateChanged:FireClient(player, publicSnapshot(data))
 	end
@@ -734,6 +746,15 @@ local function onPlayerAdded(player: Player)
 		Released = false,
 	}
 	player:SetAttribute("EquippedPets", HttpService:JSONEncode(data.EquippedPets))
+	--[[
+		Publish the Tab columns HERE as well as from `pushState`.
+
+		This function deliberately does not push state -- the client pulls a snapshot over the Bridge
+		handshake instead -- so a player who joins and stands still never triggers a push, and their row
+		in the player list would stay blank until they next earned or spent something. Measured: sixteen
+		seconds after joining with storage full, `leaderstats` did not exist.
+	]]
+	LeaderstatsService.Publish(player, data)
 	grantStaffTitles(player, data)
 	local character = player.Character
 	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
@@ -909,11 +930,13 @@ function PlayerStateService.GetPublicState(player: Player): { [string]: any }?
 	return if session then publicSnapshot(session.Data) else nil
 end
 
+--- `ignoreAreaLock`: see `CanCollect`. The two must agree or a piece passes the check and fails the take.
 function PlayerStateService.TryCollect(
 	player: Player,
 	scrapId: string,
 	variantId: string,
-	areaId: string
+	areaId: string,
+	ignoreAreaLock: boolean?
 ): (boolean, string)
 	local session = sessions[player]
 	local scrap = ScrapConfig.ById[scrapId]
@@ -931,7 +954,7 @@ function PlayerStateService.TryCollect(
 		data.StoredWeight,
 		stats.StorageCapacity,
 		scrap.Weight,
-		data.UnlockedAreas[areaId] == true,
+		ignoreAreaLock == true or data.UnlockedAreas[areaId] == true,
 		true
 	)
 	if not allowed then
@@ -966,10 +989,21 @@ function PlayerStateService.TryCollect(
 	return true, "Collected"
 end
 
+--[[
+	`ignoreAreaLock` is for THE PIT and nothing else.
+
+	Arena scrap is not on anybody's plot and is deliberately not gated by area progression -- a new player
+	standing in the Pit can pull a scrap car, and that is the whole draw. Magnet strength and storage still
+	apply, so the upgrade tree keeps its meaning; see `ArenaConfig`.
+
+	An explicit argument rather than spawning arena pieces with `AreaId = "FrontYard"`, which would have
+	worked (everyone has it) and would have quietly filed a scrap car as a Front Yard discovery.
+]]
 function PlayerStateService.CanCollect(
 	player: Player,
 	scrapId: string,
-	areaId: string
+	areaId: string,
+	ignoreAreaLock: boolean?
 ): (boolean, string)
 	local session = sessions[player]
 	local scrap = ScrapConfig.ById[scrapId]
@@ -984,7 +1018,7 @@ function PlayerStateService.CanCollect(
 		data.StoredWeight,
 		stats.StorageCapacity,
 		scrap.Weight,
-		data.UnlockedAreas[areaId] == true,
+		ignoreAreaLock == true or data.UnlockedAreas[areaId] == true,
 		true
 	)
 end
@@ -1230,6 +1264,42 @@ function PlayerStateService.AdminMutate(
 		)
 		data.UpgradeLevels[itemId] =
 			math.min(maximum, (data.UpgradeLevels[itemId] or 0) + math.max(1, amount or 1))
+	elseif command == "ActivateBoost" then
+		--[[
+			TURN A POTION ON WITHOUT HANDING OVER THE POTION.
+
+			`GrantConsumable` puts a bottle in the player's bag and leaves them to drink it, which is the
+			wrong tool for "everyone gets double cash for the next half hour" -- half the server never
+			opens their inventory. This writes the boost's expiry directly, exactly as
+			`TryUseConsumable` does, so there is one representation of an active boost and the HUD timers,
+			`derivedStats` and the save all keep working with no special case.
+
+			`itemId` may be a COMMA-SEPARATED LIST, which is how the panel activates several at once: one
+			remote call, one rate-limit slot, and every effect starting on the same second rather than
+			staggered across four round trips.
+
+			`amount` is MINUTES, clamped -- see `AdminConfig.MaximumServerBoostMinutes`. Boosts EXTEND
+			rather than replace, the same as drinking a second potion.
+		]]
+		if itemId == nil then
+			return false, "No boost specified"
+		end
+		local minutes =
+			math.clamp(math.floor(amount or 0), 1, AdminConfig.MaximumServerBoostMinutes)
+		local seconds = minutes * 60
+		local applied = {}
+		for id in string.gmatch(itemId, "[^,]+") do
+			local definition = InventoryConfig.Consumables[id]
+			if definition ~= nil then
+				local key = `{definition.BoostId}EndsAt`
+				local startAt = math.max(os.time(), data.ActiveBoosts[key] or 0)
+				data.ActiveBoosts[key] = startAt + seconds
+				table.insert(applied, definition.DisplayName)
+			end
+		end
+		if #applied == 0 then
+			return false, "No known boost in that list"
+		end
 	else
 		return false, "Unknown admin command"
 	end

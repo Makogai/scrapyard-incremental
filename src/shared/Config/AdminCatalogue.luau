@@ -19,10 +19,16 @@
 		ItemId    passed through as the command's item argument, when it takes one
 		Amount    true if the entry uses the panel's amount box
 		Danger    true for anything destructive, so the UI can style it apart
+		Owner     true if only the owner may use it -- see `OWNER_ONLY_COMMANDS`
+
+	A section may also declare `Mode = "MultiSelect"`, which asks the panel for a tick list and a single
+	action button instead of one button per entry. That exists because some things are only useful
+	together: turning on four boosts is one decision, not four.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
@@ -36,6 +42,7 @@ export type AdminEntry = {
 	ItemId: string?,
 	Amount: boolean?,
 	Danger: boolean?,
+	Owner: boolean?,
 	Glyph: string?,
 	Accent: string?,
 }
@@ -46,9 +53,49 @@ export type AdminSection = {
 	Glyph: string,
 	Accent: string,
 	Entries: { AdminEntry },
+	--- `"MultiSelect"` for a tick list with one action; nil for a button per entry.
+	Mode: string?,
+	--- MultiSelect only: what the action button says, the command it sends, and what the amount means.
+	ActionLabel: string?,
+	Command: string?,
+	AmountLabel: string?,
+	Owner: boolean?,
 }
 
 local AdminCatalogue = {}
+
+--[[
+	WHAT ONLY THE OWNER MAY DO.
+
+	The test is not "how powerful" but "what cannot be undone from inside the game":
+
+		GrantEntitlement   writes the flag a real Robux purchase writes. Handing out paid unlocks is the
+		                   owner's call, not a moderation tool.
+		ResetTestProfile   wipes a save. Already Studio-only and self-only, and still owner-only.
+
+	Everything else is available to an admin, INCLUDING events and server-wide boosts: those expire on
+	their own and are clamped by `AdminConfig`, so the worst case is a busy hour rather than a lost save.
+
+	Reach is gated separately -- see `isOwnerOnlyTarget`. "Everyone in this server" and "everyone in the
+	game" are different amounts of damage, whatever the command is.
+]]
+local OWNER_ONLY_COMMANDS = table.freeze({
+	GrantEntitlement = true,
+	ResetTestProfile = true,
+})
+
+--- Reach that only the owner has. One server is an admin's business; every server is not.
+local OWNER_ONLY_TARGETS = table.freeze({
+	AllServers = true,
+})
+
+function AdminCatalogue.isOwnerOnlyCommand(command: string): boolean
+	return OWNER_ONLY_COMMANDS[command] == true
+end
+
+function AdminCatalogue.isOwnerOnlyTarget(target: string): boolean
+	return OWNER_ONLY_TARGETS[target] == true
+end
 
 --[[
 	Target modes the panel offers.
@@ -66,6 +113,8 @@ AdminCatalogue.Targets = table.freeze({
 		Label = "EVERY SERVER",
 		Glyph = "star",
 		Wide = true,
+		--- Owner-only, enforced in `AdminService`; the panel hides it from an admin as a courtesy.
+		Owner = true,
 	}),
 })
 
@@ -280,6 +329,7 @@ function AdminCatalogue.build(): { AdminSection }
 				ItemId = passId,
 				Glyph = "robux",
 				Accent = "Pink",
+				Owner = true,
 			})
 		end
 	end
@@ -289,6 +339,7 @@ function AdminCatalogue.build(): { AdminSection }
 		Glyph = "robux",
 		Accent = "Pink",
 		Entries = entitlements,
+		Owner = true,
 	})
 
 	--[[
@@ -368,8 +419,84 @@ function AdminCatalogue.build(): { AdminSection }
 				Danger = true,
 				Glyph = "recycle",
 				Accent = "Red",
+				Owner = true,
 			},
 		},
+	})
+
+	--[[
+		EVENTS, started by hand.
+
+		One entry per scheduled event plus a stop. The amount box is MINUTES here rather than a quantity,
+		which is why the section says so in its own label -- the box is shared across sections and cannot
+		change its own caption.
+
+		Not a multi-select: exactly one event is live at a time by definition, so a tick list would be
+		offering a choice the system cannot honour. Starting a second one replaces the first.
+	]]
+	local eventEntries: { AdminEntry } = {}
+	for _, definition in EventConfig.Events do
+		table.insert(eventEntries, {
+			Id = definition.Id,
+			Label = definition.Title,
+			Command = "StartEvent",
+			ItemId = definition.Id,
+			Amount = true,
+			Glyph = definition.Glyph,
+			Accent = definition.Accent,
+		})
+	end
+	table.insert(eventEntries, {
+		Id = "StopEvent",
+		Label = "STOP EVENT",
+		Command = "StopEvent",
+		Glyph = "cross",
+		Accent = "Neutral",
+	})
+	table.insert(sections, {
+		Id = "events",
+		Label = "EVENTS",
+		Glyph = "star",
+		Accent = "Cyan",
+		Entries = eventEntries,
+		AmountLabel = "MINUTES",
+	})
+
+	--[[
+		BOOSTS: potion effects turned on directly, several at once, for a chosen number of minutes.
+
+		A MULTI-SELECT because that is how the decision is actually made -- "double cash and triple luck
+		for half an hour" is one announcement, and firing it as separate commands would stagger the start
+		times and burn a rate-limit slot each.
+
+		Distinct from the `potions` section above, which hands over BOTTLES. A bottle needs the player to
+		open their inventory and drink it, so it is the wrong tool for something meant to land on everyone
+		at once: half the server never opens the bag.
+	]]
+	local boostEntries: { AdminEntry } = {}
+	for itemId, definition in InventoryConfig.Consumables do
+		table.insert(boostEntries, {
+			Id = itemId,
+			Label = definition.DisplayName,
+			Command = "ActivateBoost",
+			ItemId = itemId,
+			Glyph = "potion",
+			Accent = "Purple",
+		})
+	end
+	table.sort(boostEntries, function(a, b)
+		return a.Label < b.Label
+	end)
+	table.insert(sections, {
+		Id = "boosts",
+		Label = "BOOSTS",
+		Glyph = "potion",
+		Accent = "Purple",
+		Mode = "MultiSelect",
+		ActionLabel = "ACTIVATE SELECTED",
+		Command = "ActivateBoost",
+		AmountLabel = "MINUTES",
+		Entries = boostEntries,
 	})
 
 	return sections

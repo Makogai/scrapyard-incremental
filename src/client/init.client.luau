@@ -15,6 +15,7 @@ local PlotSignController = require(script.Controllers.PlotSignController)
 local TutorialArrowController = require(script.Controllers.TutorialArrowController)
 local EventBillboardController = require(script.Controllers.EventBillboardController)
 local TitleController = require(script.Controllers.TitleController)
+local GlobalChatController = require(script.Controllers.GlobalChatController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -61,5 +62,12 @@ EventBillboardController.Start()
 	Bridge -- and it draws OTHER players' titles, which is the whole point of them.
 ]]
 TitleController.Start()
+
+--[[
+	After `TitleController`, which owns `TextChatService.OnIncomingMessage` for local chat. This one only
+	displays into its own channel, so the two do not collide -- but starting it second keeps the reading
+	order the same as the dependency order.
+]]
+GlobalChatController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))

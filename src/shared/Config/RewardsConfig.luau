@@ -42,7 +42,8 @@ local dailyDays = {
 		Label = "Luck Potion",
 	}),
 	table.freeze({ Day = 5, Money = 12000, Glyph = "cash", Accent = "Green", Label = "$12,000" }),
-	table.freeze({ Day = 6, Spins = 3, Glyph = "star", Accent = "Cyan", Label = "3 Spins" }),
+	--- `wheel`, not `star`: spins ARE the wheel, and the star glyph has no art behind it.
+	table.freeze({ Day = 6, Spins = 3, Glyph = "wheel", Accent = "Cyan", Label = "3 Spins" }),
 	--[[
 		Day 7 is the hero card: it spans two rows on its own in the modal, so it carries the heaviest
 		reward and the magnet glyph, which is the most recognisable object in the game.

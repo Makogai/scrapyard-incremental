@@ -48,6 +48,66 @@ one.
 
 ---
 
+## The range indicator
+
+`MagnetRangeController` draws the local player's reach on the ground. Client-only parts, so everyone sees
+their own circle and nobody else's. Two styles, chosen by `RANGE_STYLE`:
+
+| Style | What it is |
+| --- | --- |
+| **Solid** (default) | a filled translucent disc with one continuous rim, 72 butted boxes |
+| **Dashed** | the original: 36 rotating segments around the edge |
+
+**`Dashed` was never a dashed ring**, which is why it read oddly. `CFrame.Angles(0, -angle, 0)` points a
+part's X axis *radially*, so its segments were spokes sticking outward like speedometer ticks, each one
+`radius * 0.16` long — they got longer and scruffier as range went up. The tangent at angle `t` is
+`(-sin t, 0, cos t)`, which needs `y = -t - 90°`; that one term is the difference between a ring and a
+starburst.
+
+A `Cylinder` part cannot make a ring — it is a filled disc — and a torus would mean a mesh asset for
+something that is four lines of maths. So the rim is boxes laid end to end, each a hair longer than the
+exact chord so neighbours overlap rather than showing a seam.
+
+**The fill is the part that communicates.** An outline says "here is a boundary"; a filled disc says
+"everything in here is mine". So the disc carries a slow brightness breath and the ring holds still — a
+solid ring rotating is indistinguishable from one standing still, which is why the old style had to spin
+and this one does not.
+
+An upgraded magnet gets a second, tighter rim at 0.86× radius. Reach is one number, so a second ring
+cannot mean a second radius — it is a badge, and it sits *inside* so the outer edge always means exactly
+one thing.
+
+---
+
+## When a magnet refuses: red and amber
+
+A piece the player cannot pull now **tints and shakes** — on the piece itself, not just as a toast.
+
+The toast was there first and it says *why*: "magnet too weak", "storage full". What it could never say
+is *which*. Standing in a pile of eight with one radiator in it, "magnet too weak" is a riddle, and the
+only way to work it out was to walk away and come back.
+
+| Reason | Colour | What the player should do |
+| --- | --- | --- |
+| `TooHeavy` | red | upgrade the magnet, or come back later |
+| `StorageFull` | amber | go and sell — nothing is wrong with this piece |
+
+`ScrapService` sends the signal per piece per player on a 1.2s throttle; the client holds the highlight
+for 1.45s, slightly longer, so somebody standing still sees one continuous tint rather than a strobe. The
+highlight is `AlwaysOnTop`, because a piece you cannot pull is often the one buried at the back of a pile
+— exactly the case where an occluded outline tells you nothing.
+
+**Neither the tint nor the shake is gated on the particle or screen-effect settings.** This is not
+decoration: it is the only thing in the game that says which piece is out of reach, and a player who
+turned effects down for performance still has to be able to play.
+
+The shake moves a server-replicated part from the client, which is safe here for the same reason the
+attraction animation does it — the piece is anchored and the server never touches its CFrame again after
+the spawn. It is still restored explicitly rather than left to replication: nothing else would put it
+back, and a piece nudged an inch every time you walked past would drift all session. Measured: 14.65° of
+swing, settling back with 0.000° of drift. Rotation only — a positional shake on a piece resting on the
+floor reads as it sinking into the ground on the down-beat.
+
 ## The constraint: the strength ladder
 
 Every scrap has a `RequiredMagnetStrength`. That ladder is what decides how many magnet tiers
