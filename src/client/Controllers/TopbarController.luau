@@ -206,7 +206,15 @@ function TopbarController.Start()
 				end)
 			end
 			syncPip()
-			Atoms.inbox:subscribe(syncPip)
+			--[[
+				`Atoms.subscribe(atom, fn)`, NOT `atom:subscribe(fn)`.
+
+				Charm's subscribe is a free function that `Atoms` re-exports; calling it as a method threw
+				here, and because this runs inside the icon-building loop it took the whole topbar with it --
+				SETTINGS is built after INBOX so it never appeared, and INBOX never reached its `bindEvent`,
+				so it opened nothing. One typo, two missing features.
+			]]
+			Atoms.subscribe(Atoms.inbox, syncPip)
 		end
 
 		--[[

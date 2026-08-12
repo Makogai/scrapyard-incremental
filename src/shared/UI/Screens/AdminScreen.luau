@@ -56,7 +56,6 @@ local LEFT_WIDTH = 300
 local TAB_WIDTH = 104
 local TAB_GAP = 6
 
---- Sized to whatever the catalogue produced, with room for the amount box under it.
 --[[
 	TWO ROWS OF TABS, so the column stays a sensible shape as sections are added.
 
@@ -67,6 +66,17 @@ local TAB_GAP = 6
 	The width is still DERIVED, just from the longer of the two rows rather than from all of them.
 ]]
 local TAB_ROWS = 2
+local TAB_HEIGHT = 38
+--[[
+	HOW MUCH OF THE RIGHT COLUMN THE HEADER OWNS, derived rather than typed in three places.
+
+	The amount box used to be hidden under the entry list: the tabs went to two rows, the box moved down
+	with them, and the scroller below it was still starting at a hardcoded 100px -- so the box rendered
+	underneath it. Every offset down this column now comes from this one number.
+]]
+local AMOUNT_TOP = TAB_HEIGHT * TAB_ROWS + 6 + 8
+local AMOUNT_HEIGHT = 44
+local HEADER_HEIGHT = AMOUNT_TOP + AMOUNT_HEIGHT + 10
 
 local function tabsPerRow(sectionCount: number): number
 	return math.max(1, math.ceil(sectionCount / TAB_ROWS))
@@ -384,7 +394,7 @@ local function AdminScreen(props)
 		glyph = "sliders",
 		headerColor = if isOwner then Theme.Gradient.Purple else Theme.Gradient.Red,
 		width = LEFT_WIDTH + RIGHT_WIDTH + GAP + 56,
-		contentHeight = 470,
+		contentHeight = 540,
 		onClose = actions.closeScreen,
 		headerRight = e(Indicators.Badge, {
 			key = "Target",
@@ -447,7 +457,7 @@ local function AdminScreen(props)
 					e(P.Group, {
 						key = "SectionTabs",
 						--- Two rows of 38, plus the gap between them.
-						size = UDim2.new(1, 0, 0, 38 * TAB_ROWS + TAB_GAP),
+						size = UDim2.new(1, 0, 0, TAB_HEIGHT * TAB_ROWS + TAB_GAP),
 						layout = P.list({
 							direction = Enum.FillDirection.Vertical,
 							padding = TAB_GAP,
@@ -461,9 +471,9 @@ local function AdminScreen(props)
 					]]
 					e(P.Group, {
 						key = "AmountRow",
-						size = UDim2.new(1, 0, 0, 44),
-						--- Below TWO rows of tabs (38 each plus the gap) rather than one.
-						position = UDim2.fromOffset(0, 46 + 38 + TAB_GAP),
+						size = UDim2.new(1, 0, 0, AMOUNT_HEIGHT),
+						--- Below both rows of tabs. See `AMOUNT_TOP`.
+						position = UDim2.fromOffset(0, AMOUNT_TOP),
 						children = {
 							e(P.Label, {
 								key = "AmountLabel",
@@ -471,7 +481,7 @@ local function AdminScreen(props)
 								textSize = Theme.TextSize.Tiny,
 								color = Theme.Color.Gray,
 								align = Enum.TextXAlignment.Left,
-								size = UDim2.fromOffset(90, 44),
+								size = UDim2.fromOffset(90, AMOUNT_HEIGHT),
 							}),
 							--[[
 								A raw TextBox, matching `SettingsScreen`'s code entry -- the kit has no text-field
@@ -517,8 +527,8 @@ local function AdminScreen(props)
 					}),
 					e(P.Scroller, {
 						key = "Entries",
-						size = UDim2.new(1, 0, 1, -100),
-						position = UDim2.fromOffset(0, 100),
+						size = UDim2.new(1, 0, 1, -HEADER_HEIGHT),
+						position = UDim2.fromOffset(0, HEADER_HEIGHT),
 						layout = P.list({ padding = 6 }),
 						children = entryRows,
 					}),
