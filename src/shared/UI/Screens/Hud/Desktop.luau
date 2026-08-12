@@ -210,17 +210,9 @@ local function HudDesktop(props)
 				`bottomLift` is still respected: on touch, Roblox draws its own controls over that corner.
 			]]
 			--[[
-				A staff message or a gift, in the middle of the screen. Both return nil when there is nothing
-				to say, so neither costs any space in the common case.
-			]]
-			e(Parts.BroadcastNotice, {
-				key = "Broadcast",
-				notice = state.broadcast,
-				onDismiss = actions.dismissBroadcast,
-			}),
-			--[[
-				The restart countdown, in the event banner's slot -- and UNDER a live event rather than on top
-				of it, because an event that is already running should not be shoved aside by a clock.
+				The restart countdown, as an event strip, sitting BELOW a live event rather than on top of it --
+				an event already running should not be shoved aside by a clock. Lower than the event slot even
+				when nothing is running, because this is a warning rather than a headline.
 			]]
 			e(Parts.RestartCountdown, {
 				key = "Restart",
@@ -229,7 +221,7 @@ local function HudDesktop(props)
 					0.5,
 					0,
 					0,
-					topbarStripTop + topbarStripHeight + 8 + (if state.event then 66 else 0)
+					topbarStripTop + topbarStripHeight + 74 + (if state.event then 66 else 0)
 				),
 			}),
 			--- Social rewards down the right edge; disappears as they are claimed.

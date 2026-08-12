@@ -329,6 +329,40 @@ local function App(props)
 			else nil,
 
 		--[[
+			A STAFF BROADCAST OR A GIFT, in the same full-width strip a Secret hatch gets.
+
+			The same component on purpose. A staff message is the only other thing in the game that speaks to
+			the whole server, so it should look like the thing players already recognise as "stop and read
+			this" -- and reusing it means the entrance, the metrics and the fade cannot drift from the version
+			that was tuned.
+
+			QUIETER THAN A SECRET, though: no `celebrate`, no chord. A Secret happens once in five hundred
+			rolls; staff type things whenever they like, and an announcement that fanfares every time stops
+			meaning anything.
+
+			The admin's NAME is the title, because that is the thing worth reading first -- who is talking.
+			The message is the body.
+		]]
+		if state.broadcast
+			then e(Announcement.Banner, {
+				key = "Broadcast",
+				title = if state.broadcast.kind == "Gift"
+					then "Gift Received!"
+					else (if #state.broadcast.fromName > 0
+						then state.broadcast.fromName
+						else "Announcement"),
+				body = if state.broadcast.kind == "Gift"
+					then `{state.broadcast.message}  --  open your INBOX to claim`
+					else state.broadcast.message,
+				accent = if state.broadcast.kind == "Gift"
+					then Theme.Gradient.Purple
+					else Theme.Gradient.Cyan,
+				glyph = if state.broadcast.kind == "Gift" then "crate" else "note",
+				celebrate = false,
+				top = 96,
+			})
+			else nil,
+		--[[
 			Server-wide news, above everything including the takeover: a Secret hatch
 			that happened to land while this player was mid-roll is still news.
 		]]

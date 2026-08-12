@@ -318,9 +318,9 @@ local function AdminScreen(props)
 	end
 
 	--[[
-	Whether the section on screen has anything that takes typed words. The box is drawn only for those
-	sections: a text field parked above CASH and GEARS reads as though it applies to them.
-]]
+		Whether the section on screen has anything that takes typed words. The box is drawn only for those
+		sections: a text field parked above CASH and GEARS reads as though it applies to them.
+	]]
 	local wantsMessage = false
 	for _, section in ipairs(sections) do
 		if section.Id == activeSection then

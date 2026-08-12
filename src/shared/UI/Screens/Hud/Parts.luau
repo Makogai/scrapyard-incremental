@@ -354,135 +354,19 @@ Parts.BOOSTS = {
 }
 
 --------------------------------------------------------------------------------
--- BroadcastNotice
---------------------------------------------------------------------------------
-
---[[
-	A STAFF MESSAGE, IN THE MIDDLE OF THE SCREEN.
-
-	Not the right-hand toast stack: that is where routine income goes, and a broadcast that arrives in the
-	same place as "sold for $400" is a broadcast nobody reads. This sits over the play area and is meant to
-	interrupt gently.
-
-	PITCHED BETWEEN THE TWO EXTREMES. The Secret-pet burst is a full-screen event because it happens once in
-	five hundred rolls; a broadcast happens whenever staff type something, so it gets the same centre
-	placement and the same scale-in, at a fraction of the size and with no screen wash. It also carries a
-	close button, which the Secret announcement does not need -- a message you have finished reading should
-	go away when you say so.
-
-	Two looks from one component: a staff message reads as somebody talking (name, tick, words), and a gift
-	reads as a present (what arrived, and where to find it).
-]]
-function Parts.BroadcastNotice(props)
-	local notice = props.notice
-	if notice == nil then
-		return nil
-	end
-
-	local isGift = notice.kind == "Gift"
-	local accent = if isGift then Theme.Gradient.Purple else Theme.Gradient.Cyan
-
-	return e(P.Group, {
-		key = props.key or "BroadcastNotice",
-		size = UDim2.fromOffset(560, 92),
-		position = props.position or UDim2.fromScale(0.5, 0.34),
-		anchorPoint = Vector2.new(0.5, 0.5),
-		--- `Theme.Layer`, not `Theme.ZIndex` -- there is no such table, and indexing it threw inside render.
-		zIndex = Theme.Layer.Announcement,
-		children = {
-			e(P.Panel, {
-				key = "Card",
-				size = UDim2.fromScale(1, 1),
-				radius = Theme.Radius.Card,
-				color = Theme.Color.Card,
-				gradient = accent,
-				strokeThickness = Theme.Stroke.Card,
-				studs = false,
-				children = P.compact(
-					P.padding({ x = 16, y = 12 }, "Inset"),
-					e(Icon, {
-						key = "Mark",
-						glyph = if isGift then "crate" else "note",
-						gradient = Theme.Gradient.Gold,
-						size = UDim2.fromOffset(48, 48),
-						position = UDim2.fromScale(0, 0.5),
-						anchorPoint = Vector2.new(0, 0.5),
-						radius = Theme.Radius.Small,
-						zIndex = 4,
-					}),
-					e(P.Label, {
-						key = "Heading",
-						--[[
-							THE VERIFIED TICK, spelled out rather than drawn as a separate chip: at this size
-							the word STAFF next to the name is clearer than a mark, and only the server can set
-							it. See `InboxConfig`.
-						]]
-						text = if isGift
-							then "GIFT RECEIVED"
-							else `{notice.fromName}{if notice.verified
-								then "  \u{2713} STAFF"
-								else ""}`,
-						textSize = Theme.TextSize.Tiny,
-						font = Theme.Font.Bold,
-						color = Theme.Color.Gold,
-						align = Enum.TextXAlignment.Left,
-						size = UDim2.new(1, -124, 0, 18),
-						position = UDim2.fromOffset(60, 8),
-						truncate = Enum.TextTruncate.AtEnd,
-						zIndex = 4,
-					}),
-					e(P.Label, {
-						key = "Message",
-						text = notice.message,
-						textSize = Theme.TextSize.Body,
-						font = Theme.Font.Bold,
-						color = Theme.Color.White,
-						align = Enum.TextXAlignment.Left,
-						vAlign = Enum.TextYAlignment.Top,
-						wrapped = true,
-						size = UDim2.new(1, -124, 0, 44),
-						position = UDim2.fromOffset(60, 26),
-						zIndex = 4,
-					}),
-					--- Gifts say where to go; a message has nothing to do but be read.
-					if isGift
-						then e(P.Label, {
-							key = "Hint",
-							text = "OPEN YOUR INBOX TO CLAIM",
-							textSize = Theme.TextSize.Micro,
-							color = Theme.Color.Gray,
-							align = Enum.TextXAlignment.Left,
-							size = UDim2.new(1, -124, 0, 14),
-							position = UDim2.new(0, 60, 1, -18),
-							zIndex = 4,
-						})
-						else nil,
-					if props.onDismiss
-						then e(Buttons.CloseButton, {
-							key = "Close",
-							size = UDim2.fromOffset(30, 30),
-							position = UDim2.new(1, -8, 0, 8),
-							anchorPoint = Vector2.new(1, 0),
-							onClick = props.onDismiss,
-							zIndex = 5,
-						})
-						else nil
-				),
-			}),
-		},
-	})
-end
-
---------------------------------------------------------------------------------
 -- RestartCountdown
 --------------------------------------------------------------------------------
 
 --[[
-	THE RESTART COUNTDOWN, in the event banner's slot.
+	THE RESTART COUNTDOWN, drawn as an event strip.
 
-	Same place and same shape as an event strip, because it is the same KIND of thing: a server-wide fact
-	with a clock on it. A player who has learned to look under the top bar for "2x cash for 20 minutes"
-	will find "restarting in 40s" without being taught twice.
+	Literally `Parts.EventBanner` rather than a lookalike: it is the same kind of thing -- a server-wide fact
+	with a clock on it -- and a player who has learned to read "2x cash, 4:12" under the top bar reads
+	"server restart, 0:40" without being taught twice. Reusing the component also means the fade, the
+	metrics and the countdown formatting cannot drift apart from the real events.
+
+	Red accent, and `live` so it takes the accent rather than the muted upcoming treatment: this is
+	happening, not scheduled.
 
 	Ticks its own clock from the absolute `endsAt` the server sent, once a second rather than every frame --
 	a seconds readout re-rendered 60 times a second is 59 wasted renders.
@@ -514,31 +398,20 @@ function Parts.RestartCountdown(props)
 	end
 
 	local remaining = math.max(0, (restart.endsAt or 0) - now)
-	--- Red inside the last ten seconds, so the deadline is felt rather than read.
-	local urgent = remaining <= 10
 
-	return e(P.Panel, {
+	return e(Parts.EventBanner, {
 		key = props.key or "RestartCountdown",
-		size = UDim2.fromOffset(300, 34),
+		title = "SERVER RESTART",
+		detail = if #(restart.startedBy or "") > 0
+			then `Started by {restart.startedBy} -- rejoin after`
+			else "Rejoin after the restart",
+		glyph = "clock",
+		accent = "Red",
+		seconds = remaining,
+		live = true,
 		position = props.position,
 		anchorPoint = props.anchorPoint or Vector2.new(0.5, 0),
-		zIndex = props.zIndex or 6,
-		radius = Theme.Radius.Chip,
-		color = Theme.Color.Card,
-		gradient = if urgent then Theme.Gradient.Red else Theme.Gradient.Orange,
-		strokeThickness = Theme.Stroke.Thin,
-		studs = false,
-		children = {
-			e(P.Label, {
-				key = "Text",
-				text = `SERVER RESTART IN {Format.timer(remaining)}`,
-				textSize = Theme.TextSize.Tiny,
-				font = Theme.Font.Bold,
-				color = Theme.Color.White,
-				size = UDim2.fromScale(1, 1),
-				zIndex = 4,
-			}),
-		},
+		zIndex = props.zIndex,
 	})
 end
 
