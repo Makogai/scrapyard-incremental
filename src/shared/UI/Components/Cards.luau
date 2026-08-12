@@ -338,6 +338,24 @@ function Cards.PetCard(props)
 	local vfxPalette = VFX_RARITIES[props.rarity]
 
 	local children = P.compact(
+		--[[
+			THE CARD READS AS ITS RARITY, not just its stripe.
+
+			A full-bleed wash of the rarity gradient behind the contents, at low alpha so the preview and the
+			text stay legible -- the stripe alone said "Secret" in six pixels at the top of a 196px card.
+			`zIndex` 1 keeps it under the VFX layer (2) and everything else.
+		]]
+		e("Frame", {
+			key = "RarityWash",
+			BackgroundColor3 = style.color,
+			BackgroundTransparency = 0.82,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 1,
+		}, {
+			P.corner(Theme.Radius.Card),
+			P.gradient(style.gradient, { rotation = 90 }),
+		}),
 		e("Frame", {
 			key = "RarityStripe",
 			BackgroundColor3 = style.color,
@@ -364,6 +382,13 @@ function Cards.PetCard(props)
 			key = "Preview",
 			kind = "pet",
 			model = props.model,
+			--[[
+				A slow turn, so a grid of pets is alive rather than a wall of stills.
+
+				14 degrees a second is a full revolution in about 26 seconds: noticeable when you look at one
+				card, never distracting when you are scanning twenty.
+			]]
+			spin = 14,
 			silhouette = props.locked == true,
 			glyph = if props.model then nil else (props.glyph or "paw"),
 			size = UDim2.new(1, -10, 0, artHeight),

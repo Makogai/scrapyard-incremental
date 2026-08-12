@@ -89,6 +89,22 @@ return table.freeze({
 					Text = "SALVAGE MAGNET: the strongest magnet scrap cash can buy, $3,000,000, unlocked once you have reached the Vehicle Graveyard. Magnets survive rebirth.",
 				}),
 				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Every upgrade now has a Robux option: +1 level instantly, without the scrap cash.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "BUY x5 and MAX now really buy that many upgrade levels. They were being cut short after about twelve, and fewer if you had clicked anything recently.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Owning two of the same pet and equipping one left the second copy offering only UNEQUIP. Both copies now behave, and you can equip and unequip at the same time.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Pet cards are tinted by rarity, and your pets turn slowly in their cards instead of standing still.",
+				}),
+				table.freeze({
 					Kind = "Fix" :: ChangeKind,
 					Text = "Rebirthing now puts your plot back to the Front Yard. It used to take the area unlocks away but leave the old yard standing, so you kept a Vehicle Graveyard you no longer owned.",
 				}),

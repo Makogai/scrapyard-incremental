@@ -235,9 +235,9 @@ end
 local function liveActions()
 	local self = localActions()
 
-	function self.buyUpgrade(upgradeId: string)
+	function self.buyUpgrade(upgradeId: string, count: number?)
 		Sound.play("purchase")
-		Bridge.requestUpgrade(upgradeId)
+		Bridge.requestUpgrade(upgradeId, count)
 	end
 
 	function self.unlockArea(areaId: string)

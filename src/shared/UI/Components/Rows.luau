@@ -45,7 +45,14 @@ local Rows = {}
 function Rows.UpgradeCard(props)
 	local maxed = props.maxLevel ~= nil and props.level >= props.maxLevel
 	local affordable = props.affordable ~= false and not maxed
-	local height = props.height or 104
+	--[[
+		TWO ROWS WHEN THERE IS A ROBUX OPTION: cash on top, Robux underneath.
+
+		The card grows rather than the buttons shrinking -- a 48px call to action is the smallest that still
+		reads as pressable on a phone, and squeezing two into 104px produced two that read as neither.
+	]]
+	local hasRobux = props.robuxPrice ~= nil and props.onBuyRobux ~= nil
+	local height = props.height or (if hasRobux then 158 else 104)
 
 	local children = P.compact(
 		e(Icon, {
@@ -143,11 +150,36 @@ function Rows.UpgradeCard(props)
 			variant = if maxed then "Neutral" else "Primary",
 			disabled = maxed or not affordable,
 			size = UDim2.fromOffset(176, 48),
-			position = UDim2.new(1, -20, 1, -14),
+			position = UDim2.new(1, -20, 1, if hasRobux then -68 else -14),
 			anchorPoint = Vector2.new(1, 1),
 			zIndex = 4,
 			onClick = props.onBuy,
-		})
+		}),
+		--[[
+			THE ROBUX ROW.
+
+			`iconSize` is pinned rather than left to derive from the text size: the Robux mark defaults to
+			`textSize + 8` and grew with the label, which is what made it look like it was floating in the
+			corner at its own scale. Fixed at 16 it sits centred on the price it belongs to.
+		]]
+		if hasRobux
+			then e(Buttons.Button, {
+				key = "RobuxButton",
+				text = "+1 LEVEL",
+				subtext = Format.robux(props.robuxPrice),
+				subtextSize = Theme.TextSize.Micro,
+				glyph = "robux",
+				iconSize = 16,
+				variant = "Premium",
+				disabled = maxed,
+				textSize = Theme.TextSize.Small,
+				size = UDim2.fromOffset(176, 44),
+				position = UDim2.new(1, -20, 1, -14),
+				anchorPoint = Vector2.new(1, 1),
+				zIndex = 4,
+				onClick = props.onBuyRobux,
+			})
+			else nil
 	)
 
 	return e(P.Panel, {

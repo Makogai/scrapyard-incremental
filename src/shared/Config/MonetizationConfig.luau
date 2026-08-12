@@ -119,6 +119,93 @@ local passes = {
 }
 
 local products = {
+	--[[
+		BUY A LEVEL WITH ROBUX -- one product per upgrade.
+
+		It has to be one product each, because a developer product carries no parameters: the thing bought IS
+		the id. `UpgradeId` maps back to which upgrade a receipt raises, so `GrantDeveloperProduct` needs no
+		second lookup table to fall out of step with this one.
+
+		`MarketplaceId = 0` on all of them until they are created in the Creator Dashboard. A product with an
+		id of 0 cannot be prompted, so the button refuses politely rather than erroring -- see
+		`MonetizationService`.
+
+		The level is granted FREE OF CASH COST but still respects the level cap: Robux buys you a level you
+		could have bought, not a level the cap says does not exist yet.
+	]]
+	RobuxUpgradeMagnetStrength = table.freeze({
+		Id = "RobuxUpgradeMagnetStrength",
+		MarketplaceId = 0,
+		DisplayName = "Magnet Strength +1",
+		Description = "Instantly add one level of Magnet Strength, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "MagnetStrength",
+	}),
+	RobuxUpgradeMagnetRange = table.freeze({
+		Id = "RobuxUpgradeMagnetRange",
+		MarketplaceId = 0,
+		DisplayName = "Magnet Range +1",
+		Description = "Instantly add one level of Magnet Range, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "MagnetRange",
+	}),
+	RobuxUpgradeStorageCapacity = table.freeze({
+		Id = "RobuxUpgradeStorageCapacity",
+		MarketplaceId = 0,
+		DisplayName = "Storage Capacity +1",
+		Description = "Instantly add one level of Storage Capacity, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "StorageCapacity",
+	}),
+	RobuxUpgradeMovementSpeed = table.freeze({
+		Id = "RobuxUpgradeMovementSpeed",
+		MarketplaceId = 0,
+		DisplayName = "Walk Speed +1",
+		Description = "Instantly add one level of Walk Speed, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "MovementSpeed",
+	}),
+	RobuxUpgradeScrapValue = table.freeze({
+		Id = "RobuxUpgradeScrapValue",
+		MarketplaceId = 0,
+		DisplayName = "Scrap Value +1",
+		Description = "Instantly add one level of Scrap Value, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "ScrapValue",
+	}),
+	RobuxUpgradeCollectionSpeed = table.freeze({
+		Id = "RobuxUpgradeCollectionSpeed",
+		MarketplaceId = 0,
+		DisplayName = "Collection Speed +1",
+		Description = "Instantly add one level of Collection Speed, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "CollectionSpeed",
+	}),
+	RobuxUpgradeScrapFlow = table.freeze({
+		Id = "RobuxUpgradeScrapFlow",
+		MarketplaceId = 0,
+		DisplayName = "Scrap Flow +1",
+		Description = "Instantly add one level of Scrap Flow, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "ScrapFlow",
+	}),
+	RobuxUpgradeRarity = table.freeze({
+		Id = "RobuxUpgradeRarity",
+		MarketplaceId = 0,
+		DisplayName = "Rarity Luck +1",
+		Description = "Instantly add one level of Rarity Luck, no scrap cash needed.",
+		DisplayPrice = 29,
+		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
+		UpgradeId = "Rarity",
+	}),
+
 	CashSmall = table.freeze({
 		Id = "CashSmall",
 		MarketplaceId = 0,

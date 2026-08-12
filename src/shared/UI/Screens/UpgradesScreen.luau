@@ -22,6 +22,7 @@ local UI = script.Parent.Parent
 local Theme = require(UI.Theme)
 local Format = require(UI.Format)
 local GameData = require(UI.GameData)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local P = require(UI.Primitives)
 local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
@@ -43,6 +44,14 @@ local function UpgradesScreen(props)
 			local cost, gained =
 				GameData.bulkUpgrade(upgradeId, level, state.buyAmount, state.cash, state.prestige)
 			local price = if state.buyAmount == "x1" then view.price else cost
+			--[[
+				The Robux "+1 level" product for this upgrade, if one exists.
+
+				Offered even before the dashboard id is filled in, because `MonetizationService` refuses a
+				product with an id of 0 with a readable message -- a visible button that says "not available
+				yet" beats a button that appears the week someone remembers to wire it up.
+			]]
+			local robuxProduct = MonetizationConfig.Products[`RobuxUpgrade{upgradeId}`]
 			local affordable = gained > 0 and price <= state.cash
 
 			cards[#cards + 1] = e(Rows.UpgradeCard, {
@@ -57,6 +66,13 @@ local function UpgradesScreen(props)
 				price = price,
 				amount = if state.buyAmount == "x1" then nil else state.buyAmount,
 				affordable = affordable,
+				--- The Robux alternative. `nil` when the product has no dashboard id yet, so no row appears.
+				robuxPrice = robuxProduct and robuxProduct.DisplayPrice or nil,
+				onBuyRobux = if robuxProduct
+					then function()
+						actions.purchase(robuxProduct.Id, "product")
+					end
+					else nil,
 				layoutOrder = index,
 				onBuy = function()
 					actions.confirm({
@@ -69,10 +85,16 @@ local function UpgradesScreen(props)
 						Price = price,
 						ConfirmText = "BUY",
 						OnConfirm = function()
-							-- One intent per level; the server prices each.
-							for _ = 1, math.max(1, gained) do
-								actions.buyUpgrade(upgradeId)
-							end
+							--[[
+								ONE INTENT FOR THE WHOLE PURCHASE.
+
+								This used to fire one event per level, which the server's remote limiter (12
+								per 5 seconds) quietly truncated -- so MAX bought twelve levels at best, and
+								fewer if you had clicked anything in the last few seconds. The server prices
+								every level itself and stops when money or the cap runs out, so the count is
+								a request rather than something to be trusted.
+							]]
+							actions.buyUpgrade(upgradeId, math.max(1, gained))
 						end,
 					})
 				end,

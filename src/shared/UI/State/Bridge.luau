@@ -146,8 +146,16 @@ end
 -- Outbound intents
 --------------------------------------------------------------------------------
 
-function Bridge.requestUpgrade(upgradeId: string)
-	fire("RequestUpgrade", upgradeId)
+--[[
+	Buy one upgrade, or several.
+
+	`count` is a REQUEST, not a promise: the server prices every level itself and stops when the money or
+	the level cap runs out. It exists because the client used to fire one event PER LEVEL, and the remote
+	limiter allows 12 per 5 seconds -- so MAX silently bought twelve levels at best, and fewer if the player
+	had clicked anything recently. One intent per press instead.
+]]
+function Bridge.requestUpgrade(upgradeId: string, count: number?)
+	fire("RequestUpgrade", upgradeId, count)
 end
 
 function Bridge.requestAreaUnlock(areaId: string)

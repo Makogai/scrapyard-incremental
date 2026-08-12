@@ -412,6 +412,31 @@ local function completePrestige(player: Player, data: { [string]: any }, reward:
 	end
 end
 
+--[[
+	Grant one upgrade level, ignoring the cash price.
+
+	Used by the Robux "+1" products. Still bounded by the prestige level cap -- Robux skips the COST, not the
+	progression -- so a maxed upgrade refuses and the receipt is reported as unfulfilled rather than
+	silently swallowed.
+]]
+local function grantUpgradeLevel(data: { [string]: any }, upgradeId: string): boolean
+	local definition = UpgradeConfig.ById[upgradeId]
+	if definition == nil then
+		return false
+	end
+	local current = data.UpgradeLevels[upgradeId] or 0
+	local maximum = GameMath.upgradeMaximumLevel(
+		definition.BaseMaximumLevel,
+		definition.LevelsPerPrestige,
+		data.PrestigeCount
+	)
+	if current >= maximum then
+		return false
+	end
+	data.UpgradeLevels[upgradeId] = current + 1
+	return true
+end
+
 function PlayerStateService.GrantDeveloperProduct(
 	player: Player,
 	productId: string,
@@ -423,6 +448,17 @@ function PlayerStateService.GrantDeveloperProduct(
 		return false, "Product unavailable"
 	end
 	local data = session.Data
+	--[[
+		A Robux upgrade product raises one level. Handled before the receipt bookkeeping below so a refused
+		grant -- a maxed upgrade -- leaves the receipt unprocessed and Roblox retries rather than charging
+		for nothing.
+	]]
+	local upgradeId = (definition :: any).UpgradeId
+	if typeof(upgradeId) == "string" and data.ProcessedReceipts[purchaseId] ~= true then
+		if not grantUpgradeLevel(data, upgradeId) then
+			return false, "That upgrade is already at its cap"
+		end
+	end
 	if data.ProcessedReceipts[purchaseId] == true then
 		return true, "Purchase already granted"
 	end

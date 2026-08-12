@@ -428,6 +428,27 @@ local function PetDetails(props)
 
 	local style = Theme.rarity(pet.rarity)
 
+	--[[
+		COPIES, NOT IDENTITY.
+
+		The server tracks equipped pets as a COUNT per id, and the grid draws one card per copy owned. This
+		used to set a single `equipped` boolean if ANY copy was equipped, which disabled EQUIP -- so owning
+		two of the same pet and equipping one left the second copy offering only UNEQUIP. "Equip best" did
+		the right thing, which is what made it look like a UI bug rather than a logic one.
+
+		Both actions can be live at once now, and that is correct: with two copies and one equipped there is
+		genuinely a copy to equip AND a copy to take off.
+	]]
+	local equippedCopies = 0
+	for _, id in ipairs(state.equippedPets) do
+		if id == pet.id then
+			equippedCopies += 1
+		end
+	end
+	local ownedCopies = pet.count or 0
+	local canEquipAnother = equippedCopies < ownedCopies
+	local canUnequip = equippedCopies > 0
+
 	local equipped = false
 	for _, id in ipairs(state.equippedPets) do
 		if id == pet.id then
@@ -454,7 +475,7 @@ local function PetDetails(props)
 				key = "Equip",
 				text = "EQUIP",
 				variant = "Primary",
-				disabled = equipped,
+				disabled = not canEquipAnother,
 				size = UDim2.fromOffset(180, 54),
 				layoutOrder = 1,
 				onClick = function()
@@ -465,7 +486,7 @@ local function PetDetails(props)
 				key = "Unequip",
 				text = "UNEQUIP",
 				variant = "Secondary",
-				disabled = not equipped,
+				disabled = not canUnequip,
 				size = UDim2.fromOffset(180, 54),
 				layoutOrder = 2,
 				onClick = function()
