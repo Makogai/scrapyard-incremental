@@ -174,6 +174,14 @@ local function AdminScreen(props)
 	local target, setTarget = React.useState("Self")
 	local pickedUserId, setPickedUserId = React.useState(nil :: number?)
 	local amountText, setAmountText = React.useState("1000")
+	--[[
+	THE BROADCAST MESSAGE.
+
+	Its own box rather than reusing the amount field, because an entry flagged `Text` wants words and the
+	amount wants a number -- one box doing both means every broadcast is one mis-read away from being sent
+	as "1000".
+]]
+	local messageText, setMessageText = React.useState("")
 	local activeSection, setActiveSection = React.useState(sections[1] and sections[1].Id or "")
 	--- Which dangerous entry is one tap from firing, cleared on any other interaction.
 	local armed, setArmed = React.useState(nil :: string?)
@@ -189,13 +197,22 @@ local function AdminScreen(props)
 			return
 		end
 		setArmed(nil)
+		--[[
+			An entry flagged `Text` sends what was typed in the `itemId` slot -- already a validated string on
+			that remote, so a broadcast needs no widening of the signature. `AdminService` clips it to
+			`AdminConfig.MaximumBroadcastLength` and refuses an empty one.
+		]]
 		actions.adminCommand(
 			entry.Command,
 			if entry.Amount then amount else nil,
 			target,
 			pickedUserId,
-			entry.ItemId
+			if entry.Text then messageText else entry.ItemId
 		)
+		if entry.Text then
+			--- Cleared on send, so the same message cannot be fired twice by a stray second tap.
+			setMessageText("")
+		end
 	end
 
 	--- Target buttons, straight from the catalogue so a new mode needs no edit here.
@@ -297,6 +314,22 @@ local function AdminScreen(props)
 				}),
 				children = tabRows[row],
 			})
+		end
+	end
+
+	--[[
+	Whether the section on screen has anything that takes typed words. The box is drawn only for those
+	sections: a text field parked above CASH and GEARS reads as though it applies to them.
+]]
+	local wantsMessage = false
+	for _, section in ipairs(sections) do
+		if section.Id == activeSection then
+			for _, entry in ipairs(section.Entries) do
+				if entry.Text then
+					wantsMessage = true
+					break
+				end
+			end
 		end
 	end
 
@@ -525,10 +558,70 @@ local function AdminScreen(props)
 							}),
 						},
 					}),
+					--[[
+						THE MESSAGE BOX, only for sections that take words.
+
+						Same raw `TextBox` as the amount field -- see the note there about why the kit has no
+						text-field component.
+
+						PER-KEYSTROKE here, unlike the amount box, and that difference is load-bearing: pressing
+						BROADCAST blurs this field, so a `FocusLost` handler would race the button's own click.
+						The first press would capture the state from before the blur and send an empty message.
+						Nothing is sent until the button is pressed, so there is no half-typed-send to guard.
+					]]
+					if wantsMessage
+						then e(P.Group, {
+							key = "MessageRow",
+							size = UDim2.new(1, 0, 0, AMOUNT_HEIGHT),
+							position = UDim2.fromOffset(0, AMOUNT_TOP + AMOUNT_HEIGHT + 6),
+							children = {
+								e(P.Label, {
+									key = "MessageLabel",
+									text = "MESSAGE",
+									textSize = Theme.TextSize.Tiny,
+									color = Theme.Color.Gray,
+									align = Enum.TextXAlignment.Left,
+									size = UDim2.fromOffset(90, AMOUNT_HEIGHT),
+								}),
+								e("TextBox", {
+									key = "Message",
+									Text = messageText,
+									PlaceholderText = "Server restarting in 5 minutes - sorry!",
+									PlaceholderColor3 = Theme.Color.GrayDark,
+									ClearTextOnFocus = false,
+									FontFace = Theme.Font.Bold,
+									TextSize = Theme.TextSize.Small,
+									TextColor3 = Theme.Color.White,
+									TextXAlignment = Enum.TextXAlignment.Left,
+									TextTruncate = Enum.TextTruncate.AtEnd,
+									BackgroundColor3 = Theme.Color.Slot,
+									BorderSizePixel = 0,
+									Size = UDim2.new(1, -94, 0, 40),
+									Position = UDim2.fromOffset(94, 2),
+
+									[React.Change.Text] = function(rbx)
+										setMessageText(rbx.Text)
+									end,
+								}, {
+									P.corner(Theme.Radius.Small),
+									P.stroke(Theme.Color.Outline, Theme.Stroke.Chip),
+									P.padding({ x = 10 }, "EntryInset"),
+								}),
+							},
+						})
+						else nil,
 					e(P.Scroller, {
 						key = "Entries",
-						size = UDim2.new(1, 0, 1, -HEADER_HEIGHT),
-						position = UDim2.fromOffset(0, HEADER_HEIGHT),
+						size = UDim2.new(
+							1,
+							0,
+							1,
+							-(HEADER_HEIGHT + (if wantsMessage then AMOUNT_HEIGHT + 6 else 0))
+						),
+						position = UDim2.fromOffset(
+							0,
+							HEADER_HEIGHT + (if wantsMessage then AMOUNT_HEIGHT + 6 else 0)
+						),
 						layout = P.list({ padding = 6 }),
 						children = entryRows,
 					}),
