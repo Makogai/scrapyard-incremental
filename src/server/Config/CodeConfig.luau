@@ -16,4 +16,17 @@ return table.freeze({
 			Gears = 0,
 		}),
 	}),
+		ADMIN = table.freeze({
+		Id = "Admin",
+		Enabled = true,
+		StudioOnly = false,
+		StartsAt = 0,
+		ExpiresAt = 0,
+		Rewards = table.freeze({
+			Magnets = table.freeze({ "" }),
+			Items = table.freeze({GodPotion = 1 }),
+			Money = 0,
+			Gears = 0,
+		}),
+	}),
 })

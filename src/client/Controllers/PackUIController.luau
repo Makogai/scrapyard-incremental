@@ -1080,15 +1080,12 @@ function PackUIController.Start()
 			state.PrestigeCount,
 			PrestigeConfig.MaximumGearsPerPrestige
 		)
-		local currentMultiplier = GameMath.gearValueMultiplier(
-			state.Gears,
-			PrestigeConfig.GearPower,
-			PrestigeConfig.MaximumGearValueMultiplier
-		)
-		local nextMultiplier = GameMath.gearValueMultiplier(
-			state.Gears + math.max(projectedGearReward, 1),
-			PrestigeConfig.GearPower,
-			PrestigeConfig.MaximumGearValueMultiplier
+		--- The rebirth bonus, not a gear curve. See `GameMath.prestigeValueMultiplier`.
+		local currentMultiplier =
+			GameMath.prestigeValueMultiplier(state.PrestigeCount, PrestigeConfig.ValuePerPrestige)
+		local nextMultiplier = GameMath.prestigeValueMultiplier(
+			state.PrestigeCount + 1,
+			PrestigeConfig.ValuePerPrestige
 		)
 		local prestigeRatio = math.clamp(state.Money / math.max(prestigeRequirement, 1), 0, 1)
 		currentPrestigeLabel.Text = `REBIRTH {state.PrestigeCount}`

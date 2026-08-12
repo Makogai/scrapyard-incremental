@@ -105,11 +105,7 @@ function FoundationValidator.validate()
 	positive(PrestigeConfig.BaseMoneyRequirement, "Prestige.BaseMoneyRequirement")
 	positive(PrestigeConfig.RequirementGrowth, "Prestige.RequirementGrowth")
 	positive(PrestigeConfig.MaximumGearsPerPrestige, "Prestige.MaximumGearsPerPrestige")
-	positive(PrestigeConfig.GearPower, "Prestige.GearPower")
-	assert(
-		PrestigeConfig.MaximumGearValueMultiplier >= 1,
-		"Prestige multiplier cap must be at least one"
-	)
+	positive(PrestigeConfig.ValuePerPrestige, "Prestige.ValuePerPrestige")
 	assert(PlotConfig.PlotCount == Environment.MaximumPlayers, "Plot count must match server size")
 	assert(
 		PlotConfig.StreetCount * PlotConfig.PlotsPerStreet == PlotConfig.PlotCount,

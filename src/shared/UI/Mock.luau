@@ -24,9 +24,9 @@ Mock.player = {
 	prestige = 4,
 	totalScrap = 2_400_000,
 
-	storage = 650,
-	capacity = 1_000,
-	storageValue = 12_450,
+	storage = 18,
+	capacity = 25,
+	storageValue = 1_285,
 
 	area = "vehicle_graveyard",
 	equippedMagnet = "advanced",

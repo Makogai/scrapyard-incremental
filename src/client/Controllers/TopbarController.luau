@@ -39,6 +39,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ChangelogConfig = require(ReplicatedStorage.Shared.Config.ChangelogConfig)
 local UI = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("UI"))
 local Atoms = UI.Atoms
 
@@ -150,6 +151,26 @@ function TopbarController.Start()
 			built:setCaption(entry.caption)
 		end
 		built:setOrder(entry.order)
+
+		--[[
+			THE UNREAD FLAG ON *UPDATES*, so a shipped change is visibly testable.
+
+			Keyed off the newest `ChangelogConfig` entry, so adding a changelog line is the only step needed
+			to make the button announce itself -- there is no second list to keep in step.
+
+			SESSION-SCOPED on purpose: it flags on every join and clears when the window is opened. Persisting
+			it would mean a saved "last version seen" field and a schema migration, and while we are testing,
+			flagging every session is the behaviour we want -- rejoin, and the button tells you the build
+			changed. Worth revisiting at public release, when these entries get summed into one anyway.
+
+			`pcall`, because TopbarPlus is a Studio package outside the Rojo tree and `notify` has moved
+			between its versions. A missing badge is a lost convenience, not a broken topbar.
+		]]
+		if entry.screen == "changelog" and ChangelogConfig.Entries[1] ~= nil then
+			pcall(function()
+				built:notify()
+			end)
+		end
 
 		--[[
 			Toggle rather than open: pressing a selected icon closes its window.

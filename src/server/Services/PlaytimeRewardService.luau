@@ -107,7 +107,13 @@ function PlaytimeRewardService.Start()
 			for _, player in Players:GetPlayers() do
 				local previous = lastBankedAt[player]
 				lastBankedAt[player] = now
-				if previous ~= nil then
+				--[[
+					ONLY BANK TIME THE PLAYER WAS ACTUALLY PLAYING.
+
+					`previous` is still updated above whether or not the time counts, so an idle stretch is
+					skipped rather than accumulated and paid out in one lump the moment they move again.
+				]]
+				if previous ~= nil and PlayerStateService.IsActive(player) then
 					PlayerStateService.AddPlaytimeSeconds(player, now - previous, today)
 				end
 			end

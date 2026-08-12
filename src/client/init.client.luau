@@ -16,6 +16,7 @@ local TutorialArrowController = require(script.Controllers.TutorialArrowControll
 local EventBillboardController = require(script.Controllers.EventBillboardController)
 local TitleController = require(script.Controllers.TitleController)
 local GlobalChatController = require(script.Controllers.GlobalChatController)
+local EggHologramController = require(script.Controllers.EggHologramController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -69,5 +70,12 @@ TitleController.Start()
 	order the same as the dependency order.
 ]]
 GlobalChatController.Start()
+
+--[[
+	Purely cosmetic and self-contained: it reads authored map geometry and needs neither the store, the
+	Bridge nor any remote. Started last because nothing waits on it, and a podium that is not authored yet
+	only warns.
+]]
+EggHologramController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))

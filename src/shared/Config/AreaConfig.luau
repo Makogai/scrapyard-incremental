@@ -27,7 +27,7 @@ local byId: { [GameTypes.AreaId]: GameTypes.AreaDefinition } = {
 		Id = "WorkshopYard",
 		DisplayName = "Workshop Yard",
 		Order = 2,
-		UnlockPrice = 12500,
+		UnlockPrice = 75000,
 		ScrapIds = {
 			"Tire",
 			"BrokenAppliance",
@@ -44,7 +44,7 @@ local byId: { [GameTypes.AreaId]: GameTypes.AreaDefinition } = {
 		Id = "VehicleGraveyard",
 		DisplayName = "Vehicle Graveyard",
 		Order = 3,
-		UnlockPrice = 125000,
+		UnlockPrice = 450000,
 		ScrapIds = {
 			"EnginePart",
 			"CarDoor",

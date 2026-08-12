@@ -120,7 +120,7 @@ local function HudMobile(props)
 			key = "Storage",
 			storage = state.storage,
 			capacity = state.capacity,
-			value = math.floor(state.storage * 19.15),
+			value = state.storageValue,
 			compact = true,
 			size = UDim2.fromOffset(WIDTH - MARGIN * 2, STORAGE_HEIGHT),
 			position = UDim2.new(0.5, 0, 1, -Theme.Safe.BottomBand),

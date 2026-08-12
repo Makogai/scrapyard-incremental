@@ -40,6 +40,17 @@ type Session = {
 local PlayerStateService = {}
 local sessions: { [Player]: Session } = {}
 local shuttingDown = false
+
+--[[
+	WHEN EACH PLAYER LAST DID SOMETHING, for the playtime clock.
+
+	`os.clock()` rather than `os.time()`: this is a duration between two server-side moments, never a
+	timestamp anybody saves or compares across sessions, so monotonic time is the correct clock and cannot
+	be skewed by the system clock changing under it.
+
+	Cleared on leave with the rest of the per-player tables.
+]]
+local lastActiveAt: { [Player]: number } = {}
 local stateChanged: RemoteEvent?
 local notifyRemote: RemoteEvent?
 local gameplayEffect: RemoteEvent?
@@ -81,8 +92,16 @@ local function derivedStats(data: { [string]: any })
 	local range = (magnet.BaseRange + (effect("MagnetRange") - rangeUpgrade.BaseEffect))
 		* petEffects.MagnetRange
 	local godActive = data.ActiveBoosts.GodBoostEndsAt > os.time()
-	if data.ActiveBoosts.StrengthBoostEndsAt > os.time() then
+	--[[
+		The Magnet Potion moved from "+15 flat strength" to a smaller strength bump plus multipliers on
+		collection speed and range, because a flat strength number stops mattering the moment upgrades
+		outgrow it -- at +15 it was decisive at level 1 and irrelevant by the Graveyard. Multipliers scale
+		with the player, so the potion is worth the same fraction all game.
+	]]
+	local magnetPotion = data.ActiveBoosts.StrengthBoostEndsAt > os.time()
+	if magnetPotion then
 		strength += InventoryConfig.Consumables.StrengthPotion.Amount
+		range *= InventoryConfig.Consumables.StrengthPotion.RangeMultiplier
 	end
 	if godActive then
 		strength += InventoryConfig.Consumables.GodPotion.StrengthAmount
@@ -110,6 +129,24 @@ local function derivedStats(data: { [string]: any })
 	local friendBoost = 1 + (data.FriendBoostCount or 0) * RewardsConfig.Friends.BoostPerFriend
 	scrapValue *= friendBoost
 	--[[
+		THE PERMANENT REBIRTH BONUS, which is the entire reason to rebirth.
+
+		Money, areas and upgrades all reset, so without this a prestige is a pure loss. +25% value per
+		rebirth compounds against the x1.75 cost growth -- the growth has to be the faster of the two or
+		each rebirth gets easier than the last, which is why those two numbers live next to each other in
+		`PrestigeConfig` with a comment saying so.
+
+		This is now the ONLY thing a rebirth pays. Gears used to multiply income on top of it and no longer
+		do -- they are rebirth currency with no passive effect. See `PrestigeConfig`.
+
+		Through `GameMath.prestigeValueMultiplier` rather than inline, because three readouts quote this
+		number back to the player and none of them may disagree with what is applied here.
+	]]
+	scrapValue *= GameMath.prestigeValueMultiplier(
+		data.PrestigeCount or 0,
+		PrestigeConfig.ValuePerPrestige
+	)
+	--[[
 		The live server-wide event, read from the schedule rather than from a service.
 
 		`EventConfig` is pure arithmetic over `os.time()`, so this needs no state, no dependency and no
@@ -129,6 +166,16 @@ local function derivedStats(data: { [string]: any })
 	respawnMultiplier *= petEffects.RespawnRate
 	collectionSpeed *= EventConfig.multiplierAt("CollectionSpeed", now)
 	respawnMultiplier *= EventConfig.multiplierAt("RespawnRate", now)
+	if magnetPotion then
+		collectionSpeed *= InventoryConfig.Consumables.StrengthPotion.CollectionMultiplier
+	end
+	--[[
+		The Spawn Potion. `RespawnMultiplier` is a DIVISOR of time -- lower is faster -- so a potion that
+		speeds respawn up multiplies by less than one. Reads the wrong way round the first time you see it.
+	]]
+	if data.ActiveBoosts.SpawnBoostEndsAt > os.time() then
+		respawnMultiplier *= InventoryConfig.Consumables.SpawnPotion.RespawnMultiplier
+	end
 	if godActive then
 		collectionSpeed *= InventoryConfig.Consumables.GodPotion.CollectionMultiplier
 		respawnMultiplier *= InventoryConfig.Consumables.GodPotion.RespawnMultiplier
@@ -166,7 +213,22 @@ function PlayerStateService.GetLuckMultiplier(player: Player): number
 	end
 	--- Lucky Hour, from the same schedule the scrap-value events come from.
 	multiplier *= EventConfig.multiplierAt("Luck", os.time())
-	return multiplier
+	--- Permanent per-rebirth luck, the other half of what prestige buys.
+	local prestigeCount = math.max(0, math.floor(session.Data.PrestigeCount or 0))
+	multiplier *= 1 + prestigeCount * PrestigeConfig.LuckPerPrestige
+
+	--[[
+		THE CEILING ON TOTAL LUCK, and it is not decoration.
+
+		Rarity weights scale as `weight x luck ^ exponent`, and Nebula's exponent is 2.6 -- so luck
+		compounds super-linearly and every source multiplies: the Rarity upgrade, a potion, Lucky Hour, the
+		God Potion, and now rebirths. Uncapped, a stacked player reaches a 4.5% Nebula rate, which at ~50
+		pieces a minute is a server-wide announcement every twenty seconds.
+
+		Capped here rather than on each source, because the problem is the PRODUCT, and any individual
+		source looks reasonable on its own.
+	]]
+	return math.min(multiplier, ScrapConfig.MaximumLuckMultiplier)
 end
 
 --[[
@@ -764,6 +826,7 @@ local function onPlayerAdded(player: Player)
 end
 
 local function onPlayerRemoving(player: Player)
+	lastActiveAt[player] = nil
 	if sessions[player] == nil then
 		return
 	end
@@ -925,6 +988,32 @@ function PlayerStateService.PushAll()
 	end
 end
 
+--[[
+	Note that this player just did something. Cheap enough to call from any gameplay path.
+
+	Called from collection, selling, buying an upgrade and buying an area -- the four things that mean
+	somebody is playing rather than parked. Movement is deliberately NOT one of them: a character wedged
+	against a wall by a stuck input jitters forever, and that is the exact case AFK detection exists to
+	catch.
+]]
+function PlayerStateService.MarkActive(player: Player)
+	lastActiveAt[player] = os.clock()
+end
+
+--[[
+	Has this player done anything recently enough to be counted as playing?
+
+	True for a player who has only just joined and not yet touched anything -- they are at their keyboard,
+	and starting the clock at zero would mean the first minute of a session never counts.
+]]
+function PlayerStateService.IsActive(player: Player): boolean
+	local at = lastActiveAt[player]
+	if at == nil then
+		return true
+	end
+	return os.clock() - at <= RewardsConfig.Playtime.ActivityWindowSeconds
+end
+
 function PlayerStateService.GetPublicState(player: Player): { [string]: any }?
 	local session = sessions[player]
 	return if session then publicSnapshot(session.Data) else nil
@@ -948,12 +1037,19 @@ function PlayerStateService.TryCollect(
 
 	local data = session.Data
 	local stats = derivedStats(data)
+	--[[
+		ONE SLOT PER PIECE, not its weight. See `ScrapConfig.SlotsPerScrap`.
+
+		`StoredWeight` is now a COUNT of carried pieces despite the name. The field is kept because renaming
+		it means a schema migration plus every client readout, and it is listed as a follow-up in
+		`plan/ECONOMY_REBALANCE.md`. The HUD already reads as a count, so what a player sees is right.
+	]]
 	local allowed, reason = CollectionRules.canCollect(
 		stats.MagnetStrength,
 		scrap.RequiredMagnetStrength,
 		data.StoredWeight,
 		stats.StorageCapacity,
-		scrap.Weight,
+		ScrapConfig.SlotsPerScrap,
 		ignoreAreaLock == true or data.UnlockedAreas[areaId] == true,
 		true
 	)
@@ -961,7 +1057,8 @@ function PlayerStateService.TryCollect(
 		return false, reason
 	end
 
-	data.StoredWeight += scrap.Weight
+	PlayerStateService.MarkActive(player)
+	data.StoredWeight += ScrapConfig.SlotsPerScrap
 	data.StoredValue += GameMath.scrapValue(
 		scrap.BaseValue,
 		variant.ValueMultiplier,
@@ -1012,12 +1109,13 @@ function PlayerStateService.CanCollect(
 	end
 	local data = session.Data
 	local stats = derivedStats(data)
+	--- Must ask exactly what `TryCollect` asks, or a piece passes the check and fails the take.
 	return CollectionRules.canCollect(
 		stats.MagnetStrength,
 		scrap.RequiredMagnetStrength,
 		data.StoredWeight,
 		stats.StorageCapacity,
-		scrap.Weight,
+		ScrapConfig.SlotsPerScrap,
 		ignoreAreaLock == true or data.UnlockedAreas[areaId] == true,
 		true
 	)
@@ -1028,19 +1126,11 @@ function PlayerStateService.TrySell(player: Player): (boolean, number)
 	if session == nil or session.Data.StoredValue <= 0 then
 		return false, 0
 	end
+	PlayerStateService.MarkActive(player)
 	local data = session.Data
 	local stats = derivedStats(data)
-	local gearMultiplier = GameMath.gearValueMultiplier(
-		data.Gears,
-		PrestigeConfig.GearPower,
-		PrestigeConfig.MaximumGearValueMultiplier
-	)
-	local award = CollectionRules.sellAward(
-		data.StoredValue,
-		stats.ScrapValue,
-		gearMultiplier,
-		Environment.MaximumMoney
-	)
+	local award =
+		CollectionRules.sellAward(data.StoredValue, stats.ScrapValue, Environment.MaximumMoney)
 	if award <= 0 then
 		return false, 0
 	end
@@ -1074,6 +1164,7 @@ function PlayerStateService.TryPurchaseUpgrade(player: Player, upgradeId: string
 	if currentLevel >= maximumLevel then
 		return false, "Prestige to raise this upgrade cap"
 	end
+	PlayerStateService.MarkActive(player)
 	local price = GameMath.incrementalUpgradeCost(
 		definition.BaseCost,
 		definition.GrowthRate,
@@ -1107,17 +1198,20 @@ function PlayerStateService.TryUnlockArea(player: Player, areaId: string): (bool
 
 	local data = session.Data
 	local previousId = AreaConfig.Order[definition.Order - 1]
+	--- Computed ONCE and used for both the check and the charge, so they cannot disagree.
+	local price = AreaRules.unlockPrice(definition.UnlockPrice, data.PrestigeCount)
 	local allowed, reason = AreaRules.canUnlock(
 		data.UnlockedAreas[areaId] == true,
 		previousId ~= nil and data.UnlockedAreas[previousId] == true,
 		data.Money,
-		definition.UnlockPrice
+		price
 	)
 	if not allowed then
 		return false, reason
 	end
 
-	data.Money -= definition.UnlockPrice
+	PlayerStateService.MarkActive(player)
+	data.Money -= price
 	data.UnlockedAreas[areaId] = true
 	for _, scrapId in definition.ScrapIds do
 		data.UnlockedScrapTypes[scrapId] = true
@@ -1182,16 +1276,45 @@ function PlayerStateService.AdminMutate(
 	elseif command == "ClearStorage" then
 		data.StoredWeight = 0
 		data.StoredValue = 0
-	elseif command == "ResetTestProfile" then
+	elseif command == "ResetProfile" then
+		--[[
+			BACK TO A BRAND-NEW PROFILE. Everything: money, gears, upgrades, areas, pets, titles,
+			achievements, entitlements, discoveries, streaks, storage, rebirths.
+
+			`createDefault` is the same function a genuine first join uses, so there is no separate list of
+			"things to clear" to fall out of step with the schema. A new field added to a save is blank here
+			for free; a hand-written reset would keep whatever the wipe forgot about, which is exactly the
+			bug that makes a reset look like it did nothing.
+
+			THEN THE JOIN STEPS ARE RE-RUN, because "as if they just joined" is more than the data:
+			`onPlayerAdded` also grants staff titles, publishes the worn title, writes the Tab columns and
+			sets walk speed. Missing those left a wiped player wearing their old title, walking at their old
+			upgraded speed, with stale numbers in the player list.
+		]]
 		session.Data = PlayerDataSchema.createDefault(os.time())
 		data = session.Data
-		--- The fresh profile wears nothing, so the nameplate has to be told or it keeps the old title.
+		--[[
+			Staff titles come back, and that is correct. They are granted from WHO SOMEONE IS rather than
+			from anything they earned, so a real rejoin would hand them straight back -- see
+			`grantStaffTitles`.
+		]]
+		grantStaffTitles(player, data)
+		--- The fresh profile wears nothing of its own, so the nameplate has to be told.
 		publishTitle(player, data)
+		LeaderstatsService.Publish(player, data)
 		local character = player.Character
 		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
 		if humanoid then
 			humanoid.WalkSpeed = derivedStats(data).MovementSpeed
 		end
+		--[[
+			Saved straight away rather than at the next autosave.
+
+			A wipe that lives only in memory is undone by a crash or a quick rejoin, and the person who
+			asked for it has already moved on believing it happened. `saveSession` is the same path a normal
+			save takes, so the write is bounded and sanitised like any other.
+		]]
+		saveSession(player, false)
 	elseif command == "GrantTestItems" then
 		for _, consumableId in InventoryConfig.ConsumableOrder do
 			data.Inventory[consumableId] = math.min(9999, (data.Inventory[consumableId] or 0) + 3)
@@ -1577,6 +1700,30 @@ function PlayerStateService.TryBuyMagnet(player: Player, magnetId: string): (boo
 	local data = session.Data
 	if data.OwnedMagnets[magnetId] == true then
 		return false, "MAGNET ALREADY OWNED"
+	end
+	--[[
+		A magnet may require an area to have been REACHED. Checked against `DiscoveredScrap` rather than
+		`UnlockedAreas`, because unlocks reset on rebirth and a magnet does not: "you have been to the
+		Graveyard" has to stay true forever once it is, or a rebirth would lock the shop behind content the
+		player has already beaten.
+	]]
+	local requiredArea = (definition :: any).RequiredArea
+	if typeof(requiredArea) == "string" then
+		local reached = false
+		local area = AreaConfig.ById[requiredArea]
+		if area ~= nil then
+			for _, scrapId in area.ScrapIds do
+				local record = data.DiscoveredScrap[scrapId]
+				if type(record) == "table" and record.Discovered == true then
+					reached = true
+					break
+				end
+			end
+		end
+		if not reached then
+			return false,
+				`REACH THE {string.upper(area and area.DisplayName or requiredArea)} FIRST`
+		end
 	end
 	if data.Money < definition.ShopPrice then
 		return false, "NOT ENOUGH SCRAP CASH"

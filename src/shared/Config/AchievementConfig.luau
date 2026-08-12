@@ -29,6 +29,11 @@ local AchievementConfig = {}
 
 export type AchievementReward = {
 	Money: number?,
+	--[[
+		Still part of the reward shape -- codes, products and the admin panel grant through it -- but NO
+		achievement may use it. Gears are rebirth currency: the only thing that grants them is a rebirth.
+		An achievement paying gears used to be a permanent income multiplier, which is why none do now.
+	]]
 	Gears: number?,
 	Spins: number?,
 	TitleId: string?,
@@ -133,7 +138,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "Money",
 		Threshold = 1_000,
 		Track = "Wealth",
-		Reward = table.freeze({ Gears = 5 }),
+		Reward = table.freeze({ Spins = 1 }),
 	}),
 	table.freeze({
 		Id = "MoneyMillion",
@@ -144,7 +149,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "Money",
 		Threshold = 1_000_000,
 		Track = "Wealth",
-		Reward = table.freeze({ Gears = 100, Spins = 3, TitleId = "Tycoon" }),
+		Reward = table.freeze({ Spins = 3, TitleId = "Tycoon" }),
 	}),
 	table.freeze({
 		Id = "UpgradesMaxed",
@@ -155,7 +160,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "UpgradeLevelTotal",
 		Threshold = 150,
 		Track = "Wealth",
-		Reward = table.freeze({ Money = 2_000_000, Gears = 250, TitleId = "Maxed" }),
+		Reward = table.freeze({ Money = 2_000_000, TitleId = "Maxed" }),
 	}),
 
 	--------------------------------------------------------------------------------
@@ -170,7 +175,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "PrestigeCount",
 		Threshold = 1,
 		Track = "Rebirth",
-		Reward = table.freeze({ Money = 50_000, Gears = 25, Spins = 2, TitleId = "Reborn" }),
+		Reward = table.freeze({ Money = 50_000, Spins = 2, TitleId = "Reborn" }),
 	}),
 	table.freeze({
 		Id = "RebirthTen",
@@ -181,7 +186,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "PrestigeCount",
 		Threshold = 10,
 		Track = "Rebirth",
-		Reward = table.freeze({ Money = 1_000_000, Gears = 150, Spins = 3, TitleId = "Ascended" }),
+		Reward = table.freeze({ Money = 1_000_000, Spins = 3, TitleId = "Ascended" }),
 	}),
 	table.freeze({
 		Id = "RebirthFifty",
@@ -192,7 +197,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "PrestigeCount",
 		Threshold = 50,
 		Track = "Rebirth",
-		Reward = table.freeze({ Money = 25_000_000, Gears = 1_000, Spins = 10, TitleId = "Legend" }),
+		Reward = table.freeze({ Money = 25_000_000, Spins = 10, TitleId = "Legend" }),
 	}),
 
 	--------------------------------------------------------------------------------
@@ -229,7 +234,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "EggsOpened",
 		Threshold = 50,
 		Track = "Pets",
-		Reward = table.freeze({ Money = 250_000, Gears = 50 }),
+		Reward = table.freeze({ Money = 250_000 }),
 	}),
 
 	--------------------------------------------------------------------------------
@@ -255,7 +260,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "DailyStreak",
 		Threshold = 30,
 		Track = "Loyalty",
-		Reward = table.freeze({ Money = 2_500_000, Gears = 300, Spins = 10, TitleId = "Devoted" }),
+		Reward = table.freeze({ Money = 2_500_000, Spins = 10, TitleId = "Devoted" }),
 	}),
 
 	--------------------------------------------------------------------------------
@@ -281,7 +286,7 @@ local achievements: { AchievementDefinition } = {
 		Metric = "MagnetsOwned",
 		Threshold = 5,
 		Track = "World",
-		Reward = table.freeze({ Money = 150_000, Gears = 30 }),
+		Reward = table.freeze({ Money = 150_000 }),
 	}),
 	table.freeze({
 		Id = "IndexComplete",
@@ -293,7 +298,7 @@ local achievements: { AchievementDefinition } = {
 		--- Set from `AreaConfig`'s scrap list; `tests/` fails if the two drift apart.
 		Threshold = 17,
 		Track = "World",
-		Reward = table.freeze({ Money = 1_500_000, Gears = 200, TitleId = "Archivist" }),
+		Reward = table.freeze({ Money = 1_500_000, TitleId = "Archivist" }),
 	}),
 }
 

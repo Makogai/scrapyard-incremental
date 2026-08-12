@@ -214,7 +214,7 @@ local function HudDesktop(props)
 				variant = "Slim",
 				storage = state.storage,
 				capacity = state.capacity,
-				value = math.floor(state.storage * 19.15),
+				value = state.storageValue,
 				position = UDim2.new(0.5, 0, 1, -(math.floor(MARGIN / 2) + bottomLift)),
 				anchorPoint = Vector2.new(0.5, 1),
 			}),

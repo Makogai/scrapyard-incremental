@@ -218,7 +218,7 @@ function AdminController.Start()
 		if reset:GetAttribute("ConfirmArmed") == true then
 			reset:SetAttribute("ConfirmArmed", false)
 			reset.Text = "RESET TEST PROFILE"
-			remote:FireServer("ResetTestProfile", nil, "Self", player.UserId, nil)
+			remote:FireServer("ResetProfile", nil, "Self", player.UserId, nil)
 			setStatus("Development profile reset requested.")
 			return
 		end

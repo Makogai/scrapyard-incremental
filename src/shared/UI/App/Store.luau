@@ -44,6 +44,8 @@ local AchievementRules = require(ReplicatedStorage.Shared.Utility.AchievementRul
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local DayClock = require(ReplicatedStorage.Shared.Utility.DayClock)
+local CollectionRules = require(ReplicatedStorage.Shared.Utility.CollectionRules)
+local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local TutorialConfig = require(ReplicatedStorage.Shared.Config.TutorialConfig)
 local React = require(ReplicatedStorage.Packages.React)
 local ReactCharm = require(ReplicatedStorage.Packages.ReactCharm)
@@ -544,7 +546,16 @@ local function mockActions()
 	end
 
 	function self.sell()
-		Atoms.money(Atoms.money() + Atoms.storedValue())
+		--- Through the real award function, so a story pays what the game pays.
+		Atoms.money(
+			Atoms.money()
+				+ CollectionRules.sellAward(
+					Atoms.storedValue(),
+					Atoms.derived().ScrapValue,
+					Environment.MaximumMoney
+				)
+		)
+		Atoms.storedValue(0)
 		Atoms.storedWeight(0)
 	end
 
@@ -981,6 +992,19 @@ function Store.use()
 		end
 	end
 
+	--[[
+		WHAT SELLING THIS LOAD PAYS, which is what the HUD's EST. VALUE means.
+
+		Both HUD layouts used to compute `storage * 19.15` -- a flat average per piece, hardcoded, left
+		behind by an older economy. It read $19 for a $45 can and $478 for a load that sold for $1,770, so
+		the one number a player checks before walking to the crusher was the one number never right.
+
+		Through `CollectionRules.sellAward`, the same function `TrySell` calls, with the same inputs. The
+		readout and the payout cannot drift: if selling changes, this changes with it.
+	]]
+	local storageProjected =
+		CollectionRules.sellAward(storedValue, derived.ScrapValue, Environment.MaximumMoney)
+
 	local state = {
 		loaded = loaded,
 
@@ -989,7 +1013,7 @@ function Store.use()
 		eventTokens = nil,
 		prestige = prestigeCount,
 		storage = storedWeight,
-		storageValue = storedValue,
+		storageValue = storageProjected,
 		capacity = derived.StorageCapacity,
 		derived = derived,
 

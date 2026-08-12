@@ -21,6 +21,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
+local AreaRules = require(ReplicatedStorage.Shared.Utility.AreaRules)
 local GameMath = require(ReplicatedStorage.Shared.Utility.GameMath)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
@@ -201,7 +202,12 @@ local AREA_STYLE = {
 	VehicleGraveyard = { glyph = "scrap", tier = 3 },
 }
 
-function GameData.areas(): { any }
+--[[
+	`prestigeCount` is required because AREA PRICES RISE WITH REBIRTHS -- see `AreaRules.unlockPrice`. The
+	panel has to quote the same number the server will charge, or a player is told $450,000 and refused for
+	being short.
+]]
+function GameData.areas(prestigeCount: number?): { any }
 	local list = {}
 	for _, areaId in ipairs(AreaConfig.Order) do
 		local definition = AreaConfig.ById[areaId]
@@ -222,7 +228,8 @@ function GameData.areas(): { any }
 			name = definition.DisplayName,
 			tier = style.tier,
 			glyph = style.glyph,
-			cost = definition.UnlockPrice,
+			--- The price for THIS player: it rises with rebirths. See `AreaRules.unlockPrice`.
+			cost = AreaRules.unlockPrice(definition.UnlockPrice, prestigeCount),
 			bestScrap = bestName,
 			bestValue = bestValue,
 		})
@@ -840,7 +847,8 @@ end
 -- Prestige
 --------------------------------------------------------------------------------
 
-function GameData.prestige(money: number, gears: number, prestigeCount: number)
+--- `_gears` is unused: gears no longer affect income. Kept so callers need not change.
+function GameData.prestige(money: number, _gears: number, prestigeCount: number)
 	local requirement = GameMath.prestigeRequirement(
 		PrestigeConfig.BaseMoneyRequirement,
 		PrestigeConfig.RequirementGrowth,
@@ -863,11 +871,7 @@ function GameData.prestige(money: number, gears: number, prestigeCount: number)
 		shortfall = math.max(0, requirement - money),
 		permanentBonus = string.format(
 			"%.2fx Cash",
-			GameMath.gearValueMultiplier(
-				gears,
-				PrestigeConfig.GearPower,
-				PrestigeConfig.MaximumGearValueMultiplier
-			)
+			GameMath.prestigeValueMultiplier(prestigeCount, PrestigeConfig.ValuePerPrestige)
 		),
 		lose = { "Cash", "Normal upgrades", "Area progress" },
 		keep = { "Magnets", "Pets", "Potions", "Gears", "Cosmetics" },

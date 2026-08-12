@@ -239,6 +239,7 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 			CashBoostEndsAt = 0,
 			StrengthBoostEndsAt = 0,
 			LuckBoostEndsAt = 0,
+			SpawnBoostEndsAt = 0,
 			GodBoostEndsAt = 0,
 		},
 		RedeemedCodes = {},
@@ -367,6 +368,8 @@ local function migrateVersionEight(raw: { [string]: any })
 	raw.Inventory.GodPotion = raw.Inventory.GodPotion or 0
 	raw.ActiveBoosts.LuckBoostEndsAt = raw.ActiveBoosts.LuckBoostEndsAt or 0
 	raw.ActiveBoosts.GodBoostEndsAt = raw.ActiveBoosts.GodBoostEndsAt or 0
+	--- The Spawn Potion is newer than the rest, so an older save has no key for it.
+	raw.ActiveBoosts.SpawnBoostEndsAt = raw.ActiveBoosts.SpawnBoostEndsAt or 0
 	raw.SchemaVersion = 9
 end
 
@@ -599,6 +602,7 @@ function PlayerDataSchema.validate(
 		CashBoostEndsAt = boundedInteger(boosts.CashBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
 		StrengthBoostEndsAt = boundedInteger(boosts.StrengthBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
 		LuckBoostEndsAt = boundedInteger(boosts.LuckBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
+		SpawnBoostEndsAt = boundedInteger(boosts.SpawnBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
 		GodBoostEndsAt = boundedInteger(boosts.GodBoostEndsAt, 0, 0, MAXIMUM_TIMESTAMP),
 	}
 	clean.RedeemedCodes = {}

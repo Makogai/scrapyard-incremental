@@ -302,7 +302,7 @@ local eggs = {
 	JunkyardEgg = table.freeze({
 		Id = "JunkyardEgg",
 		DisplayName = "Junkyard Egg",
-		Price = 3500,
+		Price = 4000,
 		RequiredArea = "FrontYard",
 		ModelName = "JunkyardEgg",
 		IconAssetId = "",
@@ -334,7 +334,7 @@ local eggs = {
 	QuantumEgg = table.freeze({
 		Id = "QuantumEgg",
 		DisplayName = "Quantum Egg",
-		Price = 250000,
+		Price = 220000,
 		RequiredArea = "VehicleGraveyard",
 		ModelName = "QuantumEgg",
 		IconAssetId = "",
@@ -368,8 +368,14 @@ return table.freeze({
 	PremiumOrder = table.freeze({ "Singularity", "DemonicGhost", "SinisterLord" }),
 	RarityColors = rarityColors,
 	RollTotal = 10000,
-	-- Two from the start; upgrades and the pass add to this.
-	BaseEquipSlots = 2,
+	--[[
+		THREE from the start, up from two; upgrades and the pass add to this.
+
+		Three is the number the pet bonuses are balanced around -- the design's tiers assume three equipped
+		free pets when it caps the combined cash bonus at +100%. At two, a player could never reach the
+		ceiling the economy was tuned against.
+	]]
+	BaseEquipSlots = 3,
 
 	--[[
 		How big a pet stands in the world, in studs along its longest axis. This is

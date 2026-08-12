@@ -71,7 +71,8 @@ local AdminCatalogue = {}
 
 		GrantEntitlement   writes the flag a real Robux purchase writes. Handing out paid unlocks is the
 		                   owner's call, not a moderation tool.
-		ResetTestProfile   wipes a save. Already Studio-only and self-only, and still owner-only.
+		ResetProfile       wipes a save with no undo. `AdminService` also refuses it for the EVERYONE and
+		                   EVERY SERVER targets, so it can only ever reach one person at a time.
 
 	Everything else is available to an admin, INCLUDING events and server-wide boosts: those expire on
 	their own and are clamped by `AdminConfig`, so the worst case is a busy hour rather than a lost save.
@@ -81,7 +82,7 @@ local AdminCatalogue = {}
 ]]
 local OWNER_ONLY_COMMANDS = table.freeze({
 	GrantEntitlement = true,
-	ResetTestProfile = true,
+	ResetProfile = true,
 })
 
 --- Reach that only the owner has. One server is an admin's business; every server is not.
@@ -306,9 +307,9 @@ function AdminCatalogue.build(): { AdminSection }
 	})
 
 	--[[
-		One-shot actions. `ResetTestProfile` is flagged `Danger` because it wipes a save, and the UI
-		asks twice before sending it -- the server also refuses it outside Studio and for any target
-		other than yourself.
+		One-shot actions. `ResetProfile` is flagged `Danger` because it wipes a save with no undo, so the
+		panel asks twice before sending it -- and the server refuses it for any target broader than one
+		named player.
 	]]
 	--[[
 		Game passes, as entitlements.
@@ -412,10 +413,20 @@ function AdminCatalogue.build(): { AdminSection }
 				Glyph = "crate",
 				Accent = "Neutral",
 			},
+			--[[
+				A REAL WIPE, on any server, on yourself or on a picked player.
+
+				It used to be `ResetTestProfile` and `AdminService` refused it unless you were in Studio AND
+				targeting yourself -- so "reset someone" silently did nothing, which is worse than a refusal
+				because nothing says so. The name went with the restriction: this is not a test helper.
+
+				Still owner-only, still `Danger` so the panel asks twice, and `AdminService` refuses it for
+				the EVERYONE and EVERY SERVER targets -- a mis-tap there wipes a server with no undo.
+			]]
 			{
-				Id = "ResetTestProfile",
+				Id = "ResetProfile",
 				Label = "RESET PROFILE",
-				Command = "ResetTestProfile",
+				Command = "ResetProfile",
 				Danger = true,
 				Glyph = "recycle",
 				Accent = "Red",

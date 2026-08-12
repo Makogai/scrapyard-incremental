@@ -60,6 +60,34 @@ Do not enable production-store testing from Studio. Successful DataStore round-t
 
 - `SafeArea/LoadingPanel`
 - `SafeArea/TopBar/MoneyPanel` and `GearsPanel`
+
+## Egg summon podiums
+
+`EggSummonPodium` (a Model, anywhere under `Workspace.NewMap`) is picked up by two things:
+`PetService` binds the hold-E prompt to its highest part, and `EggHologramController` dresses its egg.
+
+The hologram wants:
+
+```
+EggSummonPodium
+  VehicleGraveyardEggGroup      -- optional; any child whose name contains "EggGroup"
+    Egg                         -- Model or BasePart, the thing that floats
+    Stand                       -- left alone
+```
+
+The egg is found by name (something containing "egg", excluding stand/base/group/podium/plinth/pedestal),
+falling back to the largest child model. Nothing is required: a podium that does not match is skipped
+silently rather than erroring, so a half-built podium never breaks a playtest.
+
+Two optional attributes, on the group or the podium, retune it without touching code:
+
+| Attribute | Type | Effect |
+| --- | --- | --- |
+| `HologramColor` | Color3 | Tint of the rim, the light shaft and the motes |
+| `HologramFloat` | number | Bob amplitude in studs; `0` pins the egg still |
+
+The effect is client-only, so the egg's real position and collision never move -- which is why the
+prompt anchored to it keeps working while it floats.
 - `SafeArea/StoragePanel/StorageBar/Foreground/Fill`
 - `SafeArea/Navigation/*Button`
 - `SafeArea/Menus/*Menu/CloseButton`

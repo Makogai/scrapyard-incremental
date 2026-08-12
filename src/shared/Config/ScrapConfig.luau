@@ -3,6 +3,19 @@
 local GameTypes = require(script.Parent.Parent.Types.GameTypes)
 
 --[[
+	VALUES WERE REBASED ~5-15x IN THE ECONOMY PASS. See `plan/ECONOMY_REBALANCE.md`.
+
+	The old table ran $2-$1,250, which meant the Front Yard paid in single digits and every price in the
+	game had to be tiny to match. It now runs $45-$1,750, tuned so the weighted average of each area comes
+	out near $90 / $464 / $1,146 a scrap once the rarity roll is applied -- which, at the ~52 pieces a
+	minute a travelling player actually collects, puts Workshop at ~16 minutes, the Graveyard at ~35 and
+	the first rebirth at ~68.
+
+	The spread narrowed a lot doing this: cheapest to dearest went from 625x to 39x. That is deliberate in
+	the design it came from -- every scrap type can roll every rarity, so the RARITY is meant to carry the
+	excitement rather than the type -- but it does mean a Graveyard player picking up a CarDoor earns only
+	19x what a beginner gets from a MetalCan.
+
 	NOTHING HERE DECIDES HOW BIG A PIECE OF SCRAP IS, OR WHICH WAY IT FACES. That is the model's own
 	business: `ScrapService` clones the template and stands it on its marker at the size and rotation it
 	was saved at in Studio, so scaling or rotating a model there is all it takes.
@@ -24,7 +37,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "MetalCan",
 		DisplayName = "Metal Can",
 		Weight = 1,
-		BaseValue = 3,
+		BaseValue = 45,
 		RequiredMagnetStrength = 1,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 30,
@@ -35,7 +48,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "LooseBolt",
 		DisplayName = "Loose Bolt",
 		Weight = 0.5,
-		BaseValue = 2,
+		BaseValue = 55,
 		RequiredMagnetStrength = 1,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 26,
@@ -46,7 +59,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "SmallMetalPlate",
 		DisplayName = "Small Metal Plate",
 		Weight = 3,
-		BaseValue = 9,
+		BaseValue = 70,
 		RequiredMagnetStrength = 3,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 20,
@@ -62,7 +75,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "RustyPipe",
 		DisplayName = "Rusty Pipe",
 		Weight = 2,
-		BaseValue = 7,
+		BaseValue = 85,
 		RequiredMagnetStrength = 2,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 22,
@@ -73,7 +86,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "CrushedBucket",
 		DisplayName = "Crushed Bucket",
 		Weight = 4,
-		BaseValue = 13,
+		BaseValue = 100,
 		RequiredMagnetStrength = 4,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 16,
@@ -84,7 +97,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "CopperWire",
 		DisplayName = "Copper Wire Coil",
 		Weight = 3.5,
-		BaseValue = 18,
+		BaseValue = 120,
 		RequiredMagnetStrength = 5,
 		AreaIds = { "FrontYard" },
 		SpawnWeight = 12,
@@ -95,7 +108,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "Tire",
 		DisplayName = "Tire",
 		Weight = 6,
-		BaseValue = 20,
+		BaseValue = 200,
 		RequiredMagnetStrength = 6,
 		AreaIds = { "FrontYard", "WorkshopYard" },
 		SpawnWeight = 10,
@@ -111,7 +124,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "BrokenAppliance",
 		DisplayName = "Broken Appliance",
 		Weight = 14,
-		BaseValue = 55,
+		BaseValue = 240,
 		RequiredMagnetStrength = 10,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 26,
@@ -122,7 +135,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "ToolBox",
 		DisplayName = "Busted Tool Box",
 		Weight = 10,
-		BaseValue = 42,
+		BaseValue = 290,
 		RequiredMagnetStrength = 9,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 24,
@@ -133,7 +146,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "BrakeDisc",
 		DisplayName = "Brake Disc",
 		Weight = 12,
-		BaseValue = 64,
+		BaseValue = 350,
 		RequiredMagnetStrength = 12,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 20,
@@ -144,7 +157,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "Radiator",
 		DisplayName = "Cracked Radiator",
 		Weight = 20,
-		BaseValue = 105,
+		BaseValue = 430,
 		RequiredMagnetStrength = 15,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 16,
@@ -155,7 +168,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "MotorCoil",
 		DisplayName = "Motor Coil",
 		Weight = 18,
-		BaseValue = 118,
+		BaseValue = 610,
 		RequiredMagnetStrength = 16,
 		AreaIds = { "WorkshopYard" },
 		SpawnWeight = 13,
@@ -166,7 +179,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "EnginePart",
 		DisplayName = "Engine Part",
 		Weight = 28,
-		BaseValue = 135,
+		BaseValue = 700,
 		RequiredMagnetStrength = 16,
 		AreaIds = { "WorkshopYard", "VehicleGraveyard" },
 		SpawnWeight = 18,
@@ -177,7 +190,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "CarDoor",
 		DisplayName = "Car Door",
 		Weight = 42,
-		BaseValue = 240,
+		BaseValue = 850,
 		RequiredMagnetStrength = 24,
 		AreaIds = { "WorkshopYard", "VehicleGraveyard" },
 		SpawnWeight = 9,
@@ -188,7 +201,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "ExhaustPipe",
 		DisplayName = "Exhaust Assembly",
 		Weight = 35,
-		BaseValue = 205,
+		BaseValue = 1000,
 		RequiredMagnetStrength = 21,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 22,
@@ -199,7 +212,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "Axle",
 		DisplayName = "Heavy Axle",
 		Weight = 58,
-		BaseValue = 360,
+		BaseValue = 1150,
 		RequiredMagnetStrength = 29,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 16,
@@ -210,7 +223,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "FuelTank",
 		DisplayName = "Dented Fuel Tank",
 		Weight = 74,
-		BaseValue = 520,
+		BaseValue = 1350,
 		RequiredMagnetStrength = 35,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 11,
@@ -221,7 +234,7 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		Id = "ScrapCar",
 		DisplayName = "Scrap Car",
 		Weight = 160,
-		BaseValue = 1250,
+		BaseValue = 1750,
 		RequiredMagnetStrength = 45,
 		AreaIds = { "VehicleGraveyard" },
 		SpawnWeight = 5,
@@ -278,6 +291,43 @@ local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
 }
 
 return table.freeze({
+	--[[
+		How far Spawn Rate may compress a respawn, as a fraction of the scrap's own interval.
+
+		A proportional floor rather than an absolute one -- see `ScrapService.reserve`. At 0.42 a fully
+		invested player roughly halves every timer and the ordering between cheap and expensive scrap
+		survives.
+	]]
+	--[[
+		HOW MUCH STORAGE ONE PIECE OF SCRAP TAKES. One slot, whatever it is and whatever rarity it rolled.
+
+		Storage used to be measured in WEIGHT, and `Weight` still exists per scrap -- it ran 0.5 for a bolt
+		to 160 for a scrap car. That made a lucky drop a PUNISHMENT: finding a Nebula scrap car filled a
+		third of your bag, so the best moment in the game was also the one that sent you back to the
+		crusher. Weight also made "storage full" unpredictable, because the same 25 pickups could fill a
+		bag or barely touch it.
+
+		One slot each means the counter on the HUD is the number of things you are carrying, which is what
+		a player assumes it means anyway.
+
+		`Weight` is kept in the config. It is no longer read for storage, but it is real data about the
+		scrap and the obvious input for anything later that wants to care -- a vehicle, a conveyor, a
+		carry-speed penalty.
+	]]
+	SlotsPerScrap = 1,
+	MinimumRespawnFraction = 0.42,
+	--[[
+		The highest total luck multiplier that may feed the rarity exponents.
+
+		Rarity weights are `weight x luck ^ exponent` with 2.6 on Nebula, so luck compounds much faster
+		than it reads: at luck 4 Nebula is 1 in 319, at luck 10 it is 1 in 22. Every source multiplies --
+		upgrade, potion, event, pets, rebirths -- and no single one of them looks unreasonable, which is
+		exactly why the ceiling belongs on the product rather than on any of them.
+
+		At 6 the best-case Nebula rate is about 1 in 64, which is a genuine jackpot a heavily invested
+		player sees a few times an hour.
+	]]
+	MaximumLuckMultiplier = 6,
 	ById = table.freeze(scrapById),
 	Variants = table.freeze(variantById),
 	VariantOrder = table.freeze({ "Normal", "Rare", "Epic", "Legendary", "Nebula" }),

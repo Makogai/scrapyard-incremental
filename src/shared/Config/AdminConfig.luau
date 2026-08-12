@@ -2,7 +2,8 @@
 
 local adminUserIds: { [number]: boolean } = {
 	[1113999731] = true,
-	[7862008029] = false,
+	[7862008029] = true,
+	[11218362231] = true,
 }
 
 local AdminConfig = {}

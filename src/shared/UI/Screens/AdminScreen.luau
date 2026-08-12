@@ -11,8 +11,8 @@
 	week, and an admin panel that lies about what exists is worse than no panel.
 
 	NOTHING HERE IS SECURITY. Every button sends a command, a target and an item id; the server checks
-	`AdminConfig.IsAdmin`, re-validates the command, clamps the amount and refuses `ResetTestProfile`
-	outside Studio. Hiding the entry point from non-admins is a courtesy, not a lock.
+	`AdminConfig.IsAdmin`, re-validates the command, clamps the amount, and refuses `ResetProfile` for any
+	target broader than one named player. Hiding the entry point from non-admins is a courtesy, not a lock.
 
 	THAT APPLIES TO THE OWNER TIER TOO. Entries and targets flagged `Owner` are filtered out for an admin
 	here, and `AdminService` refuses them regardless of what this file drew -- see `AdminConfig` for where

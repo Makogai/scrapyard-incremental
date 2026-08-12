@@ -12,6 +12,7 @@ local EventConfig = require("../src/shared/Config/EventConfig")
 local TitleConfig = require("../src/shared/Config/TitleConfig")
 local AchievementConfig = require("../src/shared/Config/AchievementConfig")
 local AchievementRules = require("../src/shared/Utility/AchievementRules")
+local PrestigeConfig = require("../src/shared/Config/PrestigeConfig")
 
 local passed = 0
 
@@ -79,7 +80,21 @@ expectEqual(GameMath.canStore(0, 20, 0 / 0), false, "invalid scrap weight")
 expectEqual(GameMath.prestigeGearReward(749999, 750000, 100), 0, "prestige below requirement")
 expectEqual(GameMath.prestigeGearReward(750000, 750000, 100), 1, "first prestige reward")
 expectEqual(GameMath.prestigeGearReward(1000000000, 750000, 100), 100, "prestige reward cap")
-expectNear(GameMath.gearValueMultiplier(4, 0.55, 1000000), 2.423, 0.01, "gear multiplier")
+--[[
+	The rebirth bonus replaced the gears->value curve. Linear and unbounded by gears, so a rebirth pays
+	once. Asserted against `PrestigeConfig.ValuePerPrestige` as well as literals, so retuning the config
+	cannot silently leave the readouts quoting an old number.
+]]
+expectNear(GameMath.prestigeValueMultiplier(0, 0.25), 1.0, 0.0001, "no rebirth is no bonus")
+expectNear(GameMath.prestigeValueMultiplier(1, 0.25), 1.25, 0.0001, "first rebirth bonus")
+expectNear(GameMath.prestigeValueMultiplier(4, 0.25), 2.0, 0.0001, "fourth rebirth bonus")
+expectNear(GameMath.prestigeValueMultiplier(-3, 0.25), 1.0, 0.0001, "negative rebirth guard")
+expectNear(
+	GameMath.prestigeValueMultiplier(2, PrestigeConfig.ValuePerPrestige),
+	1 + 2 * PrestigeConfig.ValuePerPrestige,
+	0.0001,
+	"rebirth bonus follows config"
+)
 expectNear(
 	GameMath.prestigeRequirement(25000000, 2.2, 3, 1e15),
 	266200000,
@@ -203,8 +218,22 @@ expectEqual(fullReason, "StorageFull", "full storage reason")
 local lockedAllowed, lockedReason = CollectionRules.canCollect(4, 3, 0, 20, 3, false, true)
 expectEqual(lockedAllowed, false, "locked area rejection")
 expectEqual(lockedReason, "AreaLocked", "locked area reason")
-expectEqual(CollectionRules.sellAward(20, 1.5, 1.2, 1000), 36, "sell award")
-expectEqual(CollectionRules.sellAward(0, 10, 10, 1000), 0, "empty sale")
+expectEqual(CollectionRules.sellAward(20, 1.5, 1000), 30, "sell award")
+expectEqual(CollectionRules.sellAward(0, 10, 1000), 0, "empty sale")
+expectEqual(CollectionRules.sellAward(500, 4, 1000), 1000, "sell award clamped to maximum")
+--[[
+	NO ACHIEVEMENT MAY PAY GEARS. Gears are rebirth currency, and the gear curve that used to make them an
+	income multiplier is gone -- but the reward shape still carries the field for codes and the admin panel,
+	so nothing but a test stops one being added back. "Hold $1,000" once paid 5 gears, which was a permanent
+	x2.67 on all income inside the first minute of play.
+]]
+for _, definition in ipairs(AchievementConfig.Definitions) do
+	expectEqual(
+		definition.Reward.Gears == nil,
+		true,
+		`achievement {definition.Id} must not pay gears`
+	)
+end
 expectEqual(PlotRules.isOwner(42, 42, "Plot01", "Plot01"), true, "plot owner allowed")
 expectEqual(PlotRules.isOwner(42, 7, "Plot02", "Plot01"), false, "visitor rejected")
 expectEqual(PlotRules.isOwner(42, 42, "Plot02", "Plot01"), false, "wrong assignment rejected")
@@ -221,6 +250,26 @@ expectEqual(fundsAllowed, false, "area affordability")
 expectEqual(fundsReason, "Not enough Scrap Cash", "area affordability reason")
 local duplicateAllowed = AreaRules.canUnlock(true, true, 90000, 6500)
 expectEqual(duplicateAllowed, false, "area duplicate rejection")
+
+--[[
+	AREA PRICES RISE WITH REBIRTHS, because unlocks reset on prestige and a Graveyard that still cost
+	$450,000 on your tenth run would be a formality you walk past.
+
+	Asserted at several rebirth counts rather than just one: the bug this catches is an off-by-one on the
+	exponent, which looks correct at rebirth 0 and is wrong everywhere else.
+]]
+expectEqual(
+	AreaRules.unlockPrice(450000, 0),
+	450000,
+	"area price at rebirth zero is the base price"
+)
+expectEqual(AreaRules.unlockPrice(450000, 1), 652500, "area price after one rebirth")
+expectEqual(AreaRules.unlockPrice(75000, 2), 157687, "workshop price after two rebirths")
+--- 2,884,380 rather than the design doc's rounded "$2.88M" -- assert what the formula does, not the table.
+expectEqual(AreaRules.unlockPrice(450000, 5), 2884380, "graveyard price after five rebirths")
+--- Negative or malformed input must not produce a negative price the player could be paid to unlock.
+expectEqual(AreaRules.unlockPrice(450000, -3), 450000, "negative rebirth count is floored to zero")
+expectEqual(AreaRules.unlockPrice(-1, 2), 0, "a negative base price yields zero")
 expectEqual(AdminConfig.IsAdmin(1113999731), true, "configured owner admin")
 expectEqual(AdminConfig.IsAdmin(1), false, "unknown user is not admin")
 
@@ -565,7 +614,22 @@ local sample = {
 	EggOpenCounts = { JunkyardEgg = 4 },
 	UnlockedAreas = { FrontYard = true, WorkshopYard = true },
 	OwnedMagnets = { MagnetBasic = true, MagnetIron = true },
-	DiscoveredScrap = { Can = {}, Tire = {}, LooseBolt = {} },
+	--[[
+		Records carry `Discovered = true` because that is what counts now.
+
+		This fixture used to be three EMPTY tables, which passed when `ScrapDiscovered` counted keys. That
+		is the bug: the schema pre-seeds a record for every scrap with `Discovered = false`, so counting keys
+		meant a fresh profile had "discovered" all of them. The fixture was encoding the defect.
+
+		The fourth entry is deliberately undiscovered, so this asserts the metric distinguishes them rather
+		than just counting a smaller table.
+	]]
+	DiscoveredScrap = {
+		Can = { Discovered = true },
+		Tire = { Discovered = true },
+		LooseBolt = { Discovered = true },
+		ScrapCar = { Discovered = false },
+	},
 }
 
 expectEqual(AchievementRules.metric(sample, "UpgradeLevelTotal"), 20, "upgrade levels sum")
@@ -610,6 +674,29 @@ expectEqual(
 	AchievementRules.unlockedCount(AchievementConfig.Definitions, alreadyPaid),
 	#earned,
 	"unlocked count matches what was paid"
+)
+
+--[[
+	A BRAND-NEW PROFILE MUST EARN NOTHING. This is the invariant, and it was broken.
+
+	`createDefault` pre-creates a `DiscoveredScrap` record for every scrap so the index can list
+	undiscovered types without special-casing nil, and `ScrapDiscovered` counted KEYS -- so a fresh save
+	reported 18 discovered against a threshold of 17, instantly completing `IndexComplete` and paying
+	$1,500,000, 200 gears and the Archivist title. Reset Profile appeared to hand out a fortune.
+
+	Asserted over EVERY definition rather than that one metric, because the same mistake is available to any
+	future achievement that reads a pre-seeded table.
+]]
+local blankProfile = PlayerDataSchema.createDefault(1000)
+expectEqual(
+	#AchievementRules.newlyEarned(blankProfile, AchievementConfig.Definitions, {}),
+	0,
+	"a brand new profile earns no achievements"
+)
+expectEqual(
+	AchievementRules.metric(blankProfile, "ScrapDiscovered"),
+	0,
+	"a brand new profile has discovered no scrap"
 )
 
 --- Tag formatting, which two different surfaces render and must not disagree about.

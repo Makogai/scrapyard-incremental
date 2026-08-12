@@ -61,7 +61,10 @@ more to the players who lack it than five everyone can reach.
 game's own curves put a player, not from round numbers: 100 scrap is ten minutes, 1,000 is a session,
 a million is weeks.
 
-Rewards are small on purpose (cash, gears, the odd spin). An achievement list that pays well becomes
+Rewards are small on purpose (cash, the odd spin). **No achievement may pay gears** -- gears are rebirth
+currency and nothing but a rebirth grants them. They used to raise income directly, so "Hold $1,000" paying
+5 gears was a permanent x2.67 on every sale in the first minute of play; `tests/run.luau` now asserts no
+definition carries a `Gears` reward. An achievement list that pays well becomes
 a grind checklist; the title is the real prize.
 
 ---

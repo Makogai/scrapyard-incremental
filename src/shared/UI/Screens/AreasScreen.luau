@@ -32,7 +32,8 @@ local function AreasScreen(props)
 	local state = props.state
 	local actions = props.actions
 
-	local areas = GameData.areas()
+	--- Prices scale with rebirths, so the screen has to pass the player's count in.
+	local areas = GameData.areas(state.prestige)
 	local cards = {}
 	local unlockedCount = 0
 	local previousUnlocked = true

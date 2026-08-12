@@ -98,14 +98,28 @@ local METRICS: { [string]: (data: { [string]: any }) -> number } = {
 	end,
 
 	--[[
-		Distinct scrap types seen. `DiscoveredScrap` maps a scrap id to a record, so the COUNT of keys is
-		the answer -- and a record that exists at all means it was discovered.
+		Distinct scrap types seen.
+
+		COUNTS `Discovered == true`, NOT the number of keys. This used to count keys, on the stated
+		assumption that a record existing at all meant the scrap had been found -- and
+		`PlayerDataSchema.createDefault` pre-creates a record for every scrap id with `Discovered = false`.
+		So a brand-new profile reported 18 discovered against a threshold of 17.
+
+		The result: every fresh save instantly completed `IndexComplete` and was paid $1,500,000, 200 gears
+		and the Archivist title. It made RESET PROFILE look broken -- you started rich, geared, and wearing
+		a title you had not earned.
+
+		Two reasonable pieces, wrong together. The schema pre-seeds records so the index can list
+		undiscovered scrap without special-casing nil; this metric is the one that has to be specific about
+		what "discovered" means.
 	]]
 	ScrapDiscovered = function(data)
 		local total = 0
 		if type(data.DiscoveredScrap) == "table" then
-			for _ in pairs(data.DiscoveredScrap) do
-				total += 1
+			for _, record in pairs(data.DiscoveredScrap) do
+				if type(record) == "table" and record.Discovered == true then
+					total += 1
+				end
 			end
 		end
 		return total

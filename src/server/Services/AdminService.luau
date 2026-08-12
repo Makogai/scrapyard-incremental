@@ -12,6 +12,7 @@ local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
 local EventService = require(script.Parent.EventService)
 local PlayerStateService = require(script.Parent.PlayerStateService)
+local PlotThemeService = require(script.Parent.PlotThemeService)
 local PlotService = require(script.Parent.PlotService)
 local RemoteService = require(script.Parent.RemoteService)
 local ScrapService = require(script.Parent.ScrapService)
@@ -45,7 +46,20 @@ local function applyToTargets(
 		if PlayerStateService.AdminMutate(target, command, amount, itemId) then
 			applied += 1
 			PlotService.RefreshAppearance(target)
-			ScrapService.RefreshPlayer(target)
+			--[[
+				A WIPE HAS TO REBUILD THE PLOT, not just refresh it.
+
+				The reset puts `ActivePlotTheme` back to the Front Yard in DATA, but the yard standing in the
+				world is still whatever they converted it to -- so a wiped player kept a Vehicle Graveyard
+				they no longer own the unlock for. `Rebuild` swaps the geometry and calls `ActivateScrap`
+				itself, which is why the scrap refresh below is skipped for this one.
+			]]
+			local plot = if command == "ResetProfile" then PlotService.GetPlot(target) else nil
+			if plot ~= nil then
+				PlotThemeService.Rebuild(target, plot)
+			else
+				ScrapService.RefreshPlayer(target)
+			end
 		end
 	end
 	return applied
@@ -174,10 +188,10 @@ function AdminService.Start()
 					return
 				end
 				--[[
-					Studio-only commands never cross a server boundary. `ResetTestProfile` wipes a save, and
-					a broadcast version of it is a way to wipe everyone's.
+					Never across a server boundary. `ResetProfile` wipes a save, and a broadcast version of it
+					is a way to wipe everyone's in the whole experience at once.
 				]]
-				if payload.Command == "ResetTestProfile" or payload.Command == "GrantTestItems" then
+				if payload.Command == "ResetProfile" or payload.Command == "GrantTestItems" then
 					return
 				end
 				--[[
@@ -218,9 +232,26 @@ function AdminService.Start()
 				or not VALID_TARGETS[targetMode]
 				or (targetMode == "Player" and typeof(targetUserId) ~= "number")
 				or (itemId ~= nil and typeof(itemId) ~= "string")
-				or ((command == "ResetTestProfile" or command == "GrantTestItems") and (not RunService:IsStudio() or targetMode ~= "Self"))
+				or (command == "GrantTestItems" and (not RunService:IsStudio() or targetMode ~= "Self"))
 				or not limiter:Allow(tostring(admin.UserId))
 			then
+				return
+			end
+
+			--[[
+				A WIPE REACHES ONE PERSON AT A TIME.
+
+				`ResetProfile` deletes a save with no undo, so the two broad targets are refused outright
+				rather than left to a confirmation dialog: EVERYONE HERE next to RESET PROFILE is one mis-tap
+				away from clearing a full server, and the panel puts those two controls in the same window.
+				Yourself or a named player only.
+
+				It is NOT Studio-only any more -- that restriction, plus a target check for `Self`, is why
+				resetting somebody appeared to do nothing at all on a live server.
+			]]
+			if command == "ResetProfile" and targetMode ~= "Self" and targetMode ~= "Player" then
+				RemoteService.GetEvent("Notify")
+					:FireClient(admin, "ADMIN: reset one player at a time, not everyone")
 				return
 			end
 

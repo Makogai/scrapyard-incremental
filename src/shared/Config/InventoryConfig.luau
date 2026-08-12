@@ -53,7 +53,14 @@ local magnets = {
 		BaseStrength = 12,
 		BaseRange = 15,
 		ModelName = "AdvancedMagnet",
-		ShopPrice = 60000,
+		--[[
+			$250,000, up from $60,000.
+
+			Priced so buying it is a REAL decision rather than an obvious one: at this price it costs about
+			a fifth of the Graveyard unlock, so taking it delays the next area noticeably. Magnets survive
+			rebirth, which is what makes paying that worthwhile.
+		]]
+		ShopPrice = 250000,
 		IconId = "",
 		--- A double line, the first hint of a fill, and a pull that visibly works faster.
 		RangeRing = table.freeze({
@@ -65,6 +72,32 @@ local magnets = {
 			PulseSeconds = 2,
 			PulseRings = 1,
 		}),
+	}),
+	--[[
+		THE TOP CASH MAGNET, and it exists to create one decision.
+
+		The economy design wanted a $3,000,000 magnet priced ABOVE the $2,000,000 rebirth, so a player
+		reaching that point has a real choice: prestige now, or grind another million for something that
+		survives the prestige. Magnets are permanent through rebirth, which is the whole reason the choice
+		is interesting rather than obvious.
+
+		It was going to be the Quantum, but the Quantum is a Robux game pass and stays one -- Robux should
+		still buy the strongest magnet in the game. So this sits between them: clearly better than the
+		Advanced, clearly weaker than the Quantum, and reachable without spending.
+
+		`RequiredArea` gates it on having DISCOVERED the Vehicle Graveyard, not on currently owning it --
+		area unlocks reset on rebirth and this does not, so the requirement is "you have been there".
+	]]
+	SalvageMagnet = table.freeze({
+		Id = "SalvageMagnet",
+		DisplayName = "Salvage Magnet",
+		Description = "Industrial-grade coil. The strongest magnet scrap cash can buy.",
+		BaseStrength = 20,
+		BaseRange = 19,
+		ModelName = "SalvageMagnet",
+		ShopPrice = 3000000,
+		RequiredArea = "VehicleGraveyard",
+		IconId = "",
 	}),
 	QuantumMagnet = table.freeze({
 		Id = "QuantumMagnet",
@@ -95,44 +128,70 @@ local magnets = {
 }
 
 local consumables = {
+	--[[
+		POTIONS ARE SHORTER AND WEAKER THAN THEY WERE, on purpose.
+
+		They used to be 10 minutes at 2x-5x, which is long and strong enough that being potioned is the
+		normal state and being un-potioned is the punishment. At 5 minutes and +20-30% they are a burst you
+		spend deliberately, and the playtime ladder can hand several out without becoming the economy.
+
+		Same-type potions extend DURATION rather than multiplying (see `TryUseConsumable`); different types
+		multiply. That is what makes stacking a Cash, Luck and Spawn potion together the interesting move.
+	]]
 	CashPotion = table.freeze({
 		Id = "CashPotion",
 		DisplayName = "Cash Boost Potion",
-		Description = "2x scrap sale value for 10 minutes.",
+		Description = "+20% scrap sale value for 5 minutes.",
 		BoostId = "CashBoost",
-		Multiplier = 2,
-		DurationSeconds = 600,
+		Multiplier = 1.2,
+		DurationSeconds = 300,
 		IconId = "rbxassetid://82464105206823",
 	}),
 	StrengthPotion = table.freeze({
 		Id = "StrengthPotion",
 		DisplayName = "Magnet Strength Potion",
-		Description = "+15 magnet strength for 10 minutes.",
+		Description = "+25% collection speed and +10% range for 5 minutes.",
 		BoostId = "StrengthBoost",
-		Amount = 15,
-		DurationSeconds = 600,
+		Amount = 6,
+		CollectionMultiplier = 1.25,
+		RangeMultiplier = 1.1,
+		DurationSeconds = 300,
 		IconId = "rbxassetid://138710304318277",
 	}),
 	LuckPotion = table.freeze({
 		Id = "LuckPotion",
 		DisplayName = "Luck Potion",
-		Description = "3x rare scrap variant luck for 10 minutes.",
+		Description = "+30% rare scrap luck for 5 minutes.",
 		BoostId = "LuckBoost",
-		LuckMultiplier = 3,
-		DurationSeconds = 600,
+		LuckMultiplier = 1.3,
+		DurationSeconds = 300,
 		IconId = "rbxassetid://130250104193544",
+	}),
+	--[[
+		NEW. The proposal wanted a Spawn Rate potion because it is the one that multiplies the value of the
+		others: more spawns is more rarity rolls, so Spawn plus Luck is worth more than either alone. That
+		combination is the reason to hold potions for a moment rather than drinking them on pickup.
+	]]
+	SpawnPotion = table.freeze({
+		Id = "SpawnPotion",
+		DisplayName = "Spawn Potion",
+		Description = "+20% scrap respawn rate for 5 minutes.",
+		BoostId = "SpawnBoost",
+		RespawnMultiplier = 0.8,
+		DurationSeconds = 300,
+		IconId = "",
 	}),
 	GodPotion = table.freeze({
 		Id = "GodPotion",
 		DisplayName = "God Potion",
-		Description = "Overwhelming cash, magnet, speed, respawn, and luck power for 10 minutes.",
+		Description = "Everything at once for 10 minutes.",
 		BoostId = "GodBoost",
-		CashMultiplier = 5,
-		StrengthAmount = 100,
-		RangeAmount = 15,
-		CollectionMultiplier = 3,
-		RespawnMultiplier = 0.4,
-		LuckMultiplier = 5,
+		CashMultiplier = 1.75,
+		StrengthAmount = 25,
+		RangeAmount = 6,
+		CollectionMultiplier = 1.5,
+		RespawnMultiplier = 0.7,
+		LuckMultiplier = 2,
 		DurationSeconds = 600,
 		IconId = "rbxassetid://73856251621754",
 	}),
@@ -140,7 +199,18 @@ local consumables = {
 
 return table.freeze({
 	Magnets = table.freeze(magnets),
-	MagnetOrder = table.freeze({ "MagnetBasic", "AdvancedMagnet", "QuantumMagnet" }),
+	MagnetOrder = table.freeze({
+		"MagnetBasic",
+		"AdvancedMagnet",
+		"SalvageMagnet",
+		"QuantumMagnet",
+	}),
 	Consumables = table.freeze(consumables),
-	ConsumableOrder = table.freeze({ "CashPotion", "StrengthPotion", "LuckPotion", "GodPotion" }),
+	ConsumableOrder = table.freeze({
+		"CashPotion",
+		"StrengthPotion",
+		"LuckPotion",
+		"SpawnPotion",
+		"GodPotion",
+	}),
 })

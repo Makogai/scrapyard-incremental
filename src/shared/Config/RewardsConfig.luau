@@ -77,42 +77,84 @@ local dailyDays = {
 	new player never reaches is a number in a config rather than a retention mechanic. The back half is
 	spaced wider so the ladder still has somewhere to go for a player who stays all evening.
 ]]
+--[[
+	THE LADDER BOOSTS PROGRESSION; IT DOES NOT PERFORM IT.
+
+	That is the whole rule, and the old ladder broke it badly. It paid $116,500 in cash across two hours
+	against a Workshop unlock of $12,500 -- so the track bought the first area NINE TIMES OVER, and the
+	five-minute reward alone was 8% of it. A player could unlock most of the game by existing.
+
+	It now pays $57,500 total, against a Workshop price of $75,000. Even someone who somehow claimed every
+	rung without playing cannot buy area two with the cash alone. Anyone genuinely active for two hours is
+	far past Workshop -- but because they played, not because the ladder handed it to them.
+
+	The value moved into POTIONS instead. A potion is worth nothing to a player who is not playing, which
+	is exactly the property a return-to-play reward should have.
+
+	The rungs with NO CASH AT ALL are deliberate: 45 minutes and 1h20 are pure potion stacks, so the
+	message is "go and farm for the next five minutes" rather than "here is a number".
+]]
 local playtimeMilestones = {
-	table.freeze({ Index = 1, Seconds = 300, Money = 1000, Label = "5 MIN", Accent = "Green" }),
-	table.freeze({ Index = 2, Seconds = 600, Money = 2500, Label = "10 MIN", Accent = "Green" }),
+	table.freeze({
+		Index = 1,
+		Seconds = 900,
+		Money = 2500,
+		Items = table.freeze({ StrengthPotion = 1 }),
+		Label = "15 MIN",
+		Accent = "Green",
+	}),
+	table.freeze({
+		Index = 2,
+		Seconds = 1800,
+		Money = 5000,
+		Items = table.freeze({ CashPotion = 1 }),
+		Label = "30 MIN",
+		Accent = "Green",
+	}),
+	--- No cash. A Luck plus Spawn stack, which is the combination worth planning around.
 	table.freeze({
 		Index = 3,
-		Seconds = 1200,
-		Items = table.freeze({ CashPotion = 1 }),
-		Label = "20 MIN",
-		Accent = "Gold",
-	}),
-	table.freeze({ Index = 4, Seconds = 1800, Money = 8000, Label = "30 MIN", Accent = "Green" }),
-	table.freeze({ Index = 5, Seconds = 2700, Spins = 1, Label = "45 MIN", Accent = "Cyan" }),
-	table.freeze({
-		Index = 6,
-		Seconds = 3600,
-		Items = table.freeze({ LuckPotion = 1 }),
-		Label = "1 HR",
+		Seconds = 2700,
+		Items = table.freeze({ LuckPotion = 1, SpawnPotion = 1 }),
+		Label = "45 MIN",
 		Accent = "Purple",
 	}),
-	table.freeze({ Index = 7, Seconds = 4800, Money = 30000, Label = "1 HR 20", Accent = "Green" }),
 	table.freeze({
-		Index = 8,
-		Seconds = 6000,
+		Index = 4,
+		Seconds = 3600,
+		Money = 10000,
+		Items = table.freeze({ CashPotion = 1 }),
+		Spins = 1,
+		Label = "1 HR",
+		Accent = "Gold",
+	}),
+	--- No cash again, and a spin instead: the ladder should not become a cash drip.
+	table.freeze({
+		Index = 5,
+		Seconds = 4800,
 		Items = table.freeze({ StrengthPotion = 1 }),
-		Label = "1 HR 40",
+		Spins = 1,
+		Label = "1 HR 20",
 		Accent = "Cyan",
 	}),
+	table.freeze({
+		Index = 6,
+		Seconds = 6000,
+		Money = 15000,
+		Items = table.freeze({ LuckPotion = 1, SpawnPotion = 1 }),
+		Label = "1 HR 40",
+		Accent = "Purple",
+	}),
 	--[[
-		The two-hour prize is SPINS, not cash. Two hours in a day is a committed session, and a spin is
-		worth more than its cash value because it might be the God Potion -- ending the ladder on a
-		gamble is a better last step than ending it on a bigger number.
+		The jackpot rung. Cash, the strongest potion stack of the ladder, and spins -- a spin is worth more
+		than its cash value because it might be the God Potion, so ending on a gamble beats ending on a
+		bigger number.
 	]]
 	table.freeze({
-		Index = 9,
+		Index = 7,
 		Seconds = 7200,
-		Money = 75000,
+		Money = 25000,
+		Items = table.freeze({ CashPotion = 2, LuckPotion = 1 }),
 		Spins = 3,
 		Label = "2 HR",
 		Accent = "Gold",
@@ -228,6 +270,18 @@ return table.freeze({
 		Milestones = table.freeze(playtimeMilestones),
 		--- How often the server banks session playtime into saved data.
 		TickSeconds = 5,
+		--[[
+			How recently a player must have DONE something for the clock to keep running.
+
+			Playtime used to accrue on wall-clock alone, so an overnight AFK claimed the whole ladder. The
+			rewards are meant to pay for playing, not for leaving the game open -- and with auto-sell in the
+			game, uptime and play are genuinely different things.
+
+			60 seconds is deliberately forgiving. Reading a shop, choosing an upgrade or walking to the
+			crusher all count as playing, and a window this wide never punishes someone who is thinking.
+			Collecting, moving, selling and buying all refresh it.
+		]]
+		ActivityWindowSeconds = 60,
 	}),
 
 	Spin = table.freeze({

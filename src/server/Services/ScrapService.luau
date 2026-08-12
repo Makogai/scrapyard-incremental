@@ -1114,10 +1114,17 @@ local function reserve(
 			A spread of +/-30% staggers a pile back into existence piece by piece instead.
 		]]
 		local spread = 0.7 + math.random() * 0.6
-		local respawnSeconds = math.max(
-			0.45,
-			ScrapConfig.ById[record.ScrapId].RespawnSeconds * respawnMultiplier * spread
-		)
+		--[[
+			THE FLOOR IS A FRACTION OF THIS SCRAP'S OWN INTERVAL, not a flat number of seconds.
+
+			It used to be `max(0.45, ...)`, which meant a 2-second can and a 12-second scrap car could both
+			bottom out at 0.45s -- so at high Spawn Rate the difference between cheap and expensive scrap
+			quietly disappeared, and the car became six times more common relative to its price. A
+			proportional floor keeps the ratio between scrap types intact however fast the player makes it.
+		]]
+		local base = ScrapConfig.ById[record.ScrapId].RespawnSeconds
+		local respawnSeconds =
+			math.max(base * ScrapConfig.MinimumRespawnFraction, base * respawnMultiplier * spread)
 		task.delay(respawnSeconds, function()
 			local marker = record.Marker
 			local ownerPlot = record.Plot

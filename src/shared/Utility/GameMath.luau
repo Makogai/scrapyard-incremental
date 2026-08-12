@@ -38,6 +38,23 @@ local PET_EFFECT_KEYS = {
 
 -- Pet effects are expressed as multipliers. Their bonuses stack additively, while
 -- premium abilities amplify the final bonus instead of compounding each pet.
+--[[
+	The ceiling on the combined pet CASH bonus, as a fraction: 1.0 means +100%.
+
+	Pet bonuses ADD (three pets at +30% is +90%, not x2.2), which is the right choice -- multiplying them
+	means every new pet tier has to be weaker than the last or the numbers explode. But additive still
+	compounds without a ceiling once abilities enter: `AmplifyPetBonuses` multiplies the whole total and
+	`CopyStrongestPet` adds the best pet's effects again, so a deliberate build stacks well past what the
+	economy is balanced for.
+
+	Capped on CASH only. The other effects -- range, collection, storage, luck -- have their own ceilings
+	further along the chain, and cash is the one that compounds directly into every price in the game.
+
+	Long term the answer to pet power creep is a duplicate sink (5 identical -> Shiny at 1.4x, and so on)
+	rather than raising this. Do not "fix" a pet that feels weak by moving this number.
+]]
+local MAXIMUM_PET_CASH_BONUS = 1.0
+
 function GameMath.petEffectMultipliers(
 	equippedPetIds: { string },
 	ownedPets: { [string]: number },
@@ -79,7 +96,11 @@ function GameMath.petEffectMultipliers(
 	end
 	local result = {}
 	for _, key in PET_EFFECT_KEYS do
-		result[key] = 1 + bonuses[key] * bonusAmplifier
+		local total = bonuses[key] * bonusAmplifier
+		if key == "Cash" then
+			total = math.min(total, MAXIMUM_PET_CASH_BONUS)
+		end
+		result[key] = 1 + total
 	end
 	return result
 end
@@ -274,16 +295,24 @@ function GameMath.scaledPrestigeGearReward(
 	)
 end
 
-function GameMath.gearValueMultiplier(
-	gears: number,
-	gearPower: number,
-	maximumMultiplier: number
-): number
-	if gears < 0 or gearPower <= 0 then
+--[[
+	The permanent income multiplier from having rebirthed, and the ONLY payoff a rebirth grants.
+
+	Linear, not exponential: `1 + count * perPrestige`. Rebirth 1 is x1.25, rebirth 4 is x2.00. It has to
+	stay slower than `RequirementGrowth` (x1.75 per rebirth) or each rebirth arrives sooner than the last
+	and the ladder collapses inward -- see the comment those two share in `PrestigeConfig`.
+
+	Replaced `gearValueMultiplier`, which paid for the same action a second time on an exponential curve.
+	One function, used by `derivedStats` and by every readout that quotes the number, so the HUD cannot
+	claim a multiplier the server does not apply.
+]]
+function GameMath.prestigeValueMultiplier(prestigeCount: number, valuePerPrestige: number): number
+	if not GameMath.isFinite(prestigeCount) or not GameMath.isFinite(valuePerPrestige) then
 		return 1
 	end
-	local multiplier = (1 + gears) ^ gearPower
-	return GameMath.clampFinite(multiplier, 1, maximumMultiplier, 1)
+	local count = math.max(0, math.floor(prestigeCount))
+	local multiplier = 1 + count * math.max(0, valuePerPrestige)
+	return GameMath.clampFinite(multiplier, 1, 1e15, 1)
 end
 
 return table.freeze(GameMath)

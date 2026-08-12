@@ -484,25 +484,19 @@ function UIController.Start()
 				state.PrestigeCount,
 				PrestigeConfig.MaximumGearsPerPrestige
 			)
-			local current = GameMath.gearValueMultiplier(
-				state.Gears,
-				PrestigeConfig.GearPower,
-				PrestigeConfig.MaximumGearValueMultiplier
+			--- The rebirth bonus, not a gear curve: what you have now and what one more rebirth buys.
+			local current = GameMath.prestigeValueMultiplier(
+				state.PrestigeCount,
+				PrestigeConfig.ValuePerPrestige
 			)
-			local nextValue = GameMath.gearValueMultiplier(
-				state.Gears + math.max(reward, 1),
-				PrestigeConfig.GearPower,
-				PrestigeConfig.MaximumGearValueMultiplier
+			local nextValue = GameMath.prestigeValueMultiplier(
+				state.PrestigeCount + 1,
+				PrestigeConfig.ValuePerPrestige
 			)
-			local valueCapReached = current >= PrestigeConfig.MaximumGearValueMultiplier
 			progress.Text = `$ {formatNumber(state.Money)} / $ {formatNumber(prestigeRequirement)}`
 			rewardLabel.Text = if reward > 0 then `REWARD: +{reward} GEARS` else "REWARD: LOCKED"
-			currentMultiplier.Text = if valueCapReached
-				then `CURRENT VALUE: {string.format("%.1f", current)}x (MAX)`
-				else `CURRENT VALUE: {string.format("%.1f", current)}x`
-			nextMultiplier.Text = if valueCapReached
-				then "AFTER PRESTIGE: VALUE CAP REACHED"
-				else `AFTER PRESTIGE: {string.format("%.1f", nextValue)}x`
+			currentMultiplier.Text = `CURRENT VALUE: {string.format("%.2f", current)}x`
+			nextMultiplier.Text = `AFTER PRESTIGE: {string.format("%.2f", nextValue)}x`
 			action.Active = reward > 0
 			action.AutoButtonColor = reward > 0
 			action.BackgroundColor3 = if reward > 0
