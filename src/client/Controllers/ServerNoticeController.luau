@@ -55,6 +55,9 @@ function ServerNoticeController.Start()
 			message = text,
 			fromName = if typeof(payload.FromName) == "string" then payload.FromName else "STAFF",
 			verified = payload.Verified == true,
+			--- For the avatar and the rank badge. Both come from the server; neither is client-supplied.
+			fromUserId = if typeof(payload.FromUserId) == "number" then payload.FromUserId else 0,
+			role = if typeof(payload.Role) == "string" then payload.Role else "",
 			--- "Gift" or nil. Decides whether this reads as a present or as somebody talking.
 			kind = if typeof(payload.Kind) == "string" then payload.Kind else nil,
 			receivedAt = os.clock(),

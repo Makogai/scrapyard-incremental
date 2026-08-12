@@ -159,8 +159,20 @@ function Announcement.Banner(props)
 					vAlign = Enum.VerticalAlignment.Center,
 				}),
 				children = P.compact(
-					if props.model
-						then e(ModelView.View, {
+					--[[
+						THREE WAYS TO STAMP THE BANNER, cheapest last: a spinning model for a pet, an IMAGE for a
+						person (their avatar, so you can see who is talking), a glyph for anything else.
+					]]
+					if props.image
+						then e(Icon, {
+							key = "Portrait",
+							image = props.image,
+							gradient = accent,
+							size = UDim2.fromOffset(HEIGHT - 20, HEIGHT - 20),
+							radius = Theme.Radius.Small,
+							layoutOrder = 1,
+						})
+						elseif props.model then e(ModelView.View, {
 							key = "Model",
 							kind = props.modelKind or "pet",
 							model = props.model,

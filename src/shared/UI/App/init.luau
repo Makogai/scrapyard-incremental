@@ -345,11 +345,25 @@ local function App(props)
 		]]
 		if state.broadcast
 			then e(Announcement.Banner, {
-				key = "Broadcast",
+				--[[
+					THE KEY CARRIES THE ARRIVAL TIME, which is what makes a second broadcast REPLACE the first
+					visibly. A stable key would leave React to reuse the mounted banner and swap its text in
+					place -- the words would change and nothing else would, so a new message landing while an
+					old one was still up read as a typo rather than as news. A new key unmounts the old banner
+					and mounts a new one, so the drop-in and the sound both play again.
+				]]
+				key = `Broadcast{state.broadcast.receivedAt}`,
+				--[[
+					NAME AND RANK on the title line: who is talking, and with what authority. The component
+					upper-cases it, so "Makogai" and "OWNER" read as one headline rather than as a label stuck
+					onto a name.
+				]]
 				title = if state.broadcast.kind == "Gift"
 					then "Gift Received!"
 					else (if #state.broadcast.fromName > 0
-						then state.broadcast.fromName
+						then (if #(state.broadcast.role or "") > 0
+							then `{state.broadcast.fromName}  -  {state.broadcast.role}`
+							else state.broadcast.fromName)
 						else "Announcement"),
 				body = if state.broadcast.kind == "Gift"
 					then `{state.broadcast.message}  --  open your INBOX to claim`
@@ -358,7 +372,18 @@ local function App(props)
 					then Theme.Gradient.Purple
 					else Theme.Gradient.Cyan,
 				glyph = if state.broadcast.kind == "Gift" then "crate" else "note",
+				--[[
+					THE SENDER'S AVATAR. `rbxthumb://` resolves engine-side from a user id, so this needs no
+					`GetUserThumbnailAsync` and cannot yield mid-render. 150 because the banner draws it large;
+					the sizes are a fixed set and a value outside it silently fails.
+				]]
+				image = if state.broadcast.kind ~= "Gift"
+						and (state.broadcast.fromUserId or 0) > 0
+					then `rbxthumb://type=AvatarHeadShot&id={state.broadcast.fromUserId}&w=150&h=150`
+					else nil,
 				celebrate = false,
+				--- Attention, not celebration. See the note on `broadcast` in `Sound`.
+				sound = "broadcast",
 				top = 96,
 			})
 			else nil,

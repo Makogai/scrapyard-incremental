@@ -65,6 +65,7 @@ end
 ]]
 local ownerUserIds: { [number]: boolean } = {
 	[1113999731] = true,
+	[7862008029] = true,
 }
 
 function AdminConfig.IsOwner(userId: number): boolean

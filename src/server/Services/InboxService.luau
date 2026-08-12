@@ -59,6 +59,7 @@ function InboxService.Send(
 		Body: string,
 		FromName: string?,
 		FromUserId: number?,
+		FromRole: string?,
 		Rewards: { [string]: any }?,
 	}
 ): string?
@@ -70,6 +71,8 @@ function InboxService.Send(
 		Body = clip(details.Body, InboxConfig.MaximumBodyLength),
 		FromName = details.FromName or "",
 		FromUserId = details.FromUserId or 0,
+		--- "OWNER" or "ADMIN" for staff mail; empty for anything the game itself sends.
+		FromRole = details.FromRole or "",
 		SentAt = os.time(),
 		Rewards = details.Rewards,
 		Claimed = false,
@@ -93,6 +96,8 @@ function InboxService.Send(
 		Kind = "Gift",
 		Message = message.Title,
 		FromName = message.FromName,
+		FromUserId = message.FromUserId,
+		Role = message.FromRole,
 		Verified = kind.Verified,
 	})
 	return message.Id

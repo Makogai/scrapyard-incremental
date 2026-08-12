@@ -743,6 +743,10 @@ function PlayerDataSchema.validate(
 						then string.sub(entry.FromName, 1, 40)
 						else "",
 					FromUserId = boundedInteger(entry.FromUserId, 0, 0, 1e12),
+					--- Only the two staff ranks are kept; anything else becomes no rank at all.
+					FromRole = if entry.FromRole == "OWNER" or entry.FromRole == "ADMIN"
+						then entry.FromRole
+						else "",
 					SentAt = boundedInteger(entry.SentAt, 0, 0, 1e12),
 					Rewards = rewards,
 					Claimed = boolean(entry.Claimed, false),

@@ -84,6 +84,17 @@ local function MessageCard(props)
 	local claimed = props.message.Claimed == true
 	local rewards = rewardSummary(props.message.Rewards)
 	local hasRewards = #rewards > 0
+	--[[
+		The sender line lays itself out left to right: avatar, rank badge, name. Each piece is optional, so
+		the offsets are accumulated rather than hardcoded -- a system message with neither avatar nor rank
+		puts its name hard against the edge instead of leaving two gaps where they would have been.
+	]]
+	local senderUserId = props.message.FromUserId or 0
+	local rank = if props.message.FromRole == "OWNER" or props.message.FromRole == "ADMIN"
+		then props.message.FromRole
+		else ""
+	local textLeft = if senderUserId > 0 then 30 else 0
+	local nameLeft = textLeft + (if #rank > 0 then 72 else 0)
 
 	return e(P.Panel, {
 		key = props.key,
@@ -148,16 +159,43 @@ local function MessageCard(props)
 					]]
 					e(P.Group, {
 						key = "From",
-						size = UDim2.new(1, 0, 0, 20),
+						size = UDim2.new(1, 0, 0, 26),
 						layoutOrder = 2,
 						children = P.compact(
-							if kind.Verified
+							--[[
+								THE SENDER'S FACE. `rbxthumb://` resolves engine-side from a user id, so no
+								`GetUserThumbnailAsync` and no yielding inside render. 48 because the sizes are a
+								fixed set and anything outside it silently fails -- it is drawn at 24.
+							]]
+							if senderUserId > 0
+								then e("ImageLabel", {
+									key = "Avatar",
+									Image = `rbxthumb://type=AvatarHeadShot&id={senderUserId}&w=48&h=48`,
+									BackgroundColor3 = Theme.Color.Slot,
+									BorderSizePixel = 0,
+									Size = UDim2.fromOffset(24, 24),
+									Position = UDim2.fromScale(0, 0.5),
+									AnchorPoint = Vector2.new(0, 0.5),
+									ZIndex = 3,
+								}, {
+									P.corner(Theme.Radius.Small),
+								})
+								else nil,
+							--[[
+								RANK, not just "STAFF". `FromRole` is written by the server from `AdminConfig`, so
+								an OWNER badge cannot be claimed by anything that merely says it is one.
+							]]
+							if #rank > 0
 								then e(Indicators.Badge, {
-									key = "Verified",
-									text = kind.Label,
-									gradient = Theme.Gradient.Cyan,
+									key = "Rank",
+									text = rank,
+									gradient = if rank == "OWNER"
+										then Theme.Gradient.Gold
+										else Theme.Gradient.Cyan,
 									textSize = Theme.TextSize.Micro,
-									size = UDim2.fromOffset(62, 18),
+									size = UDim2.fromOffset(66, 18),
+									position = UDim2.new(0, textLeft, 0.5, 0),
+									anchorPoint = Vector2.new(0, 0.5),
 									zIndex = 3,
 								})
 								else nil,
@@ -169,8 +207,8 @@ local function MessageCard(props)
 								textSize = Theme.TextSize.Small,
 								color = Theme.Color.Gray,
 								align = Enum.TextXAlignment.Left,
-								size = UDim2.new(1, -74, 1, 0),
-								position = UDim2.fromOffset(if kind.Verified then 70 else 0, 0),
+								size = UDim2.new(1, -(nameLeft + 4), 1, 0),
+								position = UDim2.fromOffset(nameLeft, 0),
 								truncate = Enum.TextTruncate.AtEnd,
 								zIndex = 3,
 							})

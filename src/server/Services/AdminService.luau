@@ -76,7 +76,8 @@ local function mailGift(
 	amount: number?,
 	itemId: string?,
 	senderName: string,
-	senderUserId: number
+	senderUserId: number,
+	senderRole: string
 ): number
 	local rewards = GIFT_REWARDS[command](math.floor(amount or 0), itemId)
 	local sent = 0
@@ -87,6 +88,7 @@ local function mailGift(
 			Body = `Sent to you by {senderName}. Hit claim to collect it.`,
 			FromName = senderName,
 			FromUserId = senderUserId,
+			FromRole = senderRole,
 			Rewards = rewards,
 		})
 		if id ~= nil then
@@ -118,7 +120,12 @@ local function applyToTargets(
 			amount,
 			itemId,
 			senderName or "the team",
-			senderUserId or 0
+			senderUserId or 0,
+			--[[
+				Resolved from the id rather than passed in, so a gift mailed from another server is labelled by
+				what that account actually is now rather than by what the sending server believed.
+			]]
+			if senderUserId ~= nil and AdminConfig.IsOwner(senderUserId) then "OWNER" else "ADMIN"
 		)
 	end
 
@@ -363,6 +370,13 @@ function AdminService.Start()
 				RemoteService.GetEvent("AdminBroadcast"):FireAllClients({
 					Message = text,
 					FromName = admin.DisplayName,
+					--- For the avatar. The client builds an `rbxthumb://` URL from it -- no web call needed.
+					FromUserId = admin.UserId,
+					--[[
+						OWNER or ADMIN. Read from `AdminConfig` here rather than sent by the client for the same
+						reason `Verified` is: a rank a client could name is a rank anybody could claim.
+					]]
+					Role = if AdminConfig.IsOwner(admin.UserId) then "OWNER" else "ADMIN",
 					--- Only the server ever sets this, which is what makes the tick worth trusting.
 					Verified = true,
 				})

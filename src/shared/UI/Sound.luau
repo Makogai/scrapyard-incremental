@@ -49,6 +49,15 @@ Sound.Library = {
 	sell = { id = CLICK, pitch = 1.1, volume = 0.5, chord = { 1.1, 1.45 }, stagger = 0.05 },
 	purchase = { id = CLICK, pitch = 1, volume = 0.55, chord = { 1, 1.5 }, stagger = 0.07 },
 	claim = { id = CLICK, pitch = 1, volume = 0.55, chord = { 1, 1.26, 1.5 }, stagger = 0.07 },
+	--[[
+		A BROADCAST ARRIVING. Two notes rather than a chord, so it reads as an alert rather than a reward --
+		and loud enough to pull your eyes up from the yard, which is the whole point of a broadcast.
+
+		Deliberately not `prestige`: that fanfare means "you achieved something", and staff talking is not
+		the player's achievement.
+	]]
+	broadcast = { id = CLICK, pitch = 1.3, volume = 0.62, chord = { 1.3, 1.75 }, stagger = 0.11 },
+
 	prestige = {
 		id = CLICK,
 		pitch = 0.8,
