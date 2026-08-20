@@ -8,8 +8,12 @@
 
 	WHAT TO LOOK AT
 
-		NO PANEL AND NO WORDS. The offer is the skin turning in its own light with the price over it. If
-		something here needs a caption to make sense, the ART is what needs fixing, not this card.
+		NO PANEL AND NO WORDS. The offer is the skin turning in its own light, with the price UNDER it as
+		bare gradient-lit text -- no plate, tilted a few degrees clockwise, nudging itself every few
+		seconds. If something here needs a caption to make sense, the ART is what needs fixing, not the card.
+
+		THE ART DOES NOT MOVE, on purpose. Only the light behind it turns. A breathing icon read as a
+		wobble on the one object the player is trying to look at.
 
 		The rays ROTATE, which means they ignore any clipping ancestor -- see `Shine.buildRays`. The boxes
 		below are drawn deliberately tight so that if the wheel ever grows past its own footprint, it

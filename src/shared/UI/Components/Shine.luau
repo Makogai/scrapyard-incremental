@@ -41,6 +41,7 @@ local React = require(ReplicatedStorage.Packages.React)
 
 local UI = script.Parent.Parent
 local P = require(UI.Primitives)
+local Assets = require(UI.Assets)
 
 local e = React.createElement
 
@@ -193,7 +194,62 @@ end
 	turns, so ten rays cost one tween and no Lua per frame. Linear, and 0 -> 360 with no reverse, because
 	a sine ease would make light appear to swing back and forth and the wrap at 360 is invisible.
 ]]
-local RAY_COUNT = 10
+--[[
+	The drawn burst. Tunable, because "the VFX looks wrong" is a per-eye judgement and these four numbers
+	are the whole look:
+
+		RAY_COUNT   how busy it is. Ten hard spokes read as a paper windmill; fourteen reads as light.
+		RAY_ALTERNATE  every second spoke is shorter, which is what stops a fan looking like a gear.
+		RAY_WIDTH   fraction of the host. Thin, because a Frame cannot taper across its width -- only
+		            along its length, via the gradient -- so narrow is how the tips stay soft.
+		RAY_SECONDS one full turn. Slow: this sits behind something the player is trying to look at.
+]]
+local RAY_COUNT = 14
+local RAY_ALTERNATE = 0.62
+local RAY_WIDTH = 0.045
+local RAY_SECONDS = 26
+
+--- One tween turns the wheel, whether the wheel is an image or a fan of Frames.
+local function spinForever(wheel: GuiObject): { Tween }
+	local tween = TweenService:Create(
+		wheel,
+		TweenInfo.new(
+			RAY_SECONDS,
+			Enum.EasingStyle.Linear,
+			Enum.EasingDirection.InOut,
+			-1,
+			false,
+			0
+		),
+		{ Rotation = 360 }
+	)
+	tween:Play()
+	return { tween }
+end
+
+--[[
+	The image version, used when `Assets.Plates.rays` has an id.
+
+	The art is WHITE ON TRANSPARENCY and gets tinted here, so one asset serves every accent colour. That
+	is a hard requirement of whatever id goes in that slot: a pre-coloured burst would need one upload per
+	accent, and an opaque one would wash out the artwork it is supposed to sit behind.
+]]
+local function buildRayImage(host: Frame, color: Color3, image: string): { Tween }
+	local wheel = Instance.new("ImageLabel")
+	wheel.Name = "Rays"
+	wheel.AnchorPoint = Vector2.new(0.5, 0.5)
+	wheel.Position = UDim2.fromScale(0.5, 0.5)
+	wheel.Size = UDim2.fromScale(1, 1)
+	wheel.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	wheel.BackgroundTransparency = 1
+	wheel.Image = image
+	wheel.ImageColor3 = color
+	wheel.ImageTransparency = 0.28
+	wheel.ScaleType = Enum.ScaleType.Fit
+	wheel.ZIndex = 1
+	wheel.Parent = host
+	return spinForever(wheel)
+end
 
 local function buildRays(host: Frame, color: Color3): { Tween }
 	local wheel = Instance.new("Frame")
@@ -213,7 +269,9 @@ local function buildRays(host: Frame, color: Color3): { Tween }
 		--- Anchored at its base, which is what `Rotation` turns around, so spokes fan from the centre.
 		ray.AnchorPoint = Vector2.new(0.5, 1)
 		ray.Position = UDim2.fromScale(0.5, 0.5)
-		ray.Size = UDim2.fromScale(0.075, 0.5)
+		--- Alternating lengths, so the burst has a shape rather than a rim.
+		local reach = if index % 2 == 0 then 0.5 * RAY_ALTERNATE else 0.5
+		ray.Size = UDim2.fromScale(RAY_WIDTH, reach)
 		ray.Rotation = (index - 1) * (360 / RAY_COUNT)
 		ray.BackgroundColor3 = color
 		ray.BorderSizePixel = 0
@@ -223,20 +281,16 @@ local function buildRays(host: Frame, color: Color3): { Tween }
 		--- Bright at the hub, gone at the tip: a hard-edged spoke reads as a paper windmill.
 		local fade = Instance.new("UIGradient")
 		fade.Rotation = 90
+		--- Gone at the tip, and never fully solid at the hub: light, not paint.
 		fade.Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(1, 0.62),
+			NumberSequenceKeypoint.new(0.45, 0.82),
+			NumberSequenceKeypoint.new(1, 0.5),
 		})
 		fade.Parent = ray
 	end
 
-	local tween = TweenService:Create(
-		wheel,
-		TweenInfo.new(18, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false, 0),
-		{ Rotation = 360 }
-	)
-	tween:Play()
-	return { tween }
+	return spinForever(wheel)
 end
 
 --[[
@@ -268,7 +322,8 @@ function Shine.Layer(props)
 
 		--- Before the glow, so the halo sits over the spokes and softens where they meet the art.
 		if props.rays then
-			add(buildRays(host, color))
+			local art = Assets.plate("rays")
+			add(if art then buildRayImage(host, color, art) else buildRays(host, color))
 		end
 		if props.glow then
 			add(buildGlow(host, color))

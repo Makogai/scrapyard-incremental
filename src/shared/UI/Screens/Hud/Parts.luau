@@ -512,33 +512,30 @@ end
 	the same image as on the prompt the player is about to see, and the two cannot drift apart.
 ]]
 --[[
-	NO PANEL. The offer is the SKIN ITSELF, turning in its own light, with the price over it -- no slab,
-	no border, no name. A studded window with a title line and a subtitle was chrome competing with the
-	one thing worth looking at, and the words were saying what the picture already said.
+	NO PANEL, NO WORDS. The offer is the SKIN ITSELF, turning in its own light, with the price under it.
+	A studded window with a title line and a subtitle was chrome competing with the one thing worth
+	looking at, and the words said what the picture already said.
 
-	No name means the ART has to carry the identity, which is why it is the pass thumbnail rather than a
+	No name means the ART carries the identity, which is why it is the pass thumbnail rather than a
 	generic glyph: what the player sees here is exactly what the purchase prompt will show them.
 
-	TWO SIZES. `compact` is the phone version -- the desktop card is a fifth of the width of a 390-wide
-	phone HUD, and that right edge already carries the boost lane, the status cluster and the toggle.
+	THE ART DOES NOT MOVE. Only the light behind it does. A breathing icon read as a wobble on the one
+	object the player is trying to look at, and the motion is doing its job better in the background.
+
+	THE PRICE IS BARE TEXT: no plate, no pill, tilted a few degrees clockwise, gradient-lit and nudging
+	itself every few seconds. Rotation is safe here only because nothing on this card clips -- see
+	AGENTS.md rule 11 before copying that anywhere with a panel around it.
 ]]
 local SKIN_SIZES = table.freeze({
-	Full = table.freeze({
-		Art = 116,
-		Price = Vector2.new(96, 34),
-		PriceText = Theme.TextSize.Button,
-		Glyph = 20,
-	}),
-	Compact = table.freeze({
-		Art = 84,
-		Price = Vector2.new(76, 26),
-		PriceText = Theme.TextSize.Small,
-		Glyph = 15,
-	}),
+	Full = table.freeze({ Art = 116, Price = 30, PriceText = Theme.TextSize.Value }),
+	Compact = table.freeze({ Art = 84, Price = 24, PriceText = Theme.TextSize.Small }),
 })
 
 --- The rays reach past the art, so the group has to leave them room or the wheel would be cut in half.
 local SKIN_RAY_SCALE = 1.55
+
+--- Clockwise, and small: a price you have to tilt your head for reads as a mistake.
+local SKIN_PRICE_TILT = 7
 
 function Parts.PlotSkinOffer(props)
 	local skin = PlotSkinConfig.forArea(props.plotTheme)
@@ -551,14 +548,15 @@ function Parts.PlotSkinOffer(props)
 	local metrics = if props.compact then SKIN_SIZES.Compact else SKIN_SIZES.Full
 
 	--[[
-		BREATHING, not springing. The art should read as alive before anyone touches it, and a spring
-		settles -- which is the opposite. `useSpin` is one addition per frame on the shared heartbeat and
-		the sine keeps the whole animation inside a binding, so the HUD never re-renders for it. Stopped
-		when there is nothing on offer, so a card that is not drawn costs nothing.
+		A nudge every few seconds rather than a constant wobble, so it draws the eye without nagging.
+
+		`delay = 0` because the default is `every`, and `useWiggle` starts its clock at `-delay` -- so left
+		alone the first nudge lands after TWO intervals, and a card the player has already looked away from
+		has missed its chance.
 	]]
-	local spin = Motion.useSpin(80, offering)
-	local pulse = spin:map(function(angle: number)
-		return 1 + 0.05 * math.sin(math.rad(angle))
+	local wiggle = Motion.useWiggle({ every = 3.2, angle = 6, shakes = 3, delay = 0 })
+	local priceRotation = wiggle:map(function(angle: number)
+		return SKIN_PRICE_TILT + angle
 	end)
 	local press = Motion.usePressable({ onClick = props.onBuy, hoverScale = 1.07 })
 
@@ -567,7 +565,7 @@ function Parts.PlotSkinOffer(props)
 	end
 
 	local rays = math.floor(metrics.Art * SKIN_RAY_SCALE)
-	local height = metrics.Price.Y + 6 + rays
+	local height = rays + metrics.Price
 
 	--- Events are a map keyed by `React.Event.*`, so they are merged into the props, not passed as one.
 	local rootProps = {
@@ -601,48 +599,36 @@ function Parts.PlotSkinOffer(props)
 					rays = true,
 					glow = true,
 					size = UDim2.fromOffset(rays, rays),
-					position = UDim2.fromScale(0.5, 1),
-					anchorPoint = Vector2.new(0.5, 1),
-					zIndex = 1,
-				}),
-				e(P.Group, {
-					key = "Art",
-					size = UDim2.fromOffset(metrics.Art, metrics.Art),
-					position = UDim2.new(0.5, 0, 1, -math.floor((rays - metrics.Art) / 2)),
-					anchorPoint = Vector2.new(0.5, 1),
-					zIndex = 3,
-					children = {
-						e("UIScale", { key = "Pulse", Scale = pulse }),
-						e(Icon, {
-							key = "Skin",
-							plain = true,
-							image = `rbxthumb://type=GamePass&id={definition.MarketplaceId}&w=150&h=150`,
-							size = UDim2.fromScale(1, 1),
-						}),
-					},
-				}),
-				--[[
-					The price, ABOVE the art rather than beside it -- nothing else on the card needs the width,
-					and a price under the art would sit where the rays are brightest.
-
-					`P.Chip` is a container and draws no text of its own, so the label is a child.
-				]]
-				e(P.Chip, {
-					key = "Price",
-					color = Theme.Button.Purchase.base,
-					gradient = Theme.Button.Purchase.gradient,
-					size = UDim2.fromOffset(metrics.Price.X, metrics.Price.Y),
 					position = UDim2.fromScale(0.5, 0),
 					anchorPoint = Vector2.new(0.5, 0),
+					zIndex = 1,
+				}),
+				e(Icon, {
+					key = "Skin",
+					plain = true,
+					image = `rbxthumb://type=GamePass&id={definition.MarketplaceId}&w=150&h=150`,
+					size = UDim2.fromOffset(metrics.Art, metrics.Art),
+					position = UDim2.new(0.5, 0, 0, math.floor((rays - metrics.Art) / 2)),
+					anchorPoint = Vector2.new(0.5, 0),
+					zIndex = 3,
+				}),
+				--[[
+					The price, under the art and wearing nothing. A gradient down the glyphs is what makes it
+					read as metal rather than as a label, and the outline is what keeps it legible over whatever
+					the player happens to be standing in front of -- there is no plate behind it to do that job.
+				]]
+				e(P.Label, {
+					key = "Price",
+					text = Format.robuxSymbol(definition.DisplayPrice),
+					textSize = metrics.PriceText,
+					color = Theme.Color.White,
+					gradient = Theme.Gradient.Yellow,
+					stroke = 3,
+					size = UDim2.new(1, 0, 0, metrics.Price),
+					position = UDim2.fromScale(0.5, 1),
+					anchorPoint = Vector2.new(0.5, 1),
+					rotation = priceRotation,
 					zIndex = 4,
-					children = {
-						e(P.Label, {
-							key = "Text",
-							text = Format.robuxSymbol(definition.DisplayPrice),
-							textSize = metrics.PriceText,
-							color = Theme.Button.Purchase.text,
-						}),
-					},
 				}),
 			},
 		}),

@@ -154,6 +154,22 @@ Assets.Plates = {
 
 	shopBuy = "rbxassetid://99243851896343",
 	shopGift = "rbxassetid://128879018619128",
+
+	--[[
+		The turning starburst behind an offer's artwork, used by `Shine`'s `rays` effect.
+
+		EMPTY, AND NOT FOR WANT OF TRYING. Creator Store "light rays" results are Decal assets, and an
+		unowned Decal id does not render in an `ImageLabel` -- measured, not assumed: our own plate ids load
+		in the same probe where two store ids stay `IsLoaded = false`, which is the same `LoadUnownedAsset`
+		restriction the console reports elsewhere. Browsing the store for UI art is therefore a dead end;
+		the route that works is the one every other icon here took, which is uploading our own.
+
+		Whatever goes in this slot must be WHITE ON TRANSPARENCY: `Shine` tints it to the card's accent, so
+		one image serves every colour, and an opaque burst would wash out the art it sits behind.
+
+		While it is empty the effect draws spokes from Frames instead, like the rest of the kit.
+	]]
+	rays = "",
 }
 
 --------------------------------------------------------------------------------
