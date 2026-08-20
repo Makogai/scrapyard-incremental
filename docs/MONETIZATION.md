@@ -16,8 +16,14 @@ is meant to cost.
    pass, and the price is set afterwards on the pass itself. Until that is done a pass cannot be bought,
    even though its id is wired. The 17 developer products DO have their prices set, because that form
    does take one.
-2. **No icons.** Everything was created without art, which Roblox allows -- each item shows a default
-   placeholder until an image is uploaded. See the icon section below.
+2. ~~No icons.~~ **Done (2026-08-20).** All 28 items have art, from `images/monetization` (20) and
+   `images/upgrades` (7). Rarity Luck reuses `scrap_flow`, matching what `Assets.luau` already does in
+   game. Uploaded icons sit in Roblox moderation for a while before they display, so grey placeholders
+   in the dashboard right after upload are expected, not a failure.
+
+**Uploading more art later:** the browser tooling can only read files it has been given access to, so
+`images/` had to be copied into the session scratchpad first. If you want this repeated, either copy the
+files across again or run `/add-dir` on the images folder.
 
 Managed Pricing is **Disabled** on all 17 products, deliberately: it is on by default and would have let
 Roblox vary the real price regionally, which would disagree with the `DisplayPrice` our UI prints.
