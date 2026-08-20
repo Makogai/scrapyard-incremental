@@ -126,12 +126,26 @@ function FoundationValidator.validate()
 	for _, passId in MonetizationConfig.PassOrder do
 		assert(MonetizationConfig.Passes[passId] ~= nil, `PassOrder names unknown pass {passId}`)
 	end
+	--[[
+		PRODUCTS ARE NOT REQUIRED TO BE IN `ProductOrder`, and asserting that they were is what took the
+		whole server down for a while.
+
+		`ProductOrder` drives the SHOP GRID. The eight `RobuxUpgrade*` products are sold from the row on
+		their own upgrade card instead, so they are deliberately absent from it -- an assert demanding
+		otherwise fails at boot, and a validator that refuses to start the game is worse than the gap it
+		was looking for.
+
+		What IS worth asserting is the direction that can only ever be a mistake: an id in the list with no
+		definition behind it, and a definition with no marketplace id.
+	]]
 	for productId, definition in MonetizationConfig.Products do
-		assert(
-			table.find(MonetizationConfig.ProductOrder, productId) ~= nil,
-			`{productId} is missing from MonetizationConfig.ProductOrder`
-		)
 		positive(definition.MarketplaceId, `{productId}.MarketplaceId`)
+	end
+	for _, productId in MonetizationConfig.ProductOrder do
+		assert(
+			MonetizationConfig.Products[productId] ~= nil,
+			`ProductOrder names unknown product {productId}`
+		)
 	end
 
 	positive(PrestigeConfig.MaximumGearsPerPrestige, "Prestige.MaximumGearsPerPrestige")
