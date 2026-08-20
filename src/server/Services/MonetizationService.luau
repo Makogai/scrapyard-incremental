@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 
 local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
+local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local PlotService = require(script.Parent.PlotService)
@@ -58,6 +59,16 @@ local function refreshOwnedPasses(player: Player)
 					ownership check has finished, so the plot is built while the entitlement is still unknown.
 				]]
 				PassPadService.RefreshPlayer(player)
+				--[[
+					A plot skin only exists as a rebuilt plot, so buying one has to rebuild. Without this the
+					player pays and their yard looks identical until something else happens to refresh it.
+				]]
+				if passId == PlotSkinConfig.Pass then
+					local skinPlot = PlotService.GetPlot(player)
+					if skinPlot ~= nil then
+						PlotThemeService.Rebuild(player, skinPlot)
+					end
+				end
 			end
 		end
 	end

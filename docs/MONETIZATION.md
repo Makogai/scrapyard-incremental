@@ -6,16 +6,16 @@ Everything sellable in the game, what to create for it, and what art it needs.
 grants are written and wired. The only thing missing is the **numeric ids Roblox assigns when you
 create the item on its side**. Every entry currently reads `MarketplaceId = 0`.
 
-**STATUS: all 28 created and wired (2026-08-20).** 11 passes and 17 developer products, every
-`MarketplaceId` filled. The tables below are kept as the record of what was created and what each item
-is meant to cost.
+**STATUS: all 30 created, wired and priced (2026-08-20).** 13 passes and 17 developer products, every
+`MarketplaceId` filled and every price set. The tables below are kept as the record of what was created
+and what each item is meant to cost.
 
 **Two things still outstanding:**
 
-1. **Every pass is `Offsale`.** Roblox does not take a price on the pass creation form -- it creates the
-   pass, and the price is set afterwards on the pass itself. Until that is done a pass cannot be bought,
-   even though its id is wired. The 17 developer products DO have their prices set, because that form
-   does take one.
+1. ~~Every pass is `Offsale`.~~ **Done (2026-08-20).** Roblox does not take a price on the pass creation
+   form -- it creates the pass, and the price is set afterwards on the pass itself, which is why they all
+   started Offsale with a wired id and no way to buy them. All 13 now have their price and Managed Pricing
+   disabled. The 17 developer products had theirs from the start, because that form does take one.
 2. ~~No icons.~~ **Done (2026-08-20).** All 28 items have art, from `images/monetization` (20) and
    `images/upgrades` (7). Rarity Luck reuses `scrap_flow`, matching what `Assets.luau` already does in
    game. Uploaded icons sit in Roblox moderation for a while before they display, so grey placeholders
@@ -78,7 +78,7 @@ number and is charged another. Keep them equal.
 
 ---
 
-## Passes (11) — bought once, owned forever
+## Passes (13) — bought once, owned forever
 
 | # | Name to type | Price | Description to paste | Config key |
 | --- | --- | --- | --- | --- |
@@ -87,12 +87,24 @@ number and is charged another. Keep them equal.
 | 3 | Turbo Collector | 249 | Permanently doubles collection speed. | `FastCollector` |
 | 4 | Quantum Magnet | 399 | Exclusive 25 strength, 32 range premium magnet. | `QuantumMagnet` |
 | 5 | 2x Walk Speed | 199 | Move twice as fast, permanently. Stacks with your speed upgrade. | `PermanentSpeed` |
-| 6 | +2 Pet Slots | 249 | Equip two additional pets permanently (maximum five). | `ExtraPetSlots` |
-| 7 | Triple Hatch | 199 | Open three eggs at once, forever. Costs three eggs' cash. | `TripleHatch` |
-| 8 | Penta Hatch | 349 | Open five eggs at once, forever. Costs five eggs' cash. | `PentaHatch` |
-| 9 | Singularity Pet | 499 | Copies twice the effects of your strongest equipped normal pet. | `SingularityPet` |
-| 10 | Demonic Ghost Pet | 699 | Increases every combined pet bonus by 35%. | `DemonicGhostPet` |
-| 11 | Sinister Lord Pet | 999 | Ultimate premium pet that doubles all combined pet bonuses. | `SinisterLordPet` |
+| 6 | Auto Sell | 299 | Your scrap sells itself the moment your storage fills. No more trips to the crusher. | `AutoSell` |
+| 7 | Lava Skin | 399 | Reskin your plot as cracked volcanic rock with molten lava running through it. Applies to every area you unlock. | `LavaSkin` |
+| 8 | +2 Pet Slots | 249 | Equip two additional pets permanently (maximum five). | `ExtraPetSlots` |
+| 9 | Triple Hatch | 199 | Open three eggs at once, forever. Costs three eggs' cash. | `TripleHatch` |
+| 10 | Penta Hatch | 349 | Open five eggs at once, forever. Costs five eggs' cash. | `PentaHatch` |
+| 11 | Singularity Pet | 499 | Copies twice the effects of your strongest equipped normal pet. | `SingularityPet` |
+| 12 | Demonic Ghost Pet | 699 | Increases every combined pet bonus by 35%. | `DemonicGhostPet` |
+| 13 | Sinister Lord Pet | 999 | Ultimate premium pet that doubles all combined pet bonuses. | `SinisterLordPet` |
+
+> **Lava Skin is one pass and three models.** `Workspace.PlotSkins` holds a lava build of the Front Yard,
+> the Workshop and the Vehicle Graveyard, each tagged with an `AreaId` attribute, and `PlotThemeService`
+> rebuilds the plot from whichever matches the area the player has converted to. Selling it per-area would
+> have charged three times for one cosmetic idea and left a player who rebirths back to the Front Yard
+> looking at a plot they had already paid to reskin. Adding a fourth area means adding a model and a row in
+> `PlotSkinConfig.ByArea` -- no new pass, no dashboard work.
+>
+> The HUD card (`Parts.PlotSkinOffer`, right edge) draws its art from `rbxthumb://type=GamePass`, so it
+> wears the pass icon rather than a second upload and the two cannot drift apart.
 
 > **Singularity Pet is limited to 500 copies globally.** Roblox has no built-in stock limit, so ours is
 > enforced in `LimitedStockService` with a DataStore counter reserved *before* the grant. Nothing to do
@@ -150,7 +162,7 @@ shop row and on the product is a feature, not laziness.
 
 ## Icons
 
-**20 new icons needed** — 28 items minus the 8 upgrade products that reuse existing art.
+**22 new icons needed** — 30 items minus the 8 upgrade products that reuse existing art.
 
 **Spec:** 512x512 PNG, square, subject centred with a little breathing room. They are shown as small as
 ~64px in the Roblox store list, so fine detail or text turns to mush: one readable silhouette per icon.
@@ -184,6 +196,8 @@ I will give you subjects one at a time. Render each in exactly this style.
 | Turbo Collector | A chunky horseshoe magnet leaning forward with cyan speed streaks trailing behind it |
 | Quantum Magnet | A sleek futuristic horseshoe magnet in white and violet, crackling with purple energy arcs and floating orbiting particles |
 | 2x Walk Speed | A pair of cartoon boots with bright green motion streaks and small dust puffs at the heels |
+| Auto Sell | An orange skip bin of scrap with green recycling arrows curving around it and a gold coin at the base |
+| Lava Skin | A small square diorama of a scrapyard plot whose ground is cracked black volcanic rock with molten lava glowing through the cracks, a scorched oil drum, a gear and a bolt sitting on top, embers rising |
 | +2 Pet Slots | Three glowing empty pet collar rings floating in a row, the front two lit gold, the back one dim |
 | Triple Hatch | Three cracked cartoon eggs side by side, warm golden light spilling from the cracks |
 | Penta Hatch | Five cracked cartoon eggs in a fan arrangement, bright golden light bursting from all of them |

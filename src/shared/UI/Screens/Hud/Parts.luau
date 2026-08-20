@@ -11,6 +11,7 @@
 		EventBanner     temporary event strip
 		ContextActions  teleport home / sell / auto-collect status
 		StatusCluster   bottom-right trio: daily login boost, friend boost, spin wheel
+		PlotSkinOffer   right-edge lava skin card for the area you are standing on
 		TutorialSpotlight darkens the screen and leaves one control lit
 		TutorialCaption the current onboarding objective
 ]]
@@ -28,8 +29,11 @@ local Icon = require(UI.Icon)
 local Buttons = require(UI.Components.Buttons)
 local Indicators = require(UI.Components.Indicators)
 local SocialConfig = require(ReplicatedStorage.Shared.Config.SocialConfig)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
+local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
 local Overlays = require(UI.Components.Overlays)
 local FadeBanner = require(UI.Components.FadeBanner)
+local Shine = require(UI.Components.Shine)
 
 local e = React.createElement
 
@@ -485,6 +489,156 @@ function Parts.SocialColumn(props)
 		zIndex = props.zIndex or 5,
 		layout = P.list({ direction = Enum.FillDirection.Vertical, padding = 6 }),
 		children = children,
+	})
+end
+
+--------------------------------------------------------------------------------
+-- PlotSkinOffer
+--------------------------------------------------------------------------------
+
+--[[
+	THE LAVA SKIN OFFER, on the right edge, naming the area the player is standing on.
+
+	ONE PASS, THREE MODELS -- so the card names the CURRENT AREA rather than the pass. "LAVA SKIN /
+	FRONT YARD" is a promise about the plot in front of the player; "Lava Skin" on its own would be a
+	promise about two plots they cannot see. `PlotSkinConfig` owns which areas have a lava model built,
+	so an area without one shows nothing rather than selling a change that would not happen.
+
+	IT LEAVES WHEN IT IS BOUGHT, and it never appears before the pass has a real MarketplaceId. An offer
+	for something you already own is dead chrome over the play area, and a card that opens an empty
+	purchase prompt is worse than no card -- that is the failure `MarketplaceId <= 0` guards.
+
+	THE ART IS THE PASS THUMBNAIL, via `rbxthumb://`, not a second upload. The image on the card is then
+	the same image as on the prompt the player is about to see, and the two cannot drift apart.
+]]
+--[[
+	TWO SIZES OF THE SAME CARD. `compact` is the phone version: the desktop card is 196x118 authored,
+	which is a fifth of the width of a 390-wide phone HUD, and the right edge there is already carrying
+	the boost lane, the status cluster and the menu toggle.
+]]
+local SKIN_SIZES = table.freeze({
+	Full = table.freeze({
+		Card = Vector2.new(196, 118),
+		Art = 54,
+		ArtInset = Vector2.new(10, 9),
+		TextLeft = 70,
+		TextWidth = 116,
+		TitleSize = Theme.TextSize.Tiny,
+		Button = Vector2.new(176, 36),
+		ButtonTop = 70,
+		ButtonText = Theme.TextSize.Button,
+		IconSize = 20,
+	}),
+	Compact = table.freeze({
+		Card = Vector2.new(152, 94),
+		Art = 40,
+		ArtInset = Vector2.new(8, 8),
+		TextLeft = 54,
+		TextWidth = 90,
+		TitleSize = Theme.TextSize.Micro,
+		Button = Vector2.new(136, 30),
+		ButtonTop = 56,
+		ButtonText = Theme.TextSize.Small,
+		IconSize = 16,
+	}),
+})
+
+function Parts.PlotSkinOffer(props)
+	local skin = PlotSkinConfig.forArea(props.plotTheme)
+	local definition = MonetizationConfig.Passes[PlotSkinConfig.Pass]
+	local owned = PlotSkinConfig.owned(props.entitlements)
+	local offering = skin ~= nil
+		and definition ~= nil
+		and definition.MarketplaceId > 0
+		and not owned
+	local metrics = if props.compact then SKIN_SIZES.Compact else SKIN_SIZES.Full
+
+	--[[
+		BREATHING, not springing. The icon should read as alive before anyone touches it, and a spring
+		settles -- which is the opposite. `useSpin` is one addition per frame on the shared heartbeat, and
+		mapping it through a sine keeps the whole animation inside a binding, so the HUD never re-renders
+		for it. Stopped when there is nothing on offer, so a card that is not drawn costs nothing.
+	]]
+	local spin = Motion.useSpin(80, offering)
+	local pulse = spin:map(function(angle: number)
+		return 1 + 0.05 * math.sin(math.rad(angle))
+	end)
+
+	if not offering then
+		return nil
+	end
+
+	return e(P.Panel, {
+		key = props.key or "PlotSkinOffer",
+		size = UDim2.fromOffset(metrics.Card.X, metrics.Card.Y),
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		zIndex = props.zIndex or 5,
+		strokeColor = Theme.Color.Orange,
+		gloss = true,
+		shadow = true,
+		--- The VFX layer lives inside this panel, so the panel is what keeps it there.
+		clip = true,
+		children = {
+			e(Shine.Layer, {
+				key = "VFX",
+				color = Theme.Color.Orange,
+				glow = true,
+				sweep = true,
+				sparkles = true,
+				zIndex = 1,
+			}),
+			--- The scale goes on an inner frame: a UIScale on a laid-out child shifts its siblings.
+			e(P.Group, {
+				key = "Art",
+				size = UDim2.fromOffset(metrics.Art, metrics.Art),
+				position = UDim2.fromOffset(metrics.ArtInset.X, metrics.ArtInset.Y),
+				zIndex = 3,
+				children = {
+					e("UIScale", { key = "Pulse", Scale = pulse }),
+					e(Icon, {
+						key = "Skin",
+						plain = true,
+						image = `rbxthumb://type=GamePass&id={definition.MarketplaceId}&w=150&h=150`,
+						size = UDim2.fromScale(1, 1),
+					}),
+				},
+			}),
+			e(P.Label, {
+				key = "Title",
+				text = string.upper(definition.DisplayName),
+				textSize = metrics.TitleSize,
+				color = Theme.Color.Orange,
+				align = Enum.TextXAlignment.Left,
+				size = UDim2.fromOffset(metrics.TextWidth, 18),
+				position = UDim2.fromOffset(metrics.TextLeft, metrics.ArtInset.Y + 3),
+				zIndex = 3,
+			}),
+			e(P.Label, {
+				key = "Area",
+				text = string.upper(skin.DisplayName),
+				textSize = Theme.TextSize.Micro,
+				color = Theme.Color.TextMuted,
+				align = Enum.TextXAlignment.Left,
+				vAlign = Enum.TextYAlignment.Top,
+				wrapped = true,
+				size = UDim2.fromOffset(metrics.TextWidth, metrics.Art - 18),
+				position = UDim2.fromOffset(metrics.TextLeft, metrics.ArtInset.Y + 21),
+				zIndex = 3,
+			}),
+			e(Buttons.Button, {
+				key = "Buy",
+				text = Format.robux(definition.DisplayPrice),
+				glyph = "robux",
+				variant = "Purchase",
+				textSize = metrics.ButtonText,
+				iconSize = metrics.IconSize,
+				size = UDim2.fromOffset(metrics.Button.X, metrics.Button.Y),
+				position = UDim2.fromOffset(metrics.ArtInset.X, metrics.ButtonTop),
+				zIndex = 3,
+				onClick = props.onBuy,
+			}),
+		},
 	})
 end
 

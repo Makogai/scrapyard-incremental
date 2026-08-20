@@ -68,6 +68,26 @@ local passes = {
 		DisplayPrice = 299,
 		Color = Color3.fromRGB(105, 232, 92),
 	}),
+	--[[
+		LAVA PLOT SKIN, one pass for every area.
+
+		ONE PURCHASE, THREE MODELS. `Workspace.PlotSkins` holds a lava build of each area, and owning this
+		pass makes the plot wear whichever one matches the area you have converted to. Selling it per-area
+		would have charged three times for one cosmetic idea and left a player who rebirths back to the Front
+		Yard looking at a plot they had already paid to reskin.
+
+		Purely cosmetic: the plot is rebuilt from a different model and nothing about income, capacity or rate
+		changes. Premium-cosmetic tier -- a skin you look at for hours is worth more than a convenience that
+		saves you a walk, and less than a pass that changes the numbers.
+	]]
+	LavaSkin = table.freeze({
+		Id = "LavaSkin",
+		MarketplaceId = 1948606430,
+		DisplayName = "Lava Skin",
+		Description = "Reskin your plot as cracked volcanic rock with molten lava running through it. Applies to every area you unlock.",
+		DisplayPrice = 399,
+		Color = Color3.fromRGB(255, 116, 46),
+	}),
 	ExtraPetSlots = table.freeze({
 		Id = "ExtraPetSlots",
 		MarketplaceId = 1951701001,
@@ -331,6 +351,7 @@ return table.freeze({
 		"QuantumMagnet",
 		"PermanentSpeed",
 		"AutoSell",
+		"LavaSkin",
 		"ExtraPetSlots",
 		"TripleHatch",
 		"PentaHatch",

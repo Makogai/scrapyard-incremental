@@ -117,6 +117,14 @@ return table.freeze({
 					Text = "A brand-new profile was instantly awarded $1,500,000, 305 gears and two titles it had not earned, because the scrap index counted every scrap as already discovered.",
 				}),
 				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "LAVA SKIN pass: your plot becomes cracked volcanic rock with lava running through it. One purchase covers every area -- the Front Yard, the Workshop and the Vehicle Graveyard each get their own lava build, and rebirthing back to the Front Yard keeps it.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Passes you can walk into: step on the 2X MONEY, AUTO SELL or 2X MOVEMENT SPEED pad on your plot to buy it, and the pad goes away once it is yours.",
+				}),
+				table.freeze({
 					Kind = "Fix" :: ChangeKind,
 					Text = "Scrap you cannot pick up now flashes and shakes -- red if your magnet is too weak, amber if your storage is full -- so you can see which piece is the problem.",
 				}),

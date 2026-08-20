@@ -56,6 +56,7 @@ local Hooks = require(UI.Hooks)
 local P = require(UI.Primitives)
 local Buttons = require(UI.Components.Buttons)
 local Parts = require(script.Parent.Parts)
+local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
 
 local e = React.createElement
 
@@ -223,6 +224,24 @@ local function HudDesktop(props)
 					0,
 					topbarStripTop + topbarStripHeight + 74 + (if state.event then 66 else 0)
 				),
+			}),
+			--[[
+				The lava skin offer, ABOVE the social column on the same edge.
+
+				Above rather than below because the social buttons come and go as they are claimed: anchoring
+				this card off the bottom of that stack would make it hop up the screen every time a reward was
+				taken. Its own anchor is the column's centre line, so the card holds still whatever the column
+				is doing.
+			]]
+			e(Parts.PlotSkinOffer, {
+				key = "PlotSkin",
+				plotTheme = state.plotTheme,
+				entitlements = state.entitlements,
+				position = UDim2.new(1, -MARGIN, 0.42, -96),
+				anchorPoint = Vector2.new(1, 1),
+				onBuy = function()
+					actions.purchase(PlotSkinConfig.Pass, "Pass")
+				end,
 			}),
 			--- Social rewards down the right edge; disappears as they are claimed.
 			e(Parts.SocialColumn, {

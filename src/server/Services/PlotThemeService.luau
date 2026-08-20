@@ -37,6 +37,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
+local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
 
 local PlotBuildService = require(script.Parent.PlotBuildService)
 local PlayerStateService = require(script.Parent.PlayerStateService)
@@ -59,6 +60,11 @@ local STAND_BACK = 18
 local DEFAULT_THEME = "FrontYard"
 
 local variants: { [string]: Model } = {}
+--[[
+	Cosmetic reskins, indexed by area exactly like `variants`. A player who owns the skin pass for the
+	theme their plot is wearing gets built from here instead. See `PlotSkinConfig`.
+]]
+local skins: { [string]: Model } = {}
 local structures: { [string]: Model } = {}
 local notifyRemote: RemoteEvent
 
@@ -310,7 +316,18 @@ function PlotThemeService.Rebuild(player: Player?, plot: Model)
 	local themeId = if plotState
 		then (plotState.ActivePlotTheme or DEFAULT_THEME)
 		else DEFAULT_THEME
-	local variant = variants[themeId] or variants[DEFAULT_THEME]
+	--[[
+		A SKIN WINS OVER THE STANDARD VARIANT, when owned for THIS theme.
+
+		Falls through to the normal variant whenever the skin is unowned or its model is missing from
+		`Workspace.PlotSkins`, so a half-authored skin degrades to the plot everybody else sees rather than
+		to no plot at all.
+	]]
+	local entitlements = if plotState then plotState.Entitlements else nil
+	local skin = PlotSkinConfig.activeSkinFor(themeId, entitlements)
+	local variant = if skin ~= nil and skins[themeId] ~= nil
+		then skins[themeId]
+		else (variants[themeId] or variants[DEFAULT_THEME])
 	if variant == nil then
 		warn(`[PlotThemeService] no variant for {themeId} and no {DEFAULT_THEME} fallback`)
 		return
@@ -430,6 +447,8 @@ end
 function PlotThemeService.Start()
 	notifyRemote = RemoteService.GetEvent("Notify")
 	print(`[PlotThemeService] {adopt(VARIANT_FOLDER, variants)}`)
+	--- Optional: a place with no authored skins simply logs that none were found and carries on.
+	print(`[PlotThemeService] {adopt(PlotSkinConfig.Folder, skins)}`)
 	print(`[PlotThemeService] {adopt(STRUCTURE_FOLDER, structures)}`)
 
 	--[[

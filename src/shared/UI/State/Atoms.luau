@@ -139,6 +139,13 @@ Atoms.unlockedAchievements = Charm.atom({} :: { [string]: boolean })
 Atoms.unlockedTitles = Charm.atom({} :: { [string]: boolean })
 Atoms.equippedTitle = Charm.atom("")
 Atoms.entitlements = Charm.atom({} :: { [string]: boolean })
+--[[
+	Which area theme the plot is currently wearing.
+
+	Needed by the plot-skin offer, which shows the skin for the area you are ACTUALLY on rather than a
+	fixed one -- so the thing on the button is the thing your plot would turn into.
+]]
+Atoms.plotTheme = Charm.atom("FrontYard")
 Atoms.ownedPets = Charm.atom({} :: { [string]: number })
 Atoms.equippedPets = Charm.atom({} :: { string })
 Atoms.petSlotUpgradeLevel = Charm.atom(0)
@@ -308,6 +315,9 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.Entitlements) == "table" then
 		Atoms.entitlements(snapshot.Entitlements)
+	end
+	if type(snapshot.ActivePlotTheme) == "string" then
+		Atoms.plotTheme(snapshot.ActivePlotTheme)
 	end
 	if type(snapshot.OwnedPets) == "table" then
 		Atoms.ownedPets(snapshot.OwnedPets)

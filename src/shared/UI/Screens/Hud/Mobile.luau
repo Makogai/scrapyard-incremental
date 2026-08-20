@@ -33,6 +33,7 @@ local Hooks = require(UI.Hooks)
 local P = require(UI.Primitives)
 local Buttons = require(UI.Components.Buttons)
 local Parts = require(script.Parent.Parts)
+local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
 
 local e = React.createElement
 
@@ -58,6 +59,9 @@ local function HudMobile(props)
 	-- Phones have no room beside Roblox's buttons, so our topbar row takes the
 	-- first band under the strip and the rest of the HUD stacks below it.
 	local topRow = safe.top + 44
+
+	--- 32-tall tiles plus their 8 gap, so the skin card lands under whatever boosts are actually drawn.
+	local boostLane = #(state.boosts or {}) * 40
 
 	--[[
 		Canvas height in design pixels, for the tutorial spotlight -- which needs an absolute rect and
@@ -111,6 +115,31 @@ local function HudMobile(props)
 				height = 32,
 				position = UDim2.new(1, -MARGIN, 0, topRow + 96),
 				anchorPoint = Vector2.new(1, 0),
+			})
+			else nil,
+
+		--[[
+			The lava skin offer, under the boost lane on the same edge, in its compact size.
+
+			Measured DOWN from the boosts rather than up from the status cluster: stacking it above that
+			cluster would put its top ~430px off the bottom edge, which is off-screen entirely on the
+			750x361 landscape phone this layout is checked against. The lane below the boosts is the only
+			right-edge room that exists on every phone.
+
+			`boostLane` counts the timers that are actually drawn -- `BoostTimers` renders nothing for an
+			empty list, so reserving its height unconditionally would leave a hole most of the time.
+		]]
+		if not open
+			then e(Parts.PlotSkinOffer, {
+				key = "PlotSkin",
+				compact = true,
+				plotTheme = state.plotTheme,
+				entitlements = state.entitlements,
+				position = UDim2.new(1, -MARGIN, 0, topRow + 96 + boostLane),
+				anchorPoint = Vector2.new(1, 0),
+				onBuy = function()
+					actions.purchase(PlotSkinConfig.Pass, "Pass")
+				end,
 			})
 			else nil,
 

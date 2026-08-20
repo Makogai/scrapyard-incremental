@@ -779,6 +779,7 @@ function Store.use()
 	local unlockedTitles = useAtom(Atoms.unlockedTitles)
 	local equippedTitle = useAtom(Atoms.equippedTitle)
 	local entitlements = useAtom(Atoms.entitlements)
+	local plotTheme = useAtom(Atoms.plotTheme)
 	local ownedPets = useAtom(Atoms.ownedPets)
 	local equippedPets = useAtom(Atoms.equippedPets)
 	local maximumEquippedPets = useAtom(Atoms.maximumEquippedPets)
@@ -1056,6 +1057,7 @@ function Store.use()
 		equippedSkin = nil,
 		potionCounts = inventory,
 		entitlements = entitlements,
+		plotTheme = plotTheme,
 		ownedPets = ownedPets,
 		equippedPets = equippedPets,
 		-- The server's number, not a guess derived from what is equipped.
