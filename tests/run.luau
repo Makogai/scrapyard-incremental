@@ -929,4 +929,43 @@ for key in string.gmatch(atomsSource, "snapshot%.([%a_][%w_]*)") do
 	end
 end
 
+--[[
+	NO ACTION DEFINED TWICE IN ONE TABLE.
+
+	`Store.luau` builds three action tables in one file -- `localActions`, `liveActions`, `mockActions` --
+	and they share the same `self.name = function` shape, so an edit anchored on the wrong neighbour lands
+	in the wrong table. Assigning the same name twice in one table is legal Luau: the second one silently
+	wins.
+
+	That is exactly how `equipSkin` broke. The mock's local version was written into `liveActions`, after
+	the real one, so the inventory card flipped to EQUIPPED off a local atom write, no request ever
+	reached the server, and the plot never changed. Nothing else could see it: both definitions are valid,
+	the types agree, and a story exercising the mock behaved perfectly.
+]]
+local storeSource = fs.readFile("src/shared/UI/App/Store.luau")
+local tableStarts = {}
+for name in string.gmatch(storeSource, "local function (%a+Actions)%(%)") do
+	table.insert(tableStarts, { Name = name, At = string.find(storeSource, `local function {name}()`, 1, true) })
+end
+expectEqual(#tableStarts >= 2, true, "Store defines several action tables")
+
+local seen: { [string]: string } = {}
+local duplicates = 0
+for position, actionName in string.gmatch(storeSource, "()function self%.(%a+)") do
+	--- Whichever table opened last before this line is the table it belongs to.
+	local owner = "?"
+	for _, entry in tableStarts do
+		if entry.At <= position then
+			owner = entry.Name
+		end
+	end
+	local key = `{owner}.{actionName}`
+	if seen[key] then
+		duplicates += 1
+		print(`  DUPLICATE ACTION: {key}`)
+	end
+	seen[key] = owner
+end
+expectEqual(duplicates, 0, "no action is defined twice in the same table")
+
 print(`Scrapyard foundation and data tests passed: {passed}`)

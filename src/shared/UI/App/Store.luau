@@ -414,16 +414,6 @@ local function liveActions()
 		Atoms.spinRoll(nil)
 	end
 
-	--[[
-	The mock swaps the skin for real, rather than being one more no-op below.
-
-	The whole point of the skins tab is the SWAP, so a story where pressing EQUIP does nothing would be
-	a story that cannot show the only behaviour worth reviewing.
-]]
-	function self.equipSkin(skinId: string?)
-		Atoms.plotSkin(skinId or "")
-	end
-
 	function self.equipTitle(titleId: string)
 		Sound.play("equip")
 		Bridge.equipTitle(titleId)
@@ -561,6 +551,20 @@ local function mockActions()
 
 	function self.equipMagnet(magnetId: string)
 		Atoms.equippedMagnet(magnetId)
+	end
+
+	--[[
+		The mock swaps the skin locally, rather than being one more no-op in the list below.
+
+		The whole point of the skins tab is the SWAP, so a story where pressing EQUIP does nothing would be
+		a story that cannot show the only behaviour worth reviewing.
+
+		IT MUST STAY IN THIS TABLE. This exact function was written into `liveActions` by mistake, where it
+		landed AFTER the real one and silently replaced it -- so in the game the card flipped to EQUIPPED off
+		a local atom write, no request ever reached the server, and the plot never changed.
+	]]
+	function self.equipSkin(skinId: string?)
+		Atoms.plotSkin(skinId or "")
 	end
 
 	function self.usePotion(itemId: string)
