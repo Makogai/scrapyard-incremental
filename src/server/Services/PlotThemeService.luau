@@ -323,7 +323,14 @@ function PlotThemeService.WearSkin(player: Player, skinId: string): (boolean, st
 	end
 
 	local plot = PlotService.GetPlot(player)
-	if plot ~= nil then
+	if plot == nil then
+		--[[
+			Saved, with nothing to show for it. Worth a warning rather than a quiet success: the card the
+			player pressed flips to EQUIPPED off the saved state, so a missing plot looks exactly like a
+			swap that did nothing -- which is the hardest version of this bug to diagnose from a report.
+		]]
+		warn(`[PlotThemeService] {player.Name} chose skin "{skinId}" with no plot to rebuild`)
+	else
 		PlotThemeService.Rebuild(player, plot)
 	end
 	return true, if skinId == "" then "SKIN REMOVED" else "SKIN APPLIED"
@@ -362,6 +369,15 @@ function PlotThemeService.Rebuild(player: Player?, plot: Model)
 		warn(`[PlotThemeService] no variant for {themeId} and no {DEFAULT_THEME} fallback`)
 		return
 	end
+	--[[
+		ONE LINE SAYING WHICH BUILD WON AND WHY. A rebuild picking the wrong variant is invisible from the
+		outside -- the plot simply looks unchanged -- and it has now been mis-picked twice for two different
+		reasons (nil entitlements, then an unworn skin). The inputs are worth printing.
+	]]
+	print(
+		`[PlotThemeService] rebuild {plot.Name}: theme={themeId} worn="{wornSkin}" `
+			.. `owned={tostring(PlotSkinConfig.owned(entitlements))} variant={variant.Name}`
+	)
 
 	--[[
 		Align by the FLOOR, not by the model pivot.
