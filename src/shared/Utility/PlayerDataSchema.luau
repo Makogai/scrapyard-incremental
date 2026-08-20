@@ -2,7 +2,17 @@
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.CurrentVersion = 17
+PlayerDataSchema.CurrentVersion = 18
+
+--[[
+	The one cosmetic plot-skin pass, mirroring `PlotSkinConfig.Pass`.
+
+	A LITERAL, like `PET_IDS` and `AREA_IDS` below, and for the same reason: this module requires nothing.
+	The Lune test runner loads it directly, and it cannot load a config that uses Roblox datatypes -- and
+	`MonetizationConfig` is full of `Color3`. So the id is repeated here and the two are kept in step by
+	`tests/run.luau`, which asserts they agree.
+]]
+local SKIN_PASS = "LavaSkin"
 
 local PET_IDS = {
 	"Pup",
@@ -230,6 +240,11 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 			See docs/PLOT_UPGRADES.md.
 		]]
 		ActivePlotTheme = "FrontYard",
+		--[[
+			The cosmetic skin worn over that theme. "" is the standard build, and the default, because a
+			skin has to be BOUGHT and then CHOSEN -- owning the pass does not force the look on anybody.
+		]]
+		ActivePlotSkin = "",
 		PlotUpgradeLevels = {},
 		UnlockedScrapTypes = {
 			MetalCan = true,
@@ -698,6 +713,18 @@ function PlayerDataSchema.validate(
 			clean.ActivePlotTheme = areaId
 			break
 		end
+	end
+	--[[
+		THE CHOSEN SKIN, validated against the pass list rather than trusted.
+
+		Not checked against ENTITLEMENTS here, deliberately: this function sanitises a save without knowing
+		what the player owns, and clearing the choice for an unowned pass would erase it for anyone whose
+		entitlements had not loaded yet. `PlotThemeService` asks about ownership at build time instead, so a
+		skin the player no longer owns simply stops being drawn.
+	]]
+	clean.ActivePlotSkin = ""
+	if raw.ActivePlotSkin == SKIN_PASS then
+		clean.ActivePlotSkin = raw.ActivePlotSkin
 	end
 	--[[
 		THE MAILBOX, sanitised message by message.

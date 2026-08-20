@@ -264,7 +264,16 @@ local function liveActions()
 		Bridge.equipMagnet(magnetId)
 	end
 
-	function self.equipSkin() end
+	--[[
+		WEAR A PLOT SKIN, or "" to go back to the standard build.
+
+		Was an empty stub for as long as the game had no skins. It is a real intent now: the server owns
+		whether the player may wear it and rebuilds the plot, so this sends the id and nothing else.
+	]]
+	function self.equipSkin(skinId: string?)
+		Sound.play("equip")
+		Bridge.setPlotSkin(skinId or "")
+	end
 
 	function self.usePotion(itemId: string)
 		Sound.play("equip")
@@ -403,6 +412,16 @@ local function liveActions()
 	--- Clears the wheel takeover once the player has seen their prize.
 	function self.closeSpin()
 		Atoms.spinRoll(nil)
+	end
+
+	--[[
+	The mock swaps the skin for real, rather than being one more no-op below.
+
+	The whole point of the skins tab is the SWAP, so a story where pressing EQUIP does nothing would be
+	a story that cannot show the only behaviour worth reviewing.
+]]
+	function self.equipSkin(skinId: string?)
+		Atoms.plotSkin(skinId or "")
 	end
 
 	function self.equipTitle(titleId: string)
@@ -642,7 +661,6 @@ local function mockActions()
 	for _, name in ipairs({
 		"teleport",
 		"teleportHome",
-		"equipSkin",
 		"buyMagnet",
 		"purchase",
 		"equipPet",
@@ -780,6 +798,7 @@ function Store.use()
 	local equippedTitle = useAtom(Atoms.equippedTitle)
 	local entitlements = useAtom(Atoms.entitlements)
 	local plotTheme = useAtom(Atoms.plotTheme)
+	local plotSkin = useAtom(Atoms.plotSkin)
 	local ownedPets = useAtom(Atoms.ownedPets)
 	local equippedPets = useAtom(Atoms.equippedPets)
 	local maximumEquippedPets = useAtom(Atoms.maximumEquippedPets)
@@ -1055,6 +1074,8 @@ function Store.use()
 		ownedMagnets = ownedMagnets,
 		equippedMagnet = equippedMagnet,
 		equippedSkin = nil,
+		--- The plot skin actually worn, "" for the standard build. See `PlotSkinConfig.Catalogue`.
+		plotSkin = plotSkin,
 		potionCounts = inventory,
 		entitlements = entitlements,
 		plotTheme = plotTheme,

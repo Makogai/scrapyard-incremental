@@ -1,5 +1,5 @@
 --[[
-	The lava skin offer card, in every area and in both of its sizes.
+	The lava skin offer, in every area and in both of its sizes.
 
 	THIS STORY EXISTS BECAUSE THE HUD IS WHERE RENDER ERRORS REACH PLAYERS. Three separate crashes have
 	shipped from HUD blocks that no story rendered -- a bad `Theme` key, a nil in a plain children array,
@@ -8,16 +8,18 @@
 
 	WHAT TO LOOK AT
 
-		One card per area. The title is the PASS ("LAVA SKIN") and the second line is the AREA, because
-		one purchase reskins all three. Adding an area to `PlotSkinConfig.ByArea` adds a row here with no
-		edit to this story -- and if its name does not fit the 116px text column, this is where it shows.
+		NO PANEL AND NO WORDS. The offer is the skin turning in its own light with the price over it. If
+		something here needs a caption to make sense, the ART is what needs fixing, not this card.
 
-		Owned, and unauthored. Both render nothing at all: the card is an offer, and an offer for
-		something you own is dead chrome sitting over the play area. The outlined boxes below should be
-		EMPTY, not "already bought" states.
+		The rays ROTATE, which means they ignore any clipping ancestor -- see `Shine.buildRays`. The boxes
+		below are drawn deliberately tight so that if the wheel ever grows past its own footprint, it
+		crosses a visible line here rather than painting over somebody's HUD.
 
-		The icon is the pass thumbnail via `rbxthumb://`, so it only appears once Roblox has moderated
-		the pass image. An empty tile here means moderation, not a broken layout.
+		Owned, and unauthored. Both render nothing at all: the card is an offer, and an offer for something
+		you own is dead chrome over the play area. Those outlined boxes should be EMPTY.
+
+		The art is the pass thumbnail via `rbxthumb://`, so it only appears once Roblox has moderated the
+		pass image. An empty middle means moderation, not a broken layout.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,7 +44,7 @@ local function Bounded(props)
 		key = props.key,
 		BackgroundColor3 = Theme.Color.PanelDark,
 		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(props.width or 220, props.height or 142),
+		Size = UDim2.fromOffset(props.width or 210, props.height or 250),
 	}, {
 		P.corner(6),
 		P.stroke(Theme.Color.Gold, 1, { transparency = 0.5 }),
@@ -111,17 +113,17 @@ return UILabs.CreateReactStory({
 						entitlements = owned,
 					}),
 				},
-				itemSize = UDim2.fromOffset(220, 142),
+				itemSize = UDim2.fromOffset(210, 250),
 			},
 			{
-				title = "Every area — the pass name on top, the area under it",
+				title = "Every area — identical by design: one pass, and the art is the whole message",
 				items = everyArea,
-				itemSize = UDim2.fromOffset(220, 142),
+				itemSize = UDim2.fromOffset(210, 250),
 			},
 			{
 				title = "Compact — the phone size, under the boost lane",
 				items = everyAreaCompact,
-				itemSize = UDim2.fromOffset(176, 118),
+				itemSize = UDim2.fromOffset(160, 190),
 			},
 			{
 				title = "Owned — empty, because an offer you have taken is not an offer",
@@ -132,7 +134,7 @@ return UILabs.CreateReactStory({
 						entitlements = { [PlotSkinConfig.Pass] = true },
 					}),
 				},
-				itemSize = UDim2.fromOffset(220, 142),
+				itemSize = UDim2.fromOffset(210, 250),
 			},
 			{
 				title = "An area with no lava model — empty, rather than selling a change that cannot happen",
@@ -143,7 +145,7 @@ return UILabs.CreateReactStory({
 						entitlements = {},
 					}),
 				},
-				itemSize = UDim2.fromOffset(220, 142),
+				itemSize = UDim2.fromOffset(210, 250),
 			},
 		},
 	})

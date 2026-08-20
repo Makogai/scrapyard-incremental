@@ -1926,6 +1926,30 @@ function PlayerStateService.SetActivePlotTheme(player: Player, areaId: string): 
 	return true
 end
 
+--[[
+	WEAR OR REMOVE A COSMETIC PLOT SKIN. `skinId` is a pass id, or "" for the standard build.
+
+	OWNERSHIP IS CHECKED HERE, unlike `SetActivePlotTheme` above, because there is no unlock rule for a
+	skin anywhere else to own: a skin is bought and then chosen, so "do you have it" is the only question
+	and this is the one place asking it. Taking a skin OFF never checks, or a refunded pass would leave a
+	player stuck wearing something they cannot remove.
+]]
+function PlayerStateService.SetActivePlotSkin(player: Player, skinId: string): boolean
+	local session = sessions[player]
+	if session == nil or typeof(skinId) ~= "string" then
+		return false
+	end
+	if skinId ~= "" and session.Data.Entitlements[skinId] ~= true then
+		return false
+	end
+	if session.Data.ActivePlotSkin == skinId then
+		return true
+	end
+	session.Data.ActivePlotSkin = skinId
+	pushState(player, session.Data)
+	return true
+end
+
 function PlayerStateService.TryUpdateSetting(player: Player, settingId: string, value: any): boolean
 	local session = sessions[player]
 	if session == nil or session.Data.Settings[settingId] == nil then
@@ -2054,6 +2078,8 @@ function PlayerStateService.GetPlotState(player: Player): { [string]: any }?
 		PlotStage = data.PlotStage,
 		--- Which theme the plot is built as; see docs/PLOT_UPGRADES.md.
 		ActivePlotTheme = data.ActivePlotTheme or "FrontYard",
+		--- And the skin worn over it, "" for the standard build.
+		ActivePlotSkin = data.ActivePlotSkin or "",
 		UpgradeLevels = table.clone(data.UpgradeLevels),
 		UnlockedAreas = table.clone(data.UnlockedAreas),
 		PlotUpgradeLevels = table.clone(data.PlotUpgradeLevels),

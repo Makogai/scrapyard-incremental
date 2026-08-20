@@ -180,11 +180,72 @@ local function buildSparkles(host: Frame, color: Color3): { Tween }
 end
 
 --[[
+	A slowly turning starburst behind the art -- the "god rays" look.
+
+	ROTATION IS THE EFFECT HERE, so read the clipping rule at the top of this file first: these spokes
+	DO escape an ancestor's `ClipsDescendants`, exactly as the old starburst did. What keeps them inside
+	the card this time is CONSTRUCTION rather than clipping -- every spoke reaches from the centre to at
+	most half the host's smaller side, so the whole wheel lives inside the circle inscribed in the host
+	and there is nothing for a clip to cut off. That is why `rays` is documented as unclipped-only and
+	the other three effects are not.
+
+	One tween drives the whole wheel: the spokes sit at fixed angles inside a container and the container
+	turns, so ten rays cost one tween and no Lua per frame. Linear, and 0 -> 360 with no reverse, because
+	a sine ease would make light appear to swing back and forth and the wrap at 360 is invisible.
+]]
+local RAY_COUNT = 10
+
+local function buildRays(host: Frame, color: Color3): { Tween }
+	local wheel = Instance.new("Frame")
+	wheel.Name = "Rays"
+	wheel.AnchorPoint = Vector2.new(0.5, 0.5)
+	wheel.Position = UDim2.fromScale(0.5, 0.5)
+	--- Square off the smaller side, so a non-square host still gets a round wheel.
+	wheel.Size = UDim2.fromScale(1, 1)
+	wheel.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	wheel.BackgroundTransparency = 1
+	wheel.ZIndex = 1
+	wheel.Parent = host
+
+	for index = 1, RAY_COUNT do
+		local ray = Instance.new("Frame")
+		ray.Name = "Ray" .. index
+		--- Anchored at its base, which is what `Rotation` turns around, so spokes fan from the centre.
+		ray.AnchorPoint = Vector2.new(0.5, 1)
+		ray.Position = UDim2.fromScale(0.5, 0.5)
+		ray.Size = UDim2.fromScale(0.075, 0.5)
+		ray.Rotation = (index - 1) * (360 / RAY_COUNT)
+		ray.BackgroundColor3 = color
+		ray.BorderSizePixel = 0
+		ray.ZIndex = 1
+		ray.Parent = wheel
+
+		--- Bright at the hub, gone at the tip: a hard-edged spoke reads as a paper windmill.
+		local fade = Instance.new("UIGradient")
+		fade.Rotation = 90
+		fade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(1, 0.62),
+		})
+		fade.Parent = ray
+	end
+
+	local tween = TweenService:Create(
+		wheel,
+		TweenInfo.new(18, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false, 0),
+		{ Rotation = 360 }
+	)
+	tween:Play()
+	return { tween }
+end
+
+--[[
 	props:
 		color     accent for every effect, usually the card's own
 		sweep     boolean
 		glow      boolean
 		sparkles  boolean
+		rays      boolean -- a turning starburst. UNCLIPPED HOSTS ONLY; see `buildRays`.
 		delay     stagger for the sweep, so a grid does not pulse in unison
 		size, position, anchorPoint, zIndex
 ]]
@@ -205,6 +266,10 @@ function Shine.Layer(props)
 			end
 		end
 
+		--- Before the glow, so the halo sits over the spokes and softens where they meet the art.
+		if props.rays then
+			add(buildRays(host, color))
+		end
 		if props.glow then
 			add(buildGlow(host, color))
 		end
@@ -228,7 +293,7 @@ function Shine.Layer(props)
 				child:Destroy()
 			end
 		end
-	end, { color, props.sweep, props.glow, props.sparkles, props.delay })
+	end, { color, props.sweep, props.glow, props.sparkles, props.rays, props.delay })
 
 	return e(P.Group, {
 		key = props.key or "Shine",
@@ -242,7 +307,11 @@ function Shine.Layer(props)
 				ref = hostRef,
 				BackgroundTransparency = 1,
 				Size = UDim2.fromScale(1, 1),
-				-- Clipped. Only works because nothing inside is rotated.
+				--[[
+					Clipped, which contains the sweep and the sparkles because neither is rotated. It does
+					NOT contain `rays`: a rotated GuiObject ignores every ancestor's clip, which is why that
+					effect is sized to stay inside the host on its own and is documented as unclipped-only.
+				]]
 				ClipsDescendants = true,
 			}),
 		},

@@ -301,6 +301,35 @@ function PlotThemeService.TryConvert(player: Player, areaId: string): (boolean, 
 end
 
 --[[
+	WEAR OR REMOVE A COSMETIC SKIN, and rebuild the plot so the change is visible immediately.
+
+	`skinId` is a pass id, or "" to go back to the standard build. Sits here rather than in
+	`InventoryService` because a skin only exists as a rebuilt plot, and this module is what rebuilds --
+	the inventory does not need to learn about plots to let you change your mind about a cosmetic.
+
+	OWNERSHIP is `PlayerStateService.SetActivePlotSkin`'s to enforce, since that is what holds the
+	entitlements. What this checks is that the id is a skin AT ALL, so a typo cannot blank a real choice.
+]]
+function PlotThemeService.WearSkin(player: Player, skinId: string): (boolean, string)
+	if skinId ~= "" and skinId ~= PlotSkinConfig.Pass then
+		return false, "That skin does not exist"
+	end
+	--- No models adopted at all means wearing it would silently change nothing; say so instead.
+	if skinId ~= "" and next(skins) == nil then
+		return false, "That skin has no model yet"
+	end
+	if not PlayerStateService.SetActivePlotSkin(player, skinId) then
+		return false, "You do not own that skin"
+	end
+
+	local plot = PlotService.GetPlot(player)
+	if plot ~= nil then
+		PlotThemeService.Rebuild(player, plot)
+	end
+	return true, if skinId == "" then "SKIN REMOVED" else "SKIN APPLIED"
+end
+
+--[[
 	Rebuild a plot from the owner's saved theme.
 
 	Order matters and is the whole reason this is one function rather than scattered calls:
@@ -317,14 +346,15 @@ function PlotThemeService.Rebuild(player: Player?, plot: Model)
 		then (plotState.ActivePlotTheme or DEFAULT_THEME)
 		else DEFAULT_THEME
 	--[[
-		A SKIN WINS OVER THE STANDARD VARIANT, when owned for THIS theme.
+		A SKIN WINS OVER THE STANDARD VARIANT, when owned, worn, and built for THIS theme.
 
 		Falls through to the normal variant whenever the skin is unowned or its model is missing from
 		`Workspace.PlotSkins`, so a half-authored skin degrades to the plot everybody else sees rather than
 		to no plot at all.
 	]]
 	local entitlements = if plotState then plotState.Entitlements else nil
-	local skin = PlotSkinConfig.activeSkinFor(themeId, entitlements)
+	local wornSkin = if plotState then (plotState.ActivePlotSkin or "") else ""
+	local skin = PlotSkinConfig.activeSkinFor(themeId, entitlements, wornSkin)
 	local variant = if skin ~= nil and skins[themeId] ~= nil
 		then skins[themeId]
 		else (variants[themeId] or variants[DEFAULT_THEME])

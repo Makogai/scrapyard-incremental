@@ -62,8 +62,17 @@ local function refreshOwnedPasses(player: Player)
 				--[[
 					A plot skin only exists as a rebuilt plot, so buying one has to rebuild. Without this the
 					player pays and their yard looks identical until something else happens to refresh it.
+
+					WORN ON PURCHASE. A skin is normally bought and then chosen, but nobody buys a look in order
+					to not see it -- so the purchase picks it, and the inventory is where it comes back off. Only
+					when nothing is worn: this path also runs on every rejoin, and it must not overwrite a player
+					who has deliberately taken the skin off.
 				]]
 				if passId == PlotSkinConfig.Pass then
+					local plotState = PlayerStateService.GetPlotState(player)
+					if plotState ~= nil and (plotState.ActivePlotSkin or "") == "" then
+						PlayerStateService.SetActivePlotSkin(player, passId)
+					end
 					local skinPlot = PlotService.GetPlot(player)
 					if skinPlot ~= nil then
 						PlotThemeService.Rebuild(player, skinPlot)

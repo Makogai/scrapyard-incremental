@@ -182,6 +182,16 @@ function Bridge.useConsumable(itemId: string)
 	fire("InventoryAction", "UseConsumable", itemId)
 end
 
+--[[
+	WEAR A PLOT SKIN, or "" to take it off.
+
+	Goes through `InventoryAction` because that is where the player changes it -- and because a skin swap
+	is exactly the shape that remote already handles: one string, server decides, `Notify` reports back.
+]]
+function Bridge.setPlotSkin(skinId: string)
+	fire("InventoryAction", "SetPlotSkin", skinId)
+end
+
 function Bridge.buyMagnet(magnetId: string)
 	fire("ShopAction", "BuyMagnet", magnetId)
 end

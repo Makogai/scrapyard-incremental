@@ -15,6 +15,7 @@ local AchievementRules = require("../src/shared/Utility/AchievementRules")
 local PrestigeConfig = require("../src/shared/Config/PrestigeConfig")
 local SocialConfig = require("../src/shared/Config/SocialConfig")
 local InboxConfig = require("../src/shared/Config/InboxConfig")
+local PlotSkinConfig = require("../src/shared/Config/PlotSkinConfig")
 
 local passed = 0
 
@@ -116,7 +117,38 @@ expectEqual(limiter:Allow("player", 2), false, "rate limit rejection")
 expectEqual(limiter:Allow("player", 5), true, "rate limit window reset")
 
 local defaultData = PlayerDataSchema.createDefault(1000)
-expectEqual(defaultData.SchemaVersion, 17, "default schema version")
+expectEqual(defaultData.SchemaVersion, 18, "default schema version")
+
+--[[
+	PLOT SKINS. `PlayerDataSchema` requires nothing -- the Lune runner cannot load a config built out of
+	Roblox datatypes -- so the pass id is a literal in there. This is what keeps that literal honest.
+]]
+expectEqual(defaultData.ActivePlotSkin, "", "no skin worn by default")
+expectEqual(PlotSkinConfig.Pass, "LavaSkin", "skin pass id matches the schema literal")
+expectEqual(PlotSkinConfig.forArea("FrontYard") ~= nil, true, "front yard has a skin model")
+expectEqual(PlotSkinConfig.forArea("Nowhere"), nil, "unknown area has no skin")
+expectEqual(PlotSkinConfig.owned({ LavaSkin = true }), true, "skin owned")
+expectEqual(PlotSkinConfig.owned({}), false, "skin not owned")
+expectEqual(PlotSkinConfig.activeSkinFor("FrontYard", {}), nil, "unowned skin is not active")
+expectEqual(
+	PlotSkinConfig.activeSkinFor("FrontYard", { LavaSkin = true }) ~= nil,
+	true,
+	"owned skin is active on an authored area"
+)
+expectEqual(
+	PlotSkinConfig.activeSkinFor("Nowhere", { LavaSkin = true }),
+	nil,
+	"owned skin is not active on an unauthored area"
+)
+
+--- A chosen skin survives a round trip, and anything else is cleared rather than trusted.
+local skinOk, skinClean = PlayerDataSchema.validate({ ActivePlotSkin = "LavaSkin" }, 1000)
+expectEqual(skinOk, true, "profile wearing a skin validates")
+expectEqual(skinClean and skinClean.ActivePlotSkin, "LavaSkin", "chosen skin survives validation")
+local _, bogusSkin = PlayerDataSchema.validate({ ActivePlotSkin = "NotAPass" }, 1000)
+expectEqual(bogusSkin and bogusSkin.ActivePlotSkin, "", "unknown skin id is cleared")
+local _, numericSkin = PlayerDataSchema.validate({ ActivePlotSkin = 7 }, 1000)
+expectEqual(numericSkin and numericSkin.ActivePlotSkin, "", "non-string skin id is cleared")
 --[[
 	THE MAILBOX STARTS EMPTY AND SURVIVES A ROUND TRIP.
 
@@ -236,7 +268,7 @@ local migratedOk, migrated = PlayerDataSchema.validate({
 	LastLoginTimestamp = 800,
 }, 1000)
 expectEqual(migratedOk, true, "version one migration")
-expectEqual(migrated.SchemaVersion, 17, "migrated schema version")
+expectEqual(migrated.SchemaVersion, 18, "migrated schema version")
 --- An ancient save arrives with an empty mailbox rather than a nil one, so the screen never sees nil.
 expectEqual(#migrated.Inbox, 0, "a migrated save has an empty mailbox")
 expectEqual(migrated.ActivePlotTheme, "FrontYard", "migrated plot theme defaults to the scrapyard")
@@ -445,7 +477,7 @@ local thirteenOk, thirteen = PlayerDataSchema.validate({
 	ActivePlotTheme = "WorkshopYard",
 }, 3000)
 expectEqual(thirteenOk, true, "version thirteen migration")
-expectEqual(thirteen.SchemaVersion, 17, "migrated to seventeen from thirteen")
+expectEqual(thirteen.SchemaVersion, 18, "migrated to eighteen from thirteen")
 expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
@@ -827,7 +859,7 @@ local fourteenOk, fourteen = PlayerDataSchema.validate({
 	DailyStreak = 4,
 }, 4000)
 expectEqual(fourteenOk, true, "version fourteen migration")
-expectEqual(fourteen.SchemaVersion, 17, "migrated to seventeen")
+expectEqual(fourteen.SchemaVersion, 18, "migrated to eighteen")
 expectEqual(fourteen.DailyStreak, 4, "migration preserves the streak")
 expectEqual(fourteen.EquippedTitle, "", "migrated player wears no title")
 expectEqual(next(fourteen.UnlockedTitles), nil, "migrated player holds no titles")
@@ -856,7 +888,7 @@ local fifteenOk, fifteen = PlayerDataSchema.validate({
 	Money = 400,
 }, 5000)
 expectEqual(fifteenOk, true, "version fifteen migration")
-expectEqual(fifteen.SchemaVersion, 17, "migrated fifteen to seventeen")
+expectEqual(fifteen.SchemaVersion, 18, "migrated fifteen to eighteen")
 expectEqual(fifteen.SecretTickets, 0, "migrated player holds no tickets")
 
 print(`Scrapyard foundation and data tests passed: {passed}`)

@@ -13,6 +13,10 @@
 	converted to. Selling it per-area would charge three times for one cosmetic idea, and a player who
 	rebirths back to the Front Yard would find themselves looking at a plot they had already paid to reskin.
 
+	BOUGHT AND CHOSEN ARE TWO DIFFERENT THINGS. Owning the pass does not force the look on anybody: the
+	worn skin is `ActivePlotSkin` in the save, swapped from the inventory, and "" means the standard build.
+	A cosmetic you cannot take off is a cosmetic you regret buying.
+
 	PURELY COSMETIC. A skin changes no value, no rate, no capacity. Anything that changes those belongs in
 	`UpgradeConfig` or a gameplay pass, and keeping that line clean is what lets a skin be priced on looks
 	alone.
@@ -57,6 +61,20 @@ PlotSkinConfig.ByArea = table.freeze({
 	}),
 })
 
+--[[
+	WHAT THE INVENTORY'S SKINS TAB LISTS, in order.
+
+	`Id = ""` is the standard build and is always owned -- it is the way OFF a skin, and a cosmetic you
+	cannot remove is a cosmetic people regret buying. Everything after it is a pass id.
+
+	`Rarity` is only a colour identity, borrowed from the eight-tier scale the rest of the game's
+	cosmetics use; it grants nothing. Add a skin by adding a model, a `ByArea` row and a line here.
+]]
+PlotSkinConfig.Catalogue = table.freeze({
+	table.freeze({ Id = "", Name = "Standard Yard", Rarity = "Normal", Glyph = "home" }),
+	table.freeze({ Id = "LavaSkin", Name = "Lava", Rarity = "Blood", Glyph = "area" }),
+})
+
 --- The folder `PlotThemeService` adopts the skin models out of. Mirrors `PlotVariants`.
 PlotSkinConfig.Folder = "PlotSkins"
 
@@ -68,7 +86,7 @@ function PlotSkinConfig.forArea(areaId: string?): Skin?
 	return PlotSkinConfig.ByArea[areaId]
 end
 
---- Whether the player owns the skin at all. Independent of where they are standing.
+--- Whether the player owns the skin at all. Independent of where they are standing, or what they wear.
 function PlotSkinConfig.owned(entitlements: { [string]: any }?): boolean
 	if entitlements == nil then
 		return false
@@ -76,14 +94,28 @@ function PlotSkinConfig.owned(entitlements: { [string]: any }?): boolean
 	return entitlements[PlotSkinConfig.Pass] == true
 end
 
---[[
-	The skin to rebuild this plot from: owned, and authored for this area.
+--- Whether the skin is the one currently CHOSEN. `""`, nil and any other id all mean "standard build".
+function PlotSkinConfig.worn(activeSkin: string?): boolean
+	return activeSkin == PlotSkinConfig.Pass
+end
 
-	Both halves matter. Owning the pass does nothing on an area whose lava model has not been built yet,
-	and an authored model does nothing for a player who has not bought the pass.
+--[[
+	The skin to rebuild this plot from: owned, chosen, and authored for this area.
+
+	ALL THREE HALVES MATTER. Owning the pass does nothing on an area whose lava model has not been built
+	yet; an authored model does nothing for a player who has not bought the pass; and neither does anything
+	for a player who has taken the skin off. `activeSkin` is omitted by callers that only know about
+	ownership, and those get the old behaviour -- so pass it wherever the save is to hand.
 ]]
-function PlotSkinConfig.activeSkinFor(areaId: string?, entitlements: { [string]: any }?): Skin?
+function PlotSkinConfig.activeSkinFor(
+	areaId: string?,
+	entitlements: { [string]: any }?,
+	activeSkin: string?
+): Skin?
 	if not PlotSkinConfig.owned(entitlements) then
+		return nil
+	end
+	if activeSkin ~= nil and not PlotSkinConfig.worn(activeSkin) then
 		return nil
 	end
 	return PlotSkinConfig.forArea(areaId)

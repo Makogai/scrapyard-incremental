@@ -9,8 +9,10 @@
 	Clicking a card opens the details modal; equipping and using go through
 	`actions`, which send bare intents.
 
-	The kit's SKINS tab is gone: the game has no skin system, and a tab that only
-	ever says COMING SOON is a tab that teaches players to ignore tabs.
+	SKINS is back. It was removed while the game had no skin system -- a tab that
+	only ever says COMING SOON teaches players to ignore tabs -- and it returned
+	with plot skins, which are a real thing to own and, more to the point, a real
+	thing to take back OFF. See `PlotSkinConfig.Catalogue`.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +29,8 @@ local Indicators = require(UI.Components.Indicators)
 local Cards = require(UI.Components.Cards)
 local Overlays = require(UI.Components.Overlays)
 local Progression = require(UI.Components.Progression)
+local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 
 local e = React.createElement
 
@@ -34,6 +38,7 @@ local TABS = {
 	{ id = "MAGNETS", text = "MAGNETS", glyph = "magnet" },
 	{ id = "POTIONS", text = "POTIONS", glyph = "potion" },
 	{ id = "TITLES", text = "TITLES", glyph = "trophy" },
+	{ id = "SKINS", text = "SKINS", glyph = "area" },
 }
 
 --[[
@@ -45,6 +50,8 @@ local TABS = {
 ]]
 local ITEM_CELL = UDim2.fromOffset(152, 190)
 local TITLE_CELL = UDim2.fromOffset(Progression.TITLE_CARD.X, Progression.TITLE_CARD.Y)
+--- `Cards.CosmeticCard` is 176x214 and carries its own button, so it needs more room than an item tile.
+local SKIN_CELL = UDim2.fromOffset(190, 228)
 
 local function InventoryScreen(props)
 	local state = props.state
@@ -109,6 +116,48 @@ local function InventoryScreen(props)
 		end
 	end
 
+	--[[
+		PLOT SKINS: the standard build first, then anything owned.
+
+		OWNED ONLY, like the magnet and potion tabs -- this window answers "what do I have", and listing the
+		unowned ones with a SHOP plate is what turned the inventory into a second shop the last time. The
+		footer still counts against every skin, because that is collection progress rather than a sales pitch.
+
+		The standard yard is always listed and always owned: it is how a skin comes off.
+	]]
+	if tab == "SKINS" then
+		local worn = state.plotSkin or ""
+		for index, entry in PlotSkinConfig.Catalogue do
+			local standard = entry.Id == ""
+			local owned = standard or (state.entitlements or {})[entry.Id] == true
+			totalCount += 1
+			if owned then
+				ownedCount += 1
+				local pass = MonetizationConfig.Passes[entry.Id]
+				grid[#grid + 1] = e(Cards.CosmeticCard, {
+					key = if standard then "Standard" else entry.Id,
+					name = entry.Name,
+					rarity = entry.Rarity,
+					glyph = entry.Glyph,
+					--[[
+						The pass thumbnail, so the card wears the same art as the offer and the purchase
+						prompt. The standard yard has no pass and falls back to its glyph.
+					]]
+					image = if pass ~= nil and pass.MarketplaceId > 0
+						then `rbxthumb://type=GamePass&id={pass.MarketplaceId}&w=150&h=150`
+						else nil,
+					equipped = worn == entry.Id,
+					state = "owned",
+					size = SKIN_CELL,
+					layoutOrder = index,
+					onEquip = function()
+						actions.equipSkin(entry.Id)
+					end,
+				})
+			end
+		end
+	end
+
 	if tab == "TITLES" then
 		--[[
 			Every title, owned or not, sorted worst-to-best by the store. Locked ones stay in the list with
@@ -145,6 +194,7 @@ local function InventoryScreen(props)
 			text = if tab == "MAGNETS"
 				then "NO MAGNETS YET -- BUY ONE FROM THE MAGNET SHOP"
 				elseif tab == "POTIONS" then "NO POTIONS YET -- BUY THEM IN THE SHOP"
+				elseif tab == "SKINS" then "NO SKINS YET -- THE LAVA SKIN IS IN THE SHOP"
 				else "NO TITLES YET",
 			textSize = Theme.TextSize.Small,
 			font = Theme.Font.Bold,
@@ -181,6 +231,7 @@ local function InventoryScreen(props)
 					text = if tab == "MAGNETS"
 						then "MAGNETS OWNED"
 						elseif titlesTab then "TITLES EARNED"
+						elseif tab == "SKINS" then "PLOT SKINS OWNED"
 						else "POTION TYPES HELD",
 					textSize = Theme.TextSize.Small,
 					font = Theme.Font.Bold,
@@ -206,7 +257,10 @@ local function InventoryScreen(props)
 				key = "ItemGrid",
 				padding = { right = 10, bottom = 6 },
 				layout = P.grid({
-					cell = if titlesTab then TITLE_CELL else ITEM_CELL,
+					cell = if titlesTab
+						then TITLE_CELL
+						elseif tab == "SKINS" then SKIN_CELL
+						else ITEM_CELL,
 					padding = UDim2.fromOffset(12, 12),
 				}),
 				children = grid,

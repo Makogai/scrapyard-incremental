@@ -512,36 +512,33 @@ end
 	the same image as on the prompt the player is about to see, and the two cannot drift apart.
 ]]
 --[[
-	TWO SIZES OF THE SAME CARD. `compact` is the phone version: the desktop card is 196x118 authored,
-	which is a fifth of the width of a 390-wide phone HUD, and the right edge there is already carrying
-	the boost lane, the status cluster and the menu toggle.
+	NO PANEL. The offer is the SKIN ITSELF, turning in its own light, with the price over it -- no slab,
+	no border, no name. A studded window with a title line and a subtitle was chrome competing with the
+	one thing worth looking at, and the words were saying what the picture already said.
+
+	No name means the ART has to carry the identity, which is why it is the pass thumbnail rather than a
+	generic glyph: what the player sees here is exactly what the purchase prompt will show them.
+
+	TWO SIZES. `compact` is the phone version -- the desktop card is a fifth of the width of a 390-wide
+	phone HUD, and that right edge already carries the boost lane, the status cluster and the toggle.
 ]]
 local SKIN_SIZES = table.freeze({
 	Full = table.freeze({
-		Card = Vector2.new(196, 118),
-		Art = 54,
-		ArtInset = Vector2.new(10, 9),
-		TextLeft = 70,
-		TextWidth = 116,
-		TitleSize = Theme.TextSize.Tiny,
-		Button = Vector2.new(176, 36),
-		ButtonTop = 70,
-		ButtonText = Theme.TextSize.Button,
-		IconSize = 20,
+		Art = 116,
+		Price = Vector2.new(96, 34),
+		PriceText = Theme.TextSize.Button,
+		Glyph = 20,
 	}),
 	Compact = table.freeze({
-		Card = Vector2.new(152, 94),
-		Art = 40,
-		ArtInset = Vector2.new(8, 8),
-		TextLeft = 54,
-		TextWidth = 90,
-		TitleSize = Theme.TextSize.Micro,
-		Button = Vector2.new(136, 30),
-		ButtonTop = 56,
-		ButtonText = Theme.TextSize.Small,
-		IconSize = 16,
+		Art = 84,
+		Price = Vector2.new(76, 26),
+		PriceText = Theme.TextSize.Small,
+		Glyph = 15,
 	}),
 })
+
+--- The rays reach past the art, so the group has to leave them room or the wheel would be cut in half.
+local SKIN_RAY_SCALE = 1.55
 
 function Parts.PlotSkinOffer(props)
 	local skin = PlotSkinConfig.forArea(props.plotTheme)
@@ -554,91 +551,101 @@ function Parts.PlotSkinOffer(props)
 	local metrics = if props.compact then SKIN_SIZES.Compact else SKIN_SIZES.Full
 
 	--[[
-		BREATHING, not springing. The icon should read as alive before anyone touches it, and a spring
-		settles -- which is the opposite. `useSpin` is one addition per frame on the shared heartbeat, and
-		mapping it through a sine keeps the whole animation inside a binding, so the HUD never re-renders
-		for it. Stopped when there is nothing on offer, so a card that is not drawn costs nothing.
+		BREATHING, not springing. The art should read as alive before anyone touches it, and a spring
+		settles -- which is the opposite. `useSpin` is one addition per frame on the shared heartbeat and
+		the sine keeps the whole animation inside a binding, so the HUD never re-renders for it. Stopped
+		when there is nothing on offer, so a card that is not drawn costs nothing.
 	]]
 	local spin = Motion.useSpin(80, offering)
 	local pulse = spin:map(function(angle: number)
 		return 1 + 0.05 * math.sin(math.rad(angle))
 	end)
+	local press = Motion.usePressable({ onClick = props.onBuy, hoverScale = 1.07 })
 
 	if not offering then
 		return nil
 	end
 
-	return e(P.Panel, {
+	local rays = math.floor(metrics.Art * SKIN_RAY_SCALE)
+	local height = metrics.Price.Y + 6 + rays
+
+	--- Events are a map keyed by `React.Event.*`, so they are merged into the props, not passed as one.
+	local rootProps = {
 		key = props.key or "PlotSkinOffer",
-		size = UDim2.fromOffset(metrics.Card.X, metrics.Card.Y),
-		position = props.position,
-		anchorPoint = props.anchorPoint,
-		zIndex = props.zIndex or 5,
-		strokeColor = Theme.Color.Orange,
-		gloss = true,
-		shadow = true,
-		--- The VFX layer lives inside this panel, so the panel is what keeps it there.
-		clip = true,
-		children = {
-			e(Shine.Layer, {
-				key = "VFX",
-				color = Theme.Color.Orange,
-				glow = true,
-				sweep = true,
-				sparkles = true,
-				zIndex = 1,
-			}),
-			--- The scale goes on an inner frame: a UIScale on a laid-out child shifts its siblings.
-			e(P.Group, {
-				key = "Art",
-				size = UDim2.fromOffset(metrics.Art, metrics.Art),
-				position = UDim2.fromOffset(metrics.ArtInset.X, metrics.ArtInset.Y),
-				zIndex = 3,
-				children = {
-					e("UIScale", { key = "Pulse", Scale = pulse }),
-					e(Icon, {
-						key = "Skin",
-						plain = true,
-						image = `rbxthumb://type=GamePass&id={definition.MarketplaceId}&w=150&h=150`,
-						size = UDim2.fromScale(1, 1),
-					}),
-				},
-			}),
-			e(P.Label, {
-				key = "Title",
-				text = string.upper(definition.DisplayName),
-				textSize = metrics.TitleSize,
-				color = Theme.Color.Orange,
-				align = Enum.TextXAlignment.Left,
-				size = UDim2.fromOffset(metrics.TextWidth, 18),
-				position = UDim2.fromOffset(metrics.TextLeft, metrics.ArtInset.Y + 3),
-				zIndex = 3,
-			}),
-			e(P.Label, {
-				key = "Area",
-				text = string.upper(skin.DisplayName),
-				textSize = Theme.TextSize.Micro,
-				color = Theme.Color.TextMuted,
-				align = Enum.TextXAlignment.Left,
-				vAlign = Enum.TextYAlignment.Top,
-				wrapped = true,
-				size = UDim2.fromOffset(metrics.TextWidth, metrics.Art - 18),
-				position = UDim2.fromOffset(metrics.TextLeft, metrics.ArtInset.Y + 21),
-				zIndex = 3,
-			}),
-			e(Buttons.Button, {
-				key = "Buy",
-				text = Format.robux(definition.DisplayPrice),
-				glyph = "robux",
-				variant = "Purchase",
-				textSize = metrics.ButtonText,
-				iconSize = metrics.IconSize,
-				size = UDim2.fromOffset(metrics.Button.X, metrics.Button.Y),
-				position = UDim2.fromOffset(metrics.ArtInset.X, metrics.ButtonTop),
-				zIndex = 3,
-				onClick = props.onBuy,
-			}),
-		},
+		Text = "",
+		BackgroundTransparency = 1,
+		AutoButtonColor = false,
+		Size = UDim2.fromOffset(rays, height),
+		Position = props.position,
+		AnchorPoint = props.anchorPoint,
+		ZIndex = props.zIndex or 5,
+	}
+	for event, handler in pairs(press.events) do
+		rootProps[event] = handler
+	end
+
+	return e("TextButton", rootProps, {
+		--- The press scale goes on a wrapper so it cannot resize the button a layout is measuring.
+		e(P.Group, {
+			key = "Body",
+			size = UDim2.fromScale(1, 1),
+			children = {
+				e("UIScale", { key = "Press", Scale = press.scale }),
+				--[[
+					The turning light, UNCLIPPED on purpose -- see `Shine.buildRays`. Nothing here needs a
+					clip: the wheel is sized to its own box and there is no panel edge for it to cross.
+				]]
+				e(Shine.Layer, {
+					key = "Rays",
+					color = Theme.Color.Orange,
+					rays = true,
+					glow = true,
+					size = UDim2.fromOffset(rays, rays),
+					position = UDim2.fromScale(0.5, 1),
+					anchorPoint = Vector2.new(0.5, 1),
+					zIndex = 1,
+				}),
+				e(P.Group, {
+					key = "Art",
+					size = UDim2.fromOffset(metrics.Art, metrics.Art),
+					position = UDim2.new(0.5, 0, 1, -math.floor((rays - metrics.Art) / 2)),
+					anchorPoint = Vector2.new(0.5, 1),
+					zIndex = 3,
+					children = {
+						e("UIScale", { key = "Pulse", Scale = pulse }),
+						e(Icon, {
+							key = "Skin",
+							plain = true,
+							image = `rbxthumb://type=GamePass&id={definition.MarketplaceId}&w=150&h=150`,
+							size = UDim2.fromScale(1, 1),
+						}),
+					},
+				}),
+				--[[
+					The price, ABOVE the art rather than beside it -- nothing else on the card needs the width,
+					and a price under the art would sit where the rays are brightest.
+
+					`P.Chip` is a container and draws no text of its own, so the label is a child.
+				]]
+				e(P.Chip, {
+					key = "Price",
+					color = Theme.Button.Purchase.base,
+					gradient = Theme.Button.Purchase.gradient,
+					size = UDim2.fromOffset(metrics.Price.X, metrics.Price.Y),
+					position = UDim2.fromScale(0.5, 0),
+					anchorPoint = Vector2.new(0.5, 0),
+					zIndex = 4,
+					children = {
+						e(P.Label, {
+							key = "Text",
+							text = Format.robuxSymbol(definition.DisplayPrice),
+							textSize = metrics.PriceText,
+							color = Theme.Button.Purchase.text,
+						}),
+					},
+				}),
+			},
+		}),
 	})
 end
 

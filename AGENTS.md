@@ -109,6 +109,10 @@ src/shared/UI/
    sweep's diagonal comes from a rotated `UIGradient` (a property of the fill, which
    clips normally) and sparkles are rounded squares rather than 45-degree diamonds.
    Rotation is fine on something meant to overhang, like the shop button's wiggle.
+   It is also fine when CONSTRUCTION does the containing instead of a clip: `Shine`'s `rays`
+   effect turns, and stays inside its host because every spoke reaches at most half the host's
+   smaller side. That effect is documented as unclipped-only, and it is the only rotated thing
+   in either VFX module.
 12. **Never spam a notification, and never let one throw.** Two separate rules, both
    learned from the same incident.
    *Spam:* `Bridge.notify` collapses an identical toast (same Title, Body and Reward)

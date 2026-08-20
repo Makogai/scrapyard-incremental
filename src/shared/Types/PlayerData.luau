@@ -36,6 +36,8 @@ export type PlayerData = {
 	PlotStage: number,
 	--- Area id the plot is built as; see docs/PLOT_UPGRADES.md.
 	ActivePlotTheme: string,
+	--- Pass id of the cosmetic skin worn over that theme, or "" for the standard build.
+	ActivePlotSkin: string,
 	Inbox: { { [string]: any } },
 	SocialClaims: { [string]: boolean },
 	PlotUpgradeLevels: { [string]: number },

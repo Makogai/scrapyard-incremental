@@ -122,6 +122,10 @@ return table.freeze({
 				}),
 				table.freeze({
 					Kind = "New" :: ChangeKind,
+					Text = "SKINS tab in your inventory: switch your plot between the standard yard and any skin you own, as often as you like.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
 					Text = "Passes you can walk into: step on the 2X MONEY, AUTO SELL or 2X MOVEMENT SPEED pad on your plot to buy it, and the pad goes away once it is yours.",
 				}),
 				table.freeze({

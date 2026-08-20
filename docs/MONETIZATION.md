@@ -103,8 +103,15 @@ number and is charged another. Keep them equal.
 > looking at a plot they had already paid to reskin. Adding a fourth area means adding a model and a row in
 > `PlotSkinConfig.ByArea` -- no new pass, no dashboard work.
 >
-> The HUD card (`Parts.PlotSkinOffer`, right edge) draws its art from `rbxthumb://type=GamePass`, so it
-> wears the pass icon rather than a second upload and the two cannot drift apart.
+> **Owning it and wearing it are separate.** The worn skin is `ActivePlotSkin` in the save (`""` is the
+> standard build), swapped from the INVENTORY → SKINS tab, and the purchase puts it on for you the first
+> time. A cosmetic you cannot take back off is a cosmetic people regret buying, which is also why the
+> standard yard is listed there as a card of its own.
+>
+> The HUD card (`Parts.PlotSkinOffer`, right edge) is the offer and disappears once the pass is owned --
+> re-wearing lives in the inventory, not on the HUD. It draws its art from `rbxthumb://type=GamePass`, so
+> it wears the pass icon rather than a second upload and the two cannot drift apart. No panel and no
+> caption: the skin turns in its own light with the price above it.
 
 > **Singularity Pet is limited to 500 copies globally.** Roblox has no built-in stock limit, so ours is
 > enforced in `LimitedStockService` with a DataStore counter reserved *before* the grant. Nothing to do

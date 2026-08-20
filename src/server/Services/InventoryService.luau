@@ -7,6 +7,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
 local PlayerStateService = require(script.Parent.PlayerStateService)
+local PlotThemeService = require(script.Parent.PlotThemeService)
 local RemoteService = require(script.Parent.RemoteService)
 
 local InventoryService = {}
@@ -102,6 +103,9 @@ function InventoryService.Start()
 			success, message = PlayerStateService.TryUnequipMagnet(player, itemId)
 		elseif action == "UseConsumable" then
 			success, message = PlayerStateService.TryUseConsumable(player, itemId)
+		elseif action == "SetPlotSkin" then
+			--- `itemId` is a pass id, or "" to go back to the standard build.
+			success, message = PlotThemeService.WearSkin(player, itemId)
 		else
 			return
 		end

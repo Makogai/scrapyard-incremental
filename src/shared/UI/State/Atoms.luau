@@ -146,6 +146,8 @@ Atoms.entitlements = Charm.atom({} :: { [string]: boolean })
 	fixed one -- so the thing on the button is the thing your plot would turn into.
 ]]
 Atoms.plotTheme = Charm.atom("FrontYard")
+--- The cosmetic skin worn over that theme, "" for the standard build. Swapped from the inventory.
+Atoms.plotSkin = Charm.atom("")
 Atoms.ownedPets = Charm.atom({} :: { [string]: number })
 Atoms.equippedPets = Charm.atom({} :: { string })
 Atoms.petSlotUpgradeLevel = Charm.atom(0)
@@ -315,6 +317,9 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.Entitlements) == "table" then
 		Atoms.entitlements(snapshot.Entitlements)
+	end
+	if type(snapshot.ActivePlotSkin) == "string" then
+		Atoms.plotSkin(snapshot.ActivePlotSkin)
 	end
 	if type(snapshot.ActivePlotTheme) == "string" then
 		Atoms.plotTheme(snapshot.ActivePlotTheme)
