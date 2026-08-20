@@ -6,7 +6,21 @@ Everything sellable in the game, what to create for it, and what art it needs.
 grants are written and wired. The only thing missing is the **numeric ids Roblox assigns when you
 create the item on its side**. Every entry currently reads `MarketplaceId = 0`.
 
-**28 ids to fill: 11 passes and 17 developer products.**
+**STATUS: all 28 created and wired (2026-08-20).** 11 passes and 17 developer products, every
+`MarketplaceId` filled. The tables below are kept as the record of what was created and what each item
+is meant to cost.
+
+**Two things still outstanding:**
+
+1. **Every pass is `Offsale`.** Roblox does not take a price on the pass creation form -- it creates the
+   pass, and the price is set afterwards on the pass itself. Until that is done a pass cannot be bought,
+   even though its id is wired. The 17 developer products DO have their prices set, because that form
+   does take one.
+2. **No icons.** Everything was created without art, which Roblox allows -- each item shows a default
+   placeholder until an image is uploaded. See the icon section below.
+
+Managed Pricing is **Disabled** on all 17 products, deliberately: it is on by default and would have let
+Roblox vary the real price regionally, which would disagree with the `DisplayPrice` our UI prints.
 
 A `MarketplaceId = 0` is not a crash. `Bridge.promptPass` / `promptProduct` check the id first: a real id
 opens the Roblox purchase dialog, no id shows a "not available yet" toast naming the item. So every buy

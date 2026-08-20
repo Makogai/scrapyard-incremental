@@ -1,0 +1,16 @@
+newmtl Model1Mtl
+Material Color
+Ka 0.163641 0.166872 0.193972
+Kd 0.163641 0.166872 0.193972
+Ks 0.0648145 0.0660945 0.0768282 
+
+d 1
+
+Ns 0
+
+map_Ka Model1_diff.png
+map_Kd Model1_diff.png
+map_d Model1_diff.png
+
+map_Bump Model1_nmap.png
+
