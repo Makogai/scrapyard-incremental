@@ -1303,6 +1303,22 @@ function PlayerStateService.TryCollect(
 	if VARIANT_RANK[variantId] > VARIANT_RANK[discovery.HighestVariant] then
 		discovery.HighestVariant = variantId
 	end
+	--[[
+		AUTO SELL: the pass earns its keep here.
+
+		Fires only when storage is FULL, not on every pickup. Selling each piece as it lands would remove
+		the storage bar from the game entirely -- the tension of a filling bar is the thing the pass is
+		relieving, so it has to still exist and still fill.
+
+		`TrySell` pushes its own state, so the push below is redundant on this path and harmless: it
+		re-sends a snapshot that is already correct rather than risking one that is not.
+	]]
+	if data.Entitlements.AutoSell == true then
+		local capacity = derivedStats(data).StorageCapacity
+		if data.StoredWeight >= capacity then
+			PlayerStateService.TrySell(player)
+		end
+	end
 	pushState(player, data)
 	if notifyRemote and not wasDiscovered then
 		notifyRemote:FireClient(player, `NEW DISCOVERY: {scrap.DisplayName}`)

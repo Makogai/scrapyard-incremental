@@ -6,6 +6,7 @@ local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local FoundationValidator = require(ReplicatedStorage.Shared.Utility.FoundationValidator)
 local RemoteService = require(script.Services.RemoteService)
 local InboxService = require(script.Services.InboxService)
+local PassPadService = require(script.Services.PassPadService)
 local SocialRewardService = require(script.Services.SocialRewardService)
 local LimitedStockService = require(script.Services.LimitedStockService)
 local ServerRestartService = require(script.Services.ServerRestartService)
@@ -101,6 +102,11 @@ AchievementService.Start()
 	gifts into it. `LimitedStockService` warms its DataStore cache on a slow timer, so it must be running
 	before the first purchase can be processed.
 ]]
+--[[
+	The pass pads on each plot. After `PlotThemeService`, whose rebuilds it hooks, and after
+	`PlayerStateService`, whose entitlements decide which pads survive.
+]]
+PassPadService.Start()
 InboxService.Start()
 SocialRewardService.Start()
 LimitedStockService.Start()

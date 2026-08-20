@@ -50,6 +50,24 @@ local passes = {
 		DisplayPrice = 199,
 		Color = Color3.fromRGB(105, 232, 92),
 	}),
+	--[[
+		AUTO SELL, sold from a pad on the plot.
+
+		Sells the load the moment storage fills, so the walk to the crusher stops being mandatory. Priced
+		at the top of the convenience passes because it removes a whole loop rather than speeding one up.
+
+		Note what it does NOT do: it does not raise income. A player with this earns the same per piece as
+		one without -- they just stop walking. That is what keeps it a convenience purchase rather than a
+		pay-to-win one.
+	]]
+	AutoSell = table.freeze({
+		Id = "AutoSell",
+		MarketplaceId = 1948420346,
+		DisplayName = "Auto Sell",
+		Description = "Your scrap sells itself the moment your storage fills. No more trips to the crusher.",
+		DisplayPrice = 299,
+		Color = Color3.fromRGB(105, 232, 92),
+	}),
 	ExtraPetSlots = table.freeze({
 		Id = "ExtraPetSlots",
 		MarketplaceId = 1951701001,
@@ -301,11 +319,18 @@ local products = {
 
 return table.freeze({
 	Passes = table.freeze(passes),
+	--[[
+		THE SHOP RENDERS THIS LIST, not `Passes`. A pass missing from here exists, is priced, is buyable
+		from its own Roblox page -- and is invisible in game. `PermanentSpeed` and `AutoSell` were both
+		missing exactly that way, which is why `tests/run.luau` now asserts the two agree.
+	]]
 	PassOrder = table.freeze({
 		"DoubleCash",
 		"StoragePlus",
 		"FastCollector",
 		"QuantumMagnet",
+		"PermanentSpeed",
+		"AutoSell",
 		"ExtraPetSlots",
 		"TripleHatch",
 		"PentaHatch",

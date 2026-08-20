@@ -11,6 +11,7 @@ local PlayerStateService = require(script.Parent.PlayerStateService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local PlotService = require(script.Parent.PlotService)
 local PlotThemeService = require(script.Parent.PlotThemeService)
+local PassPadService = require(script.Parent.PassPadService)
 local ScrapService = require(script.Parent.ScrapService)
 local RemoteService = require(script.Parent.RemoteService)
 
@@ -51,6 +52,12 @@ local function refreshOwnedPasses(player: Player)
 			)
 			if succeeded and owned then
 				PlayerStateService.GrantEntitlement(player, passId)
+				--[[
+					A pad for a pass you now own has to go, and this is the path that catches it for a
+					player who bought it in a previous session -- `OnAppearanceRefreshed` fires before the
+					ownership check has finished, so the plot is built while the entitlement is still unknown.
+				]]
+				PassPadService.RefreshPlayer(player)
 			end
 		end
 	end

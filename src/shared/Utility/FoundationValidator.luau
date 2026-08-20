@@ -3,6 +3,7 @@
 local AreaConfig = require(script.Parent.Parent.Config.AreaConfig)
 local Environment = require(script.Parent.Parent.Config.Environment)
 local PrestigeConfig = require(script.Parent.Parent.Config.PrestigeConfig)
+local MonetizationConfig = require(script.Parent.Parent.Config.MonetizationConfig)
 local PlotConfig = require(script.Parent.Parent.Config.PlotConfig)
 local ScrapConfig = require(script.Parent.Parent.Config.ScrapConfig)
 local UpgradeConfig = require(script.Parent.Parent.Config.UpgradeConfig)
@@ -104,6 +105,35 @@ function FoundationValidator.validate()
 
 	positive(PrestigeConfig.BaseMoneyRequirement, "Prestige.BaseMoneyRequirement")
 	positive(PrestigeConfig.RequirementGrowth, "Prestige.RequirementGrowth")
+	--[[
+		EVERY PASS AND PRODUCT IS IN ITS ORDER LIST, and every marketplace id is real.
+
+		The shop renders `PassOrder` / `ProductOrder`, not the definition tables, so an item missing from an
+		order list exists, is priced, is buyable from its own Roblox page -- and is invisible in game.
+		`PermanentSpeed` and `AutoSell` were both missing exactly that way for a while.
+
+		Checked here rather than in `tests/run.luau` because `MonetizationConfig` uses `Color3`, which does
+		not exist under Lune. This runs at server boot instead, which is early enough to catch it before a
+		player can miss the item.
+	]]
+	for passId, definition in MonetizationConfig.Passes do
+		assert(
+			table.find(MonetizationConfig.PassOrder, passId) ~= nil,
+			`{passId} is missing from MonetizationConfig.PassOrder`
+		)
+		positive(definition.MarketplaceId, `{passId}.MarketplaceId`)
+	end
+	for _, passId in MonetizationConfig.PassOrder do
+		assert(MonetizationConfig.Passes[passId] ~= nil, `PassOrder names unknown pass {passId}`)
+	end
+	for productId, definition in MonetizationConfig.Products do
+		assert(
+			table.find(MonetizationConfig.ProductOrder, productId) ~= nil,
+			`{productId} is missing from MonetizationConfig.ProductOrder`
+		)
+		positive(definition.MarketplaceId, `{productId}.MarketplaceId`)
+	end
+
 	positive(PrestigeConfig.MaximumGearsPerPrestige, "Prestige.MaximumGearsPerPrestige")
 	positive(PrestigeConfig.ValuePerPrestige, "Prestige.ValuePerPrestige")
 	assert(PlotConfig.PlotCount == Environment.MaximumPlayers, "Plot count must match server size")

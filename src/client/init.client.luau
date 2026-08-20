@@ -19,6 +19,7 @@ local GlobalChatController = require(script.Controllers.GlobalChatController)
 local EggHologramController = require(script.Controllers.EggHologramController)
 local ServerNoticeController = require(script.Controllers.ServerNoticeController)
 local SecretPetVfxController = require(script.Controllers.SecretPetVfxController)
+local PassPadController = require(script.Controllers.PassPadController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -86,5 +87,7 @@ EggHologramController.Start()
 ]]
 ServerNoticeController.Start()
 SecretPetVfxController.Start()
+--- Stepping on a plot pad opens the purchase dialog; the prompt has to be client-side.
+PassPadController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))
