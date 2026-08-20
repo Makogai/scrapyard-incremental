@@ -20,7 +20,11 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
+
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
+local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local Atoms = require(script.Parent.Atoms)
 
 local Bridge = {}
@@ -182,12 +186,72 @@ function Bridge.buyMagnet(magnetId: string)
 	fire("ShopAction", "BuyMagnet", magnetId)
 end
 
+--[[
+	BUYING SOMETHING. Three outcomes, in order.
+
+	THE PROMPT MUST HAPPEN ON THE CLIENT. `MarketplaceService:PromptGamePassPurchase` only opens the
+	Roblox purchase dialog when called locally, so this cannot be a remote -- and it used to be one. Both
+	of these fired `MonetizationPrompt`, whose server handler is gated on `RunService:IsStudio()` AND
+	`AdminConfig.IsAdmin`: in a live server it returned immediately, so every buy button in the React UI
+	silently did nothing. The shop, the magnet shop, the egg batch passes, Skip Rebirth and the details
+	modal all route through here, so that was the whole monetization surface.
+
+	`MonetizationPrompt` stays, but only as what it always was: the Studio-only, admin-only path that
+	GRANTS without charging so a reward can be tested before it is live.
+
+	A missing `MarketplaceId` says so out loud rather than doing nothing. Twenty-eight of them are still
+	0 -- see `docs/MONETIZATION.md` -- and a dead button is indistinguishable from a broken game.
+]]
+local function definitionFor(kind: string, id: string)
+	if kind == "Product" then
+		return MonetizationConfig.Products[id]
+	end
+	return MonetizationConfig.Passes[id]
+end
+
+local function promptPurchase(kind: string, id: string)
+	local definition = definitionFor(kind, id)
+	if definition == nil then
+		return
+	end
+
+	local player = Players.LocalPlayer
+	if definition.MarketplaceId > 0 then
+		local ok = pcall(function()
+			if kind == "Product" then
+				MarketplaceService:PromptProductPurchase(player, definition.MarketplaceId)
+			else
+				MarketplaceService:PromptGamePassPurchase(player, definition.MarketplaceId)
+			end
+		end)
+		--- A bad id is a configuration error, not a player error, so it says which item.
+		if not ok then
+			Bridge.notify({
+				Title = "COULD NOT OPEN THAT",
+				Body = `{definition.DisplayName} has a bad marketplace id.`,
+			})
+		end
+		return
+	end
+
+	if RunService:IsStudio() then
+		--- Admin-gated on the server; a non-admin in Studio simply gets nothing, same as before.
+		fire("MonetizationPrompt", kind, id)
+		return
+	end
+
+	Bridge.notify({
+		Title = "NOT AVAILABLE YET",
+		Body = `{definition.DisplayName} is not on sale yet.`,
+	})
+end
+
 function Bridge.promptPass(passId: string)
-	fire("MonetizationPrompt", "Pass", passId)
+	promptPurchase("Pass", passId)
 end
 
 function Bridge.promptProduct(productId: string)
-	fire("MonetizationPrompt", "Product", productId)
+	promptPurchase("Product", productId)
 end
 
 --[[
