@@ -74,29 +74,23 @@ local function UpgradesScreen(props)
 					end
 					else nil,
 				layoutOrder = index,
-				onBuy = function()
-					actions.confirm({
-						Title = "Purchase Upgrade?",
-						Glyph = view.glyph,
-						Lines = {
-							view.name,
-							view.current .. "  ->  " .. (view.next or view.current),
-						},
-						Price = price,
-						ConfirmText = "BUY",
-						OnConfirm = function()
-							--[[
-								ONE INTENT FOR THE WHOLE PURCHASE.
+				--[[
+					NO CONFIRMATION. An upgrade is the most repeated purchase in the game and the price is
+					already on the button, so a modal asking "are you sure" between the number and the click
+					is a second click for information the player just read.
 
-								This used to fire one event per level, which the server's remote limiter (12
-								per 5 seconds) quietly truncated -- so MAX bought twelve levels at best, and
-								fewer if you had clicked anything in the last few seconds. The server prices
-								every level itself and stops when money or the cap runs out, so the count is
-								a request rather than something to be trusted.
-							]]
-							actions.buyUpgrade(upgradeId, math.max(1, gained))
-						end,
-					})
+					It stays unconfirmed even for MAX. The spend can be large, but it is bounded by what you
+					can afford and it buys levels you cannot lose -- unlike a rebirth or a profile wipe,
+					which keep their confirmations because they destroy something.
+
+					ONE INTENT FOR THE WHOLE PURCHASE. This used to fire one event per level, which the
+					server's remote limiter (12 per 5 seconds) quietly truncated -- so MAX bought twelve
+					levels at best, and fewer if you had clicked anything recently. The server prices every
+					level itself and stops when money or the cap runs out, so the count is a request rather
+					than something to be trusted.
+				]]
+				onBuy = function()
+					actions.buyUpgrade(upgradeId, math.max(1, gained))
 				end,
 			})
 		end
