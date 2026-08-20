@@ -276,13 +276,14 @@ local function liveActions()
 		Bridge.buyMagnet(magnetId)
 	end
 
+	--[[
+		`kind` is passed through as a hint and nothing more: `Bridge` resolves pass-vs-product from the id
+		itself. This used to branch on `kind == "Product"` and silently prompt a pass for anything spelled
+		differently, which is exactly what broke every Robux upgrade button.
+	]]
 	function self.purchase(id: string, kind: string?)
 		Sound.play("purchase")
-		if kind == "Product" then
-			Bridge.promptProduct(id)
-		else
-			Bridge.promptPass(id)
-		end
+		Bridge.promptPurchase(id, kind)
 	end
 
 	function self.equipPet(petId: string)

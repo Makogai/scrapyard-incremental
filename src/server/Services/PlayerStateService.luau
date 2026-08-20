@@ -462,7 +462,14 @@ function PlayerStateService.GrantDeveloperProduct(
 	if data.ProcessedReceipts[purchaseId] == true then
 		return true, "Purchase already granted"
 	end
-	local rewards = definition.Rewards
+	--[[
+		`or {}` because a product need not pay anything from this table.
+
+		The Robux upgrade products grant a LEVEL, handled above, and carry no `Rewards` at all -- so reading
+		`rewards.Money` off a nil table threw inside `ProcessReceipt`. Roblox retries a receipt that errors,
+		so the symptom would have been a purchase that never completed and never said why.
+	]]
+	local rewards = definition.Rewards or {}
 	data.Money =
 		math.min(Environment.MaximumMoney, data.Money + math.max(0, math.floor(rewards.Money or 0)))
 	--[[

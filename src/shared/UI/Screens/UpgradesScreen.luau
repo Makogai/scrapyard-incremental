@@ -70,7 +70,7 @@ local function UpgradesScreen(props)
 				robuxPrice = robuxProduct and robuxProduct.DisplayPrice or nil,
 				onBuyRobux = if robuxProduct
 					then function()
-						actions.purchase(robuxProduct.Id, "product")
+						actions.purchase(robuxProduct.Id, "Product")
 					end
 					else nil,
 				layoutOrder = index,

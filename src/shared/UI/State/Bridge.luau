@@ -202,16 +202,45 @@ end
 	A missing `MarketplaceId` says so out loud rather than doing nothing. Twenty-eight of them are still
 	0 -- see `docs/MONETIZATION.md` -- and a dead button is indistinguishable from a broken game.
 ]]
-local function definitionFor(kind: string, id: string)
-	if kind == "Product" then
-		return MonetizationConfig.Products[id]
+--[[
+	WHICH TABLE THE ID LIVES IN, rather than which string the caller happened to pass.
+
+	Ids are unique across passes and products, so the id alone is enough -- and resolving it this way is
+	immune to the bug that shipped: `UpgradesScreen` passed the kind as "product" while the dispatch
+	compared against "Product", so every Robux upgrade fell through to the pass branch, found no pass by
+	that id, and returned silently. A button that does nothing and says nothing is the worst failure mode
+	available, and one capital letter caused it.
+
+	`kind` survives only as a tiebreaker for an id that somehow exists in both, which cannot currently
+	happen but is cheaper to handle than to prove impossible.
+]]
+local function resolvePurchase(id: string, kind: string?): ({ [string]: any }?, string)
+	local pass = MonetizationConfig.Passes[id]
+	local product = MonetizationConfig.Products[id]
+
+	if pass ~= nil and product ~= nil then
+		if kind ~= nil and string.lower(kind) == "product" then
+			return product, "Product"
+		end
+		return pass, "Pass"
 	end
-	return MonetizationConfig.Passes[id]
+	if product ~= nil then
+		return product, "Product"
+	end
+	if pass ~= nil then
+		return pass, "Pass"
+	end
+	return nil, "Pass"
 end
 
-local function promptPurchase(kind: string, id: string)
-	local definition = definitionFor(kind, id)
+local function promptPurchase(requestedKind: string?, id: string)
+	local definition, kind = resolvePurchase(id, requestedKind)
 	if definition == nil then
+		--- An unknown id is a wiring mistake, not a player action. Say so rather than doing nothing.
+		Bridge.notify({
+			Title = "COULD NOT OPEN THAT",
+			Body = `"{id}" is not a pass or a product.`,
+		})
 		return
 	end
 
@@ -252,6 +281,11 @@ end
 
 function Bridge.promptProduct(productId: string)
 	promptPurchase("Product", productId)
+end
+
+--- Kind-agnostic entry point: the id decides. What `actions.purchase` uses.
+function Bridge.promptPurchase(id: string, kind: string?)
+	promptPurchase(kind, id)
 end
 
 --[[
