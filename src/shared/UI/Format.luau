@@ -73,9 +73,31 @@ function Format.moneyExact(value: number): string
 	return "$" .. Format.comma(value)
 end
 
---- 199 -> "199" (paired with the Robux glyph, never a raw "R$" string)
+--[[
+	THE ROBUX GLYPH, as a character.
+
+	`U+E002` is the Robux mark in Roblox's own font. It is what the world-space pad labels were authored
+	with, and the only way to show the symbol in a plain `TextLabel` -- a BillboardGui has no room for the
+	`Icon` component the React UI uses, so it cannot borrow the image asset.
+
+	Kept here beside `robux` so the two never drift: anything writing a Robux price in raw text uses
+	`Format.robuxSymbol`, anything with an `Icon` beside it uses `Format.robux` and lets the image speak.
+]]
+Format.RobuxGlyph = utf8.char(0xE002)
+
+--- 199 -> "199" (paired with the Robux ICON, never a raw "R$" string)
 function Format.robux(value: number): string
 	return Format.comma(value)
+end
+
+--[[
+	199 -> "<glyph>  199", for plain text with no icon beside it.
+
+	Two spaces, not one: that is how the pads were authored and the mark needs the room to not crowd the
+	digits.
+]]
+function Format.robuxSymbol(value: number): string
+	return Format.RobuxGlyph .. "  " .. Format.comma(value)
 end
 
 --- 522 -> "08:42", 4231 -> "1:10:31"

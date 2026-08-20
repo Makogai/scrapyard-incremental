@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
+local Format = require(ReplicatedStorage.Shared.UI.Format)
 
 local MonetizationController = {}
 
@@ -37,7 +38,7 @@ function MonetizationController.Start()
 				local buy = card:FindFirstChild("BuyButton")
 				if buy and buy:IsA("TextButton") then
 					local owned = currentState.Entitlements[passId] == true
-					buy.Text = if owned then "OWNED" else `R$ {passPrices[passId]}`
+					buy.Text = if owned then "OWNED" else `{Format.robuxSymbol(passPrices[passId])}`
 					buy.Active = not owned
 					buy.AutoButtonColor = not owned
 				end
@@ -85,7 +86,7 @@ function MonetizationController.Start()
 			`ProductCard_{productId} is missing`
 		)
 		local button = card:WaitForChild("BuyButton") :: GuiButton
-		button.Text = `R$ {definition.DisplayPrice}`
+		button.Text = `{Format.robuxSymbol(definition.DisplayPrice)}`
 		if definition.MarketplaceId > 0 then
 			task.spawn(function()
 				local succeeded, info = pcall(
@@ -95,7 +96,7 @@ function MonetizationController.Start()
 					Enum.InfoType.Product
 				)
 				if succeeded and info and info.PriceInRobux then
-					button.Text = `R$ {info.PriceInRobux}`
+					button.Text = `{Format.robuxSymbol(info.PriceInRobux)}`
 				end
 			end)
 		end

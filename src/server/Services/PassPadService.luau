@@ -28,6 +28,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
+local Format = require(ReplicatedStorage.Shared.UI.Format)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local PlotService = require(script.Parent.PlotService)
 
@@ -76,7 +77,11 @@ local function writePrice(pad: Model, price: number)
 
 	local priceLabel = labelParts[2]:FindFirstChild("Text", true)
 	if priceLabel ~= nil and priceLabel:IsA("TextLabel") then
-		priceLabel.Text = tostring(price)
+		--[[
+			WITH THE ROBUX GLYPH. An earlier version wrote the bare number, which stripped the mark off every
+			pad in the game -- a price with no currency on it is just a number sitting on a plate.
+		]]
+		priceLabel.Text = Format.robuxSymbol(price)
 	end
 end
 

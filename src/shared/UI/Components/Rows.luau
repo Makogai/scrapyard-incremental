@@ -42,6 +42,13 @@ local Rows = {}
 		accent      ColorSequence?  icon plaque colour
 		onBuy       function
 ]]
+--[[
+	The two fixed columns of an upgrade row: the icon-and-name block on the left, and the buttons on the
+	right. Everything between them is the current->next readout, sized from these rather than guessed.
+]]
+local NAME_COLUMN = 420
+local BUTTON_COLUMN = 250
+
 function Rows.UpgradeCard(props)
 	local maxed = props.maxLevel ~= nil and props.level >= props.maxLevel
 	local affordable = props.affordable ~= false and not maxed
@@ -52,15 +59,20 @@ function Rows.UpgradeCard(props)
 		reads as pressable on a phone, and squeezing two into 104px produced two that read as neither.
 	]]
 	local hasRobux = props.robuxPrice ~= nil and props.onBuyRobux ~= nil
-	local height = props.height or (if hasRobux then 158 else 104)
+	--[[
+		Taller than it was, on purpose. The row now carries the PRICE ON THE BUTTON rather than floating it
+		above, which needs a button big enough for two lines of text -- and the Robux option under it needs
+		to be a real button rather than a caption, or nobody reads the price on it.
+	]]
+	local height = props.height or (if hasRobux then 176 else 118)
 
 	local children = P.compact(
 		e(Icon, {
 			key = "Icon",
 			glyph = props.glyph,
 			gradient = props.accent or Theme.Gradient.Blue,
-			size = UDim2.fromOffset(70, 70),
-			position = UDim2.new(0, 14, 0.5, 0),
+			size = UDim2.fromOffset(78, 78),
+			position = UDim2.new(0, 16, 0.5, 0),
 			anchorPoint = Vector2.new(0, 0.5),
 			radius = Theme.Radius.Card,
 			zIndex = 3,
@@ -68,10 +80,10 @@ function Rows.UpgradeCard(props)
 		e(P.Label, {
 			key = "Name",
 			text = string.upper(props.name),
-			textSize = Theme.TextSize.Heading,
+			textSize = Theme.TextSize.Title,
 			align = Enum.TextXAlignment.Left,
-			size = UDim2.fromOffset(260, 30),
-			position = UDim2.fromOffset(98, 20),
+			size = UDim2.fromOffset(300, 38),
+			position = UDim2.fromOffset(108, 20),
 			zIndex = 3,
 		}),
 		e(Indicators.Badge, {
@@ -80,16 +92,24 @@ function Rows.UpgradeCard(props)
 			gradient = if maxed then Theme.Gradient.Gold else Theme.Gradient.PanelDeep,
 			textColor = if maxed then Theme.Color.Ink else Theme.Color.Gray,
 			textSize = Theme.TextSize.Tiny,
-			position = UDim2.fromOffset(98, 54),
+			position = UDim2.fromOffset(108, 62),
 			zIndex = 3,
 		}),
 
-		-- Current -> Next block, centred in the row.
+		--[[
+			Current -> Next, filling the gap BETWEEN the name column and the buttons rather than centred on
+			a guessed fraction of the row.
+
+			It used to sit at 0.56 of the width, which was fine against a 176px button and overlaps a 210px
+			one. Anchored to the left edge of the gap with a width derived from both columns, it cannot
+			collide however wide the buttons get -- and the horizontal list inside still centres its content
+			in whatever space is left.
+		]]
 		e(P.Group, {
 			key = "Change",
-			size = UDim2.fromOffset(260, 40),
-			position = UDim2.fromScale(0.56, 0.5),
-			anchorPoint = Vector2.new(0.5, 0.5),
+			size = UDim2.new(1, -(NAME_COLUMN + BUTTON_COLUMN), 0, 40),
+			position = UDim2.new(0, NAME_COLUMN, 0.5, 0),
+			anchorPoint = Vector2.new(0, 0.5),
 			zIndex = 3,
 			layout = P.list({
 				direction = Enum.FillDirection.Horizontal,
@@ -131,26 +151,27 @@ function Rows.UpgradeCard(props)
 			),
 		}),
 
-		-- Price above the buy button, right aligned.
-		if not maxed
-			then e(Indicators.PriceTag, {
-				key = "Price",
-				cash = props.price,
-				textSize = Theme.TextSize.Value,
-				color = if affordable then Theme.Color.Positive else Theme.Color.Red,
-				position = UDim2.new(1, -20, 0, 16),
-				anchorPoint = Vector2.new(1, 0),
-				zIndex = 3,
-			})
-			else nil,
+		--[[
+			THE PRICE IS THE BUTTON.
+
+			It used to sit as a separate tag above, which left the button saying "UPGRADE" -- a word the
+			player already knows from the window they are standing in -- while the number they actually
+			decide on floated somewhere else. Now the cost is the headline and the verb is the caption, so
+			one glance at the button answers "can I afford this".
+
+			`moneyExact` rather than `money`: this is a spend, and "$1,250" is a decision where "$1.2K" is a
+			guess. Same reasoning as the confirmation modal.
+		]]
 		e(Buttons.Button, {
 			key = "Button",
-			text = if maxed then "MAXED" else "UPGRADE",
-			subtext = if maxed or not props.amount then nil else props.amount,
+			text = if maxed then "MAXED" else Format.moneyExact(props.price),
+			subtext = if maxed then nil else (props.amount or "UPGRADE"),
+			subtextSize = Theme.TextSize.Tiny,
 			variant = if maxed then "Neutral" else "Primary",
 			disabled = maxed or not affordable,
-			size = UDim2.fromOffset(176, 48),
-			position = UDim2.new(1, -20, 1, if hasRobux then -68 else -14),
+			textSize = Theme.TextSize.Button,
+			size = UDim2.fromOffset(210, 58),
+			position = UDim2.new(1, -20, 1, if hasRobux then -76 else -16),
 			anchorPoint = Vector2.new(1, 1),
 			zIndex = 4,
 			onClick = props.onBuy,
@@ -165,14 +186,20 @@ function Rows.UpgradeCard(props)
 		if hasRobux
 			then e(Buttons.Button, {
 				key = "RobuxButton",
-				text = "+1 LEVEL",
-				subtext = Format.robux(props.robuxPrice),
-				subtextSize = Theme.TextSize.Micro,
+				--- Price as the headline, "+1 LEVEL" as the caption -- the reverse of how this started.
+				text = Format.robux(props.robuxPrice),
+				subtext = "+1 LEVEL",
+				subtextSize = Theme.TextSize.Tiny,
 				glyph = "robux",
-				iconSize = 16,
+				--[[
+					20, up from 16. The mark is pinned rather than derived from the text size -- it used to
+					grow with the label and drift around the corner at its own scale -- but 16 next to a
+					22px price read as an afterthought.
+				]]
+				iconSize = 20,
 				variant = "Premium",
 				disabled = maxed,
-				textSize = Theme.TextSize.Small,
+				textSize = Theme.TextSize.Button,
 				size = UDim2.fromOffset(176, 44),
 				position = UDim2.new(1, -20, 1, -14),
 				anchorPoint = Vector2.new(1, 1),

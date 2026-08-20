@@ -11,6 +11,7 @@ local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local GameMath = require(ReplicatedStorage.Shared.Utility.GameMath)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
+local Format = require(ReplicatedStorage.Shared.UI.Format)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
@@ -423,7 +424,9 @@ function PackUIController.Start()
 			local priceLine = ""
 			if inventoryShopMode and not owned then
 				priceLine = if magnet.Premium
-					then `\nPRICE  R$ {MonetizationConfig.Passes.QuantumMagnet.DisplayPrice}`
+					then `\nPRICE  {Format.robuxSymbol(
+						MonetizationConfig.Passes.QuantumMagnet.DisplayPrice
+					)}`
 					else `\nPRICE  ${compact(magnet.ShopPrice or 0)}`
 			end
 			statsLabel.Text =
@@ -431,7 +434,9 @@ function PackUIController.Start()
 			if not owned then
 				if inventoryShopMode and (magnet.Premium or magnet.ShopPrice) then
 					popoverAction.Text = if magnet.Premium
-						then `BUY  R$ {MonetizationConfig.Passes.QuantumMagnet.DisplayPrice}`
+						then `BUY  {Format.robuxSymbol(
+							MonetizationConfig.Passes.QuantumMagnet.DisplayPrice
+						)}`
 						else `BUY  ${compact(magnet.ShopPrice)}`
 					popoverAction.Active = true
 					popoverAction.Interactable = true
@@ -499,9 +504,9 @@ function PackUIController.Start()
 					price.Visible = inventoryShopMode
 					price.Text = if owned
 						then "OWNED"
-						elseif
-							magnet.Premium
-						then `R$ {MonetizationConfig.Passes.QuantumMagnet.DisplayPrice}`
+						elseif magnet.Premium then `{Format.robuxSymbol(
+							MonetizationConfig.Passes.QuantumMagnet.DisplayPrice
+						)}`
 						elseif magnet.ShopPrice then `$ {compact(magnet.ShopPrice)}`
 						else "FREE"
 					price.BackgroundColor3 = if owned
@@ -588,7 +593,9 @@ function PackUIController.Start()
 		descriptionLabel.Text = magnet.Description
 		local priceText = if owned
 			then "OWNED"
-			elseif magnet.Premium then `R$ {MonetizationConfig.Passes.QuantumMagnet.DisplayPrice}`
+			elseif magnet.Premium then `{Format.robuxSymbol(
+				MonetizationConfig.Passes.QuantumMagnet.DisplayPrice
+			)}`
 			elseif magnet.ShopPrice then `$ {compact(magnet.ShopPrice)}`
 			else "FREE"
 		statsLabel.Text = `STRENGTH  {magnet.BaseStrength}\nRANGE  {magnet.BaseRange}`
@@ -636,9 +643,9 @@ function PackUIController.Start()
 				price.Visible = true
 				price.Text = if owned
 					then "OWNED"
-					elseif
-						magnet.Premium
-					then `R$ {MonetizationConfig.Passes.QuantumMagnet.DisplayPrice}`
+					elseif magnet.Premium then `{Format.robuxSymbol(
+						MonetizationConfig.Passes.QuantumMagnet.DisplayPrice
+					)}`
 					elseif magnet.ShopPrice then `$ {compact(magnet.ShopPrice)}`
 					else "FREE"
 				price.BackgroundColor3 = if owned
@@ -1285,7 +1292,7 @@ function PackUIController.Start()
 		skipPrestigeButton.Active = true
 		skipPrestigeButton.Interactable = true
 		if skipPrestigePrice then
-			skipPrestigePrice.Text = `R$ {skipProduct.DisplayPrice}`
+			skipPrestigePrice.Text = `{Format.robuxSymbol(skipProduct.DisplayPrice)}`
 		end
 		if skipProduct.MarketplaceId > 0 and skipPrestigePrice then
 			task.spawn(function()
@@ -1296,7 +1303,7 @@ function PackUIController.Start()
 					Enum.InfoType.Product
 				)
 				if succeeded and info and typeof(info.PriceInRobux) == "number" then
-					skipPrestigePrice.Text = `R$ {info.PriceInRobux}`
+					skipPrestigePrice.Text = `{Format.robuxSymbol(info.PriceInRobux)}`
 				end
 			end)
 		end
