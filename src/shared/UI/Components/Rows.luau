@@ -46,8 +46,20 @@ local Rows = {}
 	The two fixed columns of an upgrade row: the icon-and-name block on the left, and the buttons on the
 	right. Everything between them is the current->next readout, sized from these rather than guessed.
 ]]
-local NAME_COLUMN = 420
-local BUTTON_COLUMN = 250
+local NAME_COLUMN = 400
+local BUTTON_COLUMN = 230
+
+--[[
+	ONE WIDTH AND ONE HEIGHT for both buttons, because they stack and two stacked buttons of different
+	widths read as a mistake rather than as a choice.
+
+	Deliberately back down from a taller first attempt: 58px buttons and a 176px row made a single upgrade
+	dominate the window, and a list of eight of them stopped being scannable. 40px is still a comfortable
+	touch target and lets the row close back up.
+]]
+local BUTTON_WIDTH = 200
+local BUTTON_HEIGHT = 40
+local BUTTON_GAP = 8
 
 function Rows.UpgradeCard(props)
 	local maxed = props.maxLevel ~= nil and props.level >= props.maxLevel
@@ -64,15 +76,15 @@ function Rows.UpgradeCard(props)
 		above, which needs a button big enough for two lines of text -- and the Robux option under it needs
 		to be a real button rather than a caption, or nobody reads the price on it.
 	]]
-	local height = props.height or (if hasRobux then 176 else 118)
+	local height = props.height or (if hasRobux then BUTTON_HEIGHT * 2 + BUTTON_GAP + 28 else 100)
 
 	local children = P.compact(
 		e(Icon, {
 			key = "Icon",
 			glyph = props.glyph,
 			gradient = props.accent or Theme.Gradient.Blue,
-			size = UDim2.fromOffset(78, 78),
-			position = UDim2.new(0, 16, 0.5, 0),
+			size = UDim2.fromOffset(66, 66),
+			position = UDim2.new(0, 14, 0.5, 0),
 			anchorPoint = Vector2.new(0, 0.5),
 			radius = Theme.Radius.Card,
 			zIndex = 3,
@@ -80,10 +92,10 @@ function Rows.UpgradeCard(props)
 		e(P.Label, {
 			key = "Name",
 			text = string.upper(props.name),
-			textSize = Theme.TextSize.Title,
+			textSize = Theme.TextSize.Heading,
 			align = Enum.TextXAlignment.Left,
-			size = UDim2.fromOffset(300, 38),
-			position = UDim2.fromOffset(108, 20),
+			size = UDim2.fromOffset(280, 30),
+			position = UDim2.fromOffset(92, 18),
 			zIndex = 3,
 		}),
 		e(Indicators.Badge, {
@@ -92,7 +104,7 @@ function Rows.UpgradeCard(props)
 			gradient = if maxed then Theme.Gradient.Gold else Theme.Gradient.PanelDeep,
 			textColor = if maxed then Theme.Color.Ink else Theme.Color.Gray,
 			textSize = Theme.TextSize.Tiny,
-			position = UDim2.fromOffset(108, 62),
+			position = UDim2.fromOffset(92, 50),
 			zIndex = 3,
 		}),
 
@@ -169,9 +181,14 @@ function Rows.UpgradeCard(props)
 			subtextSize = Theme.TextSize.Tiny,
 			variant = if maxed then "Neutral" else "Primary",
 			disabled = maxed or not affordable,
-			textSize = Theme.TextSize.Button,
-			size = UDim2.fromOffset(210, 58),
-			position = UDim2.new(1, -20, 1, if hasRobux then -76 else -16),
+			textSize = Theme.TextSize.Body,
+			size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT),
+			position = UDim2.new(
+				1,
+				-16,
+				1,
+				if hasRobux then -(BUTTON_HEIGHT + BUTTON_GAP + 14) else -14
+			),
 			anchorPoint = Vector2.new(1, 1),
 			zIndex = 4,
 			onClick = props.onBuy,
@@ -196,12 +213,12 @@ function Rows.UpgradeCard(props)
 					grow with the label and drift around the corner at its own scale -- but 16 next to a
 					22px price read as an afterthought.
 				]]
-				iconSize = 20,
+				iconSize = 18,
 				variant = "Premium",
 				disabled = maxed,
-				textSize = Theme.TextSize.Button,
-				size = UDim2.fromOffset(176, 44),
-				position = UDim2.new(1, -20, 1, -14),
+				textSize = Theme.TextSize.Body,
+				size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT),
+				position = UDim2.new(1, -16, 1, -14),
 				anchorPoint = Vector2.new(1, 1),
 				zIndex = 4,
 				onClick = props.onBuyRobux,
