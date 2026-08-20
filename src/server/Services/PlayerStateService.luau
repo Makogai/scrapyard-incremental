@@ -288,6 +288,17 @@ local function publicSnapshot(data: { [string]: any })
 		DerivedStats = derivedStats(data),
 		TotalScrapCollected = data.TotalScrapCollected,
 		PlotStage = data.PlotStage,
+		--[[
+			WHAT THE PLOT LOOKS LIKE, both halves, because the UI asks about both.
+
+			Neither was here before and both were read by the client regardless -- `Atoms.plotTheme` and
+			`Atoms.plotSkin` pull these names off the snapshot. Missing, they left the theme pinned to
+			FrontYard forever and made the inventory's EQUIP button look broken: the server swapped the skin
+			and rebuilt the plot, and the card it was pressed on never changed, because nothing ever told the
+			client. `GetPlotState` carrying them is not enough; that one is server-side only.
+		]]
+		ActivePlotTheme = data.ActivePlotTheme or "FrontYard",
+		ActivePlotSkin = data.ActivePlotSkin or "",
 		PrestigeCount = data.PrestigeCount,
 		CrusherLevel = data.CrusherLevel,
 		Settings = table.clone(data.Settings),
@@ -2080,6 +2091,13 @@ function PlayerStateService.GetPlotState(player: Player): { [string]: any }?
 		ActivePlotTheme = data.ActivePlotTheme or "FrontYard",
 		--- And the skin worn over it, "" for the standard build.
 		ActivePlotSkin = data.ActivePlotSkin or "",
+		--[[
+			PASS OWNERSHIP, because a plot skin is a pass and the rebuild has to know whether the player may
+			wear what they have chosen. Its absence is what made the lava skin unreachable: `PlotThemeService`
+			read `plotState.Entitlements`, got nil, and fell through to the standard variant every single time
+			-- so the skin could be bought, worn and saved, and the yard never changed.
+		]]
+		Entitlements = table.clone(data.Entitlements),
 		UpgradeLevels = table.clone(data.UpgradeLevels),
 		UnlockedAreas = table.clone(data.UnlockedAreas),
 		PlotUpgradeLevels = table.clone(data.PlotUpgradeLevels),

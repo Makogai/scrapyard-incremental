@@ -891,4 +891,42 @@ expectEqual(fifteenOk, true, "version fifteen migration")
 expectEqual(fifteen.SchemaVersion, 18, "migrated fifteen to eighteen")
 expectEqual(fifteen.SecretTickets, 0, "migrated player holds no tickets")
 
+--[[
+	THE SNAPSHOT CONTRACT: every field the client reads is a field the server actually sends.
+
+	A SOURCE-LEVEL CHECK, and the only kind available for this. `Atoms` and `PlayerStateService` cannot be
+	required here -- one needs Charm, the other needs DataStores -- so this reads them as text: every
+	`snapshot.Something` the client pulls must appear as a key in `publicSnapshot`'s return table.
+
+	It exists because that gap is silent and expensive. `ActivePlotTheme` and `ActivePlotSkin` were both
+	read by the client and sent by nobody, so the plot theme stayed pinned to the Front Yard and the
+	inventory's EQUIP button looked broken -- the server swapped the skin, saved it and rebuilt the plot,
+	and the card that was pressed never changed. Nothing in stylua, selene, the type checker or a render
+	probe can see a missing table key: a nil field is valid Luau that simply does nothing.
+
+	Keys are matched loosely (`Name = `), so this is a canary rather than a proof -- it catches a field
+	nobody wired up, which is the failure that actually happens.
+]]
+local fs = require("@lune/fs")
+local atomsSource = fs.readFile("src/shared/UI/State/Atoms.luau")
+local stateSource = fs.readFile("src/server/Services/PlayerStateService.luau")
+local snapshotStart = string.find(stateSource, "local function publicSnapshot", 1, true)
+expectEqual(snapshotStart ~= nil, true, "publicSnapshot found in PlayerStateService")
+local returnStart = string.find(stateSource, "return {", snapshotStart, true)
+--- The newline is built rather than escaped, so this file stays free of escape noise.
+local newline = string.char(10)
+local returnEnd = string.find(stateSource, newline .. "end", returnStart, true)
+local sentKeys = string.sub(stateSource, returnStart, returnEnd)
+local checked = {}
+for key in string.gmatch(atomsSource, "snapshot%.([%a_][%w_]*)") do
+	if not checked[key] then
+		checked[key] = true
+		expectEqual(
+			string.find(sentKeys, key .. " = ", 1, true) ~= nil,
+			true,
+			`publicSnapshot sends {key}`
+		)
+	end
+end
+
 print(`Scrapyard foundation and data tests passed: {passed}`)
