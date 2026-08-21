@@ -53,6 +53,7 @@ local ReactCharm = require(ReplicatedStorage.Packages.ReactCharm)
 local UI = script.Parent.Parent
 local Atoms = require(UI.State.Atoms)
 local Bridge = require(UI.State.Bridge)
+local SocialConfig = require(ReplicatedStorage.Shared.Config.SocialConfig)
 local GameData = require(UI.GameData)
 local Hooks = require(UI.Hooks)
 local Mock = require(UI.Mock)
@@ -565,6 +566,31 @@ local function mockActions()
 	]]
 	function self.equipSkin(skinId: string?)
 		Atoms.plotSkin(skinId or "")
+	end
+
+	--[[
+		The social reward buttons, claimed locally.
+
+		MISSING ENTIRELY UNTIL NOW, and not as a no-op -- `Parts.SocialColumn` calls `props.onClaim` with no
+		guard, so clicking one of these in a story threw `attempt to call a nil value` and took the HUD down
+		with it. Marking the claim is also the only way a story can show what the column does when a reward
+		leaves it, which is the behaviour worth reviewing.
+	]]
+	function self.claimSocial(rewardId: string)
+		local claims = table.clone(Atoms.socialClaims())
+		claims[rewardId] = true
+		Atoms.socialClaims(claims)
+	end
+
+	function self.claimInvite()
+		--- The next unclaimed rung, so repeated presses walk up the milestones like the server would.
+		local claims = table.clone(Atoms.socialClaims())
+		local ready = SocialConfig.claimableInvites(Atoms.friendCount(), claims)
+		if ready[1] ~= nil then
+			--- `Invite<index>`, the same key `PlayerStateService.ClaimInviteMilestone` writes.
+			claims[`Invite{ready[1]}`] = true
+			Atoms.socialClaims(claims)
+		end
 	end
 
 	function self.usePotion(itemId: string)
