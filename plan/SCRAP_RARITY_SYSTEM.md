@@ -12,19 +12,19 @@ These are the level-zero base odds before Rarity Luck or potion boosts.
 
 | Tier | Base weight | Base chance | Value multiplier | Luck exponent | Presentation |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Normal | 9,600 | 96% | 1× | 0 | Base metal presentation |
-| Rare | 300 | 3% | 2× | 1.0 | Blue highlight and `RareShimmer` |
-| Epic | 80 | 0.8% | 5× | 1.5 | Purple highlight and `EpicPulse` |
-| Legendary | 18 | 0.18% | 15× | 2.0 | Gold highlight and `LegendaryBurst` |
-| Nebula | 2 | 0.02% (1 in 5,000) | 75× | 2.6 | Cyan cosmic highlight and `NebulaAura` |
+| Normal | 93,825 | 93.825% | 1× | 0 | Base metal presentation |
+| Rare | 5,000 | 5% | 2× | 1.0 | Blue highlight and `RareShimmer` |
+| Epic | 1,000 | 1% | 4× | 1.5 | Purple highlight and `EpicPulse` |
+| Legendary | 150 | 0.15% | 8× | 2.0 | Gold highlight and `LegendaryBurst` |
+| Nebula | 25 | 0.025% (1 in 4,000) | 25× | 2.6 | Cyan cosmic highlight and `NebulaAura` |
 
-Rarity odds are dynamically re-normalized after luck is applied. For each non-Normal tier:
+Weights sum to `VariantRollTotal` 100,000. Rarity odds are dynamically re-normalized after luck is applied. For each non-Normal tier:
 
 ```text
 effective weight = base weight × rarity luck ^ tier luck exponent
 ```
 
-Normal remains at weight 9,600. Higher rarities therefore benefit more strongly from Rarity Luck than lower rarities.
+Normal remains at weight 93,825. Higher rarities therefore benefit more strongly from Rarity Luck than lower rarities.
 
 ## Rarity Luck upgrade
 
@@ -61,37 +61,37 @@ There are now 18 scrap types: the original eight plus ten new types.
 
 | ID | Display name | Base value | Weight | Strength | Spawn weight |
 | --- | --- | ---: | ---: | ---: | ---: |
-| `MetalCan` | Metal Can | $3 | 1 | 1 | 30 |
-| `LooseBolt` | Loose Bolt | $2 | 0.5 | 1 | 26 |
-| `SmallMetalPlate` | Small Metal Plate | $9 | 3 | 3 | 20 |
-| `RustyPipe` | Rusty Pipe | $7 | 2 | 2 | 22 |
-| `CrushedBucket` | Crushed Bucket | $13 | 4 | 4 | 16 |
-| `CopperWire` | Copper Wire Coil | $18 | 3.5 | 5 | 12 |
-| `Tire` | Tire | $20 | 6 | 6 | 10 |
+| `MetalCan` | Metal Can | $45 | 1 | 1 | 30 |
+| `LooseBolt` | Loose Bolt | $55 | 0.5 | 1 | 26 |
+| `SmallMetalPlate` | Small Metal Plate | $70 | 3 | 3 | 20 |
+| `RustyPipe` | Rusty Pipe | $85 | 2 | 2 | 22 |
+| `CrushedBucket` | Crushed Bucket | $100 | 4 | 4 | 16 |
+| `CopperWire` | Copper Wire Coil | $120 | 3.5 | 5 | 12 |
+| `Tire` | Tire | $200 | 6 | 6 | 10 |
 
 ### Workshop Yard
 
 | ID | Display name | Base value | Weight | Strength | Spawn weight |
 | --- | --- | ---: | ---: | ---: | ---: |
-| `Tire` | Tire | $20 | 6 | 6 | 10 |
-| `BrokenAppliance` | Broken Appliance | $55 | 14 | 10 | 26 |
-| `ToolBox` | Busted Tool Box | $42 | 10 | 9 | 24 |
-| `BrakeDisc` | Brake Disc | $64 | 12 | 12 | 20 |
-| `Radiator` | Cracked Radiator | $105 | 20 | 15 | 16 |
-| `MotorCoil` | Motor Coil | $118 | 18 | 16 | 13 |
-| `EnginePart` | Engine Part | $135 | 28 | 16 | 18 |
-| `CarDoor` | Car Door | $240 | 42 | 24 | 9 |
+| `Tire` | Tire | $200 | 6 | 6 | 10 |
+| `BrokenAppliance` | Broken Appliance | $240 | 14 | 10 | 26 |
+| `ToolBox` | Busted Tool Box | $290 | 10 | 9 | 24 |
+| `BrakeDisc` | Brake Disc | $350 | 12 | 12 | 20 |
+| `Radiator` | Cracked Radiator | $430 | 20 | 15 | 16 |
+| `MotorCoil` | Motor Coil | $610 | 18 | 16 | 13 |
+| `EnginePart` | Engine Part | $700 | 28 | 16 | 18 |
+| `CarDoor` | Car Door | $850 | 42 | 24 | 9 |
 
 ### Vehicle Graveyard
 
 | ID | Display name | Base value | Weight | Strength | Spawn weight |
 | --- | --- | ---: | ---: | ---: | ---: |
-| `EnginePart` | Engine Part | $135 | 28 | 16 | 18 |
-| `CarDoor` | Car Door | $240 | 42 | 24 | 9 |
-| `ExhaustPipe` | Exhaust Assembly | $205 | 35 | 21 | 22 |
-| `Axle` | Heavy Axle | $360 | 58 | 29 | 16 |
-| `FuelTank` | Dented Fuel Tank | $520 | 74 | 35 | 11 |
-| `ScrapCar` | Scrap Car | $1,250 | 160 | 45 | 5 |
+| `EnginePart` | Engine Part | $700 | 28 | 16 | 18 |
+| `CarDoor` | Car Door | $850 | 42 | 24 | 9 |
+| `ExhaustPipe` | Exhaust Assembly | $1,000 | 35 | 21 | 22 |
+| `Axle` | Heavy Axle | $1,150 | 58 | 29 | 16 |
+| `FuelTank` | Dented Fuel Tank | $1,350 | 74 | 35 | 11 |
+| `ScrapCar` | Scrap Car | $1,750 | 160 | 45 | 5 |
 
 ## New model status
 

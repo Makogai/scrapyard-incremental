@@ -1,12 +1,12 @@
 --!nonstrict
 --[[
 	PlotThemeService.luau
-	Turns an unlocked area into a whole-plot theme the player can convert to.
+	Turns an unlocked area into a whole-plot theme automatically.
 
-	Unlocking an area no longer opens a fenced region inside the yard. It drops that area's
-	STRUCTURE on the plot; hold E on it and the entire plot is rebuilt as that theme. A player
-	walking past someone else's Vehicle Graveyard can see exactly what they are missing, which
-	is the point -- the envy is the feature.
+	Unlocking an area no longer opens a fenced region, and it no longer waits for a hold-E
+	on a structure. Buying Workshop rebuilds the entire plot as the Workshop; buying the
+	Vehicle Graveyard does the same. Prestige puts the yard back to the Front Yard with the
+	rest of the reset. There is no manual convert-back.
 
 	AUTHORING, all in Studio, no code change to add a theme:
 
@@ -16,14 +16,10 @@
 		  VehicleGraveyardPlot   AreaId = "VehicleGraveyard"
 
 		Workspace.AreaStructures
-		  WorkshopYard           one model per area, named after the area id
+		  WorkshopYard           leftover Studio templates, adopted out of Workspace
 		  VehicleGraveyard
 
-		Plot0N.AreaStructureSlots
-		  WorkshopYard           a part per area saying where its structure stands
-		  VehicleGraveyard
-
-	Both source folders are moved to ServerStorage at startup: they are templates, and in
+	Plot variants are moved to ServerStorage at startup: they are templates, and in
 	Workspace they replicate to every client and can be walked into.
 
 	WHY THE PLAYER IS TELEPORTED. Converting rebuilds the plot's geometry underneath whoever
@@ -42,16 +38,11 @@ local PlotSkinConfig = require(ReplicatedStorage.Shared.Config.PlotSkinConfig)
 local PlotBuildService = require(script.Parent.PlotBuildService)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local PlotService = require(script.Parent.PlotService)
-local RemoteService = require(script.Parent.RemoteService)
 
 local PlotThemeService = {}
 
 local VARIANT_FOLDER = "PlotVariants"
 local STRUCTURE_FOLDER = "AreaStructures"
-local SLOT_FOLDER = "AreaStructureSlots"
-
---- How long E must be held. Long enough that nobody converts their plot by walking past.
-local HOLD_SECONDS = 2
 
 --- Where the owner is put while their plot is rebuilt, in studs out from the plot's edge.
 local STAND_BACK = 18
@@ -66,7 +57,6 @@ local variants: { [string]: Model } = {}
 ]]
 local skins: { [string]: Model } = {}
 local structures: { [string]: Model } = {}
-local notifyRemote: RemoteEvent
 
 --[[
 	Move a template folder out of Workspace and index it by name.
@@ -129,96 +119,17 @@ local function partTopY(part: BasePart): number
 end
 
 --[[
-	Stand a structure on its slot.
-
-	Measured rather than computed, like the scrap and the richest-player statue: `PivotTo`
-	places the pivot, and on an imported model the pivot is wherever the exporter left it, so
-	the only reliable way to sit something on a surface is to measure its box afterwards and
-	correct.
+	Strip leftover convert structures. Themes now follow the latest area unlock, so the
+	hold-E prompts must not come back on a refresh.
 ]]
-local function placeStructure(plot: Model, areaId: string)
+function PlotThemeService.RefreshStructures(plot: Model, _plotState: { [string]: any }?)
 	local runtime = plot:FindFirstChild("RuntimeObjects")
-	local slots = plot:FindFirstChild(SLOT_FOLDER)
-	local slot = slots and slots:FindFirstChild(areaId)
-	local template = structures[areaId]
-	if runtime == nil or slot == nil or not slot:IsA("BasePart") or template == nil then
-		return
-	end
-
-	local existing = runtime:FindFirstChild(`Structure_{areaId}`)
-	if existing then
-		existing:Destroy()
-	end
-
-	local clone = template:Clone()
-	clone.Name = `Structure_{areaId}`
-	clone:SetAttribute("AreaId", areaId)
-	for _, descendant in clone:GetDescendants() do
-		if descendant:IsA("BasePart") then
-			descendant.Anchored = true
-		end
-	end
-	clone.Parent = runtime
-
-	clone:PivotTo(CFrame.new(slot.Position.X, slot.Position.Y, slot.Position.Z))
-	local centre, size = clone:GetBoundingBox()
-	local lift = (partTopY(slot) + size.Y / 2) - centre.Position.Y
-	clone:PivotTo(clone:GetPivot() + Vector3.new(0, lift, 0))
-
-	--[[
-		The prompt is attached here rather than authored on the model, so a new structure is
-		art and nothing else. `PetService` does the same for the egg podium.
-	]]
-	local anchor = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart", true)
-	if anchor == nil then
-		return
-	end
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "ConvertPlotPrompt"
-	prompt.ActionText = "Convert Plot"
-	prompt.ObjectText = AreaConfig.ById[areaId].DisplayName or areaId
-	prompt.HoldDuration = HOLD_SECONDS
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
-	prompt.MaxActivationDistance = 12
-	-- Structures will have props in front of them.
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = anchor
-
-	prompt.Triggered:Connect(function(player: Player)
-		PlotThemeService.TryConvert(player, areaId)
-	end)
-end
-
---- Put a structure on the plot for every area the owner has unlocked but is not standing in.
-function PlotThemeService.RefreshStructures(plot: Model, plotState: { [string]: any }?)
-	local runtime = plot:FindFirstChild("RuntimeObjects")
-	if runtime == nil or plotState == nil then
+	if runtime == nil then
 		return
 	end
 	for _, child in runtime:GetChildren() do
 		if string.match(child.Name, "^Structure_") then
 			child:Destroy()
-		end
-	end
-
-	local unlocked = plotState.UnlockedAreas or {}
-	local active = plotState.ActivePlotTheme or DEFAULT_THEME
-	for _, areaId in AreaConfig.Order do
-		--[[
-			Nothing to convert to for the theme you are already on, and nothing to offer for an area
-			you have not bought.
-
-			THE DEFAULT THEME DOES GET A STRUCTURE once you are not on it. It used to be excluded on
-			the grounds that it is where you start, so there is no unlock to represent -- but this
-			structure is the ONLY way to convert a plot, so leaving it out made the first conversion
-			irreversible: a player who tried the Workshop look could never get their starting yard
-			back. `TryConvert` already exempts the default theme from the unlock check, so the missing
-			structure was the only thing in the way.
-		]]
-		local owned = areaId == DEFAULT_THEME or unlocked[areaId] == true
-		if areaId ~= active and owned then
-			placeStructure(plot, areaId)
 		end
 	end
 end
@@ -247,57 +158,6 @@ local function standBackCFrame(plot: Model): CFrame?
 		Vector3.new(stand.X, partTopY(floor) + 4, stand.Z),
 		Vector3.new(floor.Position.X, partTopY(floor) + 4, floor.Position.Z)
 	)
-end
-
---[[
-	Convert a player's plot to a theme.
-
-	The client sends an area id and nothing else. Ownership, whether the area is unlocked, and
-	whether a variant exists are all decided here -- a client that asks for a theme it has not
-	bought gets refused, not trusted.
-]]
-function PlotThemeService.TryConvert(player: Player, areaId: string): (boolean, string)
-	if typeof(areaId) ~= "string" or AreaConfig.ById[areaId] == nil then
-		return false, "Unknown area"
-	end
-	local plot = PlotService.GetAssignments()[player]
-	if plot == nil then
-		return false, "You have no plot"
-	end
-	local plotState = PlayerStateService.GetPlotState(player)
-	if plotState == nil then
-		return false, "No player state"
-	end
-	if areaId ~= DEFAULT_THEME and (plotState.UnlockedAreas or {})[areaId] ~= true then
-		return false, "Unlock that area first"
-	end
-	if variants[areaId] == nil then
-		return false, "That plot theme has no model yet"
-	end
-	if (plotState.ActivePlotTheme or DEFAULT_THEME) == areaId then
-		return false, "Your plot is already that theme"
-	end
-
-	local saved = PlayerStateService.SetActivePlotTheme(player, areaId)
-	if not saved then
-		return false, "Could not save that"
-	end
-
-	PlotThemeService.Rebuild(player, plot)
-	--[[
-		`Notify` carries a PLAIN STRING. Every other producer sends one, and `Bridge` is what
-		wraps it into a toast payload (`{ Title = message, ... }`).
-
-		This used to fire the wrapped table instead. That put a table in `Title`, so the toast's
-		`string.upper(props.title)` threw during render, React tore down the whole tree, and the
-		only thing left on screen was the topbar -- from one hold-E. If you want a richer toast
-		here, add a dedicated remote; do not change what `Notify` means.
-	]]
-	notifyRemote:FireClient(
-		player,
-		`YOUR PLOT IS NOW A {AreaConfig.ById[areaId].DisplayName or areaId}`
-	)
-	return true, "Converted"
 end
 
 --[[
@@ -345,7 +205,7 @@ end
 	  2. release the active scrap, or `ScrapService` keeps records pointing at destroyed models
 	  3. swap the geometry, keeping the slot's own position and PlotId
 	  4. re-run the build so the sign, stage visibility and gates re-bind to the new instances
-	  5. put the structures back for every unlocked area
+	  5. strip leftover convert structures, then stand scrap back up
 ]]
 function PlotThemeService.Rebuild(player: Player?, plot: Model)
 	local plotState = if player then PlayerStateService.GetPlotState(player) else nil
@@ -491,15 +351,14 @@ function PlotThemeService.Rebuild(player: Player?, plot: Model)
 end
 
 function PlotThemeService.Start()
-	notifyRemote = RemoteService.GetEvent("Notify")
 	print(`[PlotThemeService] {adopt(VARIANT_FOLDER, variants)}`)
 	--- Optional: a place with no authored skins simply logs that none were found and carries on.
 	print(`[PlotThemeService] {adopt(PlotSkinConfig.Folder, skins)}`)
 	print(`[PlotThemeService] {adopt(STRUCTURE_FOLDER, structures)}`)
 
 	--[[
-		Build every assigned plot from its owner's saved theme, and keep the structures in step
-		as areas are unlocked. `PlotService` fires these when a plot is handed out or refreshed.
+		Build every assigned plot from its owner's saved theme. Convert structures are cleared on
+		refresh so a leftover hold-E prompt cannot come back.
 	]]
 	PlotService.OnAssigned(function(player: Player, plot: Model)
 		PlotThemeService.Rebuild(player, plot)

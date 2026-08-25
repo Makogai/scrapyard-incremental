@@ -35,6 +35,12 @@ local e = React.createElement
 
 --- Height of the artwork well. Tall enough for a spinning pet model to read.
 local ART_HEIGHT = 228
+--- Pets list many stats; a shorter well leaves room for a two-column grid.
+local PET_ART_HEIGHT = 168
+local STAT_ROW_HEIGHT = 44
+local STAT_TILE_HEIGHT = 38
+--- Visible stats area. Taller lists scroll instead of pushing the modal off the screen.
+local STATS_VIEWPORT = 168
 
 local function findById(list, id)
 	for _, entry in ipairs(list) do
@@ -51,6 +57,10 @@ end
 
 local function DetailsFrame(props)
 	local style = Theme.rarity(props.rarity)
+	local columns = math.max(1, props.statColumns or 1)
+	local compact = props.compactStats == true
+	local rowHeight = if compact then STAT_TILE_HEIGHT else STAT_ROW_HEIGHT
+	local artHeight = props.artHeight or ART_HEIGHT
 
 	local statRows = {}
 	for index, stat in ipairs(props.stats or {}) do
@@ -59,11 +69,19 @@ local function DetailsFrame(props)
 			label = string.upper(stat.label),
 			value = stat.value,
 			glyph = stat.glyph,
-			valueColor = stat.color,
-			size = UDim2.new(1, 0, 0, 44),
+			valueColor = stat.color or (if compact then Theme.Color.Positive else nil),
+			compact = compact,
+			size = UDim2.new(1, 0, 0, rowHeight),
 			layoutOrder = index,
 		})
 	end
+
+	local statRowCount = math.ceil(#statRows / columns)
+	local statsHeight = if #statRows > 0
+		then statRowCount * rowHeight + math.max(0, statRowCount - 1) * 6
+		else 0
+	local statsViewport = if statsHeight > 0 then math.min(statsHeight, STATS_VIEWPORT) else 0
+	local descriptionHeight = if props.description then (if compact then 40 else 48) else 0
 
 	return e(Overlays.Modal, {
 		key = props.key or "DetailsModal",
@@ -77,11 +95,12 @@ local function DetailsFrame(props)
 			pushed out of the bottom.
 		]]
 		contentHeight = 30
-			+ ART_HEIGHT
-			+ 48
-			+ (#statRows * 44)
+			+ artHeight
+			+ descriptionHeight
+			+ statsViewport
 			+ (if props.note then 56 else 0)
-			+ 40,
+			+ (if props.badges then 40 else 0)
+			+ 24,
 		onClose = props.onClose,
 		footerHeight = 66,
 		footer = e(P.Group, {
@@ -103,7 +122,7 @@ local function DetailsFrame(props)
 				children = P.compact(
 					e(P.Slot, {
 						key = "Artwork",
-						size = UDim2.new(1, 0, 0, ART_HEIGHT),
+						size = UDim2.new(1, 0, 0, artHeight),
 						strokeColor = style.color,
 						strokeThickness = 3,
 						layoutOrder = 1,
@@ -122,7 +141,7 @@ local function DetailsFrame(props)
 									kind = props.modelKind or "pet",
 									model = props.model,
 									spin = 35,
-									size = UDim2.fromOffset(ART_HEIGHT - 34, ART_HEIGHT - 34),
+									size = UDim2.fromOffset(artHeight - 34, artHeight - 34),
 									position = UDim2.fromScale(0.5, 0.46),
 									anchorPoint = Vector2.new(0.5, 0.5),
 									zIndex = 6,
@@ -170,16 +189,24 @@ local function DetailsFrame(props)
 							font = Theme.Font.Bold,
 							color = Theme.Color.Gray,
 							wrapped = true,
-							size = UDim2.new(1, -8, 0, 48),
+							size = UDim2.new(1, -8, 0, descriptionHeight),
 							layoutOrder = 3,
 						})
 						else nil,
 					if #statRows > 0
-						then e(P.Group, {
+						then e(P.Scroller, {
 							key = "Stats",
-							size = UDim2.new(1, 0, 0, #statRows * 44 + (#statRows - 1) * 6),
+							size = UDim2.new(1, 0, 0, statsViewport),
 							layoutOrder = 4,
-							layout = P.list({ padding = 6 }),
+							padding = 2,
+							scrollBarThickness = 6,
+							layout = if columns > 1
+								then P.grid({
+									cell = UDim2.new(0.5, -6, 0, rowHeight),
+									padding = UDim2.fromOffset(8, 6),
+									maxCells = 2,
+								})
+								else P.list({ padding = 6 }),
 							children = statRows,
 						})
 						else nil,
@@ -527,6 +554,9 @@ local function PetDetails(props)
 		glyph = "paw",
 		image = pet.image,
 		glyphColor = style.color,
+		artHeight = PET_ART_HEIGHT,
+		compactStats = true,
+		statColumns = 2,
 		description = pet.description,
 		badges = P.compact(
 			e(Indicators.Badge, {
@@ -546,10 +576,7 @@ local function PetDetails(props)
 				})
 				else nil
 		),
-		stats = {
-			{ label = "Bonus", value = pet.bonus, glyph = "upgrade", color = Theme.Color.Positive },
-			{ label = "Rarity", value = pet.rarity, glyph = "star", color = style.color },
-		},
+		stats = pet.effects or {},
 		note = if pet.owned then nil else "Hatch this pet from an egg",
 		actions = buttons,
 		onClose = actions.closeDetail,

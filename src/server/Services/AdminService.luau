@@ -135,14 +135,16 @@ local function applyToTargets(
 			applied += 1
 			PlotService.RefreshAppearance(target)
 			--[[
-				A WIPE HAS TO REBUILD THE PLOT, not just refresh it.
+				A WIPE OR FULL AREA UNLOCK HAS TO REBUILD THE PLOT, not just refresh it.
 
-				The reset puts `ActivePlotTheme` back to the Front Yard in DATA, but the yard standing in the
-				world is still whatever they converted it to -- so a wiped player kept a Vehicle Graveyard
-				they no longer own the unlock for. `Rebuild` swaps the geometry and calls `ActivateScrap`
-				itself, which is why the scrap refresh below is skipped for this one.
+				Reset puts `ActivePlotTheme` back to the Front Yard in DATA; UnlockAllAreas puts it
+				on the last area. Without `Rebuild` the yard standing in the world stays whatever it
+				was. `Rebuild` swaps the geometry and calls `ActivateScrap` itself, which is why the
+				scrap refresh below is skipped for these two.
 			]]
-			local plot = if command == "ResetProfile" then PlotService.GetPlot(target) else nil
+			local plot = if command == "ResetProfile" or command == "UnlockAllAreas"
+				then PlotService.GetPlot(target)
+				else nil
 			if plot ~= nil then
 				PlotThemeService.Rebuild(target, plot)
 			else

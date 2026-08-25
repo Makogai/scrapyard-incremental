@@ -96,6 +96,9 @@ local function formatEffect(definition, value: number): string
 	if math.abs(value - math.floor(value)) < 0.005 then
 		return string.format("%d%s", math.floor(value + 0.5), unit)
 	end
+	if unit == " slots" then
+		return string.format("%d%s", math.floor(value + 0.5), unit)
+	end
 	return string.format("%.2f%s", value, unit)
 end
 
@@ -120,7 +123,6 @@ local function costAt(definition, level: number): number
 	return GameMath.incrementalUpgradeCost(
 		definition.BaseCost,
 		definition.GrowthRate,
-		definition.CostPower,
 		level,
 		Environment.MaximumMoney
 	)
@@ -318,6 +320,86 @@ end
 -- Pets
 --------------------------------------------------------------------------------
 
+local PET_EFFECT_ORDER = {
+	"Cash",
+	"MagnetStrength",
+	"MagnetRange",
+	"Storage",
+	"CollectionSpeed",
+	"RespawnRate",
+	"RarityLuck",
+	"MovementSpeed",
+}
+
+local PET_EFFECT_LABELS = {
+	Cash = "Scrap Value",
+	MagnetStrength = "Magnet Strength",
+	MagnetRange = "Magnet Range",
+	Storage = "Storage",
+	CollectionSpeed = "Collection Speed",
+	RespawnRate = "Respawn Speed",
+	RarityLuck = "Rarity Luck",
+	MovementSpeed = "Movement Speed",
+}
+
+local PET_EFFECT_GLYPHS = {
+	Cash = "coin",
+	MagnetStrength = "magnet",
+	MagnetRange = "pin",
+	Storage = "crate",
+	CollectionSpeed = "clock",
+	RespawnRate = "recycle",
+	RarityLuck = "star",
+	MovementSpeed = "bolt",
+}
+
+local function petEffectStats(definition): { any }
+	local stats = {}
+	local effects = definition.Effects or {}
+	local cash = definition.MoneyMultiplier or effects.Cash or 1
+	if cash > 1.001 then
+		table.insert(stats, {
+			label = PET_EFFECT_LABELS.Cash,
+			value = if cash % 1 < 0.001
+				then string.format("×%d", cash)
+				else string.format("×%.2f", cash),
+			glyph = PET_EFFECT_GLYPHS.Cash,
+			magnitude = cash,
+		})
+	end
+	for _, key in ipairs(PET_EFFECT_ORDER) do
+		if key ~= "Cash" then
+			local multiplier = effects[key] or 1
+			if multiplier > 1.001 then
+				table.insert(stats, {
+					label = PET_EFFECT_LABELS[key],
+					value = string.format("+%d%%", math.floor((multiplier - 1) * 100 + 0.5)),
+					glyph = PET_EFFECT_GLYPHS[key],
+					magnitude = multiplier,
+				})
+			end
+		end
+	end
+	return stats
+end
+
+local function petHeadlineBonus(definition): string
+	local stats = petEffectStats(definition)
+	if #stats == 0 then
+		return "+0% Cash"
+	end
+	local best = stats[1]
+	for index = 2, #stats do
+		if stats[index].magnitude > best.magnitude then
+			best = stats[index]
+		end
+	end
+	if best.label == PET_EFFECT_LABELS.Cash then
+		return best.value .. " Scrap Value"
+	end
+	return `{best.value} {best.label}`
+end
+
 --- Every configured pet, with the owned count folded in.
 function GameData.pets(owned: { [string]: number }): { any }
 	local list = {}
@@ -332,10 +414,8 @@ function GameData.pets(owned: { [string]: number }): { any }
 			id = petId,
 			name = definition.DisplayName,
 			rarity = definition.Rarity,
-			bonus = string.format(
-				"+%d%% Cash",
-				math.floor((definition.MoneyMultiplier - 1) * 100 + 0.5)
-			),
+			bonus = petHeadlineBonus(definition),
+			effects = petEffectStats(definition),
 			description = definition.Description,
 			eggId = definition.EggId,
 			premium = definition.Premium == true,
@@ -559,7 +639,7 @@ local PASS_STYLE = {
 		premium = true,
 		badge = "Premium",
 		pattern = "rings",
-		benefit = "Doubles whatever your best pet already does.",
+		benefit = "×8 scrap value, plus +300% magnet strength and a wider, faster pull.",
 	},
 	DemonicGhostPet = {
 		glyph = "pet",
@@ -568,7 +648,7 @@ local PASS_STYLE = {
 		premium = true,
 		badge = "Premium",
 		pattern = "dots",
-		benefit = "Every pet bonus you own, 35% stronger.",
+		benefit = "+40% scrap value, with luck, storage, and faster respawns.",
 	},
 	--[[
 		The most expensive thing in the shop, so it closes the passes shelf as a wide
@@ -582,17 +662,17 @@ local PASS_STYLE = {
 		badge = "Exclusive",
 		layout = "hero",
 		pattern = "sunburst",
-		benefit = "The best pet in the game. Doubles every pet bonus.",
+		benefit = "×5 scrap value, +400% magnet strength, and walk speed neither other premium has.",
 		features = {
 			{
-				glyph = "paw",
-				title = "Doubles Every Pet Bonus",
-				note = "Applies to your whole equipped team.",
+				glyph = "magnet",
+				title = "+400% Magnet Strength",
+				note = "The strongest paid pull. Beats Singularity on magnet.",
 			},
 			{
-				glyph = "trophy",
-				title = "The Strongest Pet",
-				note = "Nothing else in the game beats it.",
+				glyph = "coin",
+				title = "×5 Scrap Value",
+				note = "Plus range, collection speed, walk speed, and a luck ribbon.",
 			},
 		},
 	},
@@ -862,6 +942,10 @@ function GameData.prestige(money: number, _gears: number, prestigeCount: number)
 		PrestigeConfig.MaximumGearsPerPrestige
 	)
 
+	local after = prestigeCount + 1
+	local nextValue = GameMath.prestigeValueMultiplier(after, PrestigeConfig.ValuePerPrestige)
+	local nextLuck = GameMath.prestigeLuckBonus(after, PrestigeConfig.LuckPerPrestige)
+
 	return {
 		current = prestigeCount,
 		money = money,
@@ -869,10 +953,7 @@ function GameData.prestige(money: number, _gears: number, prestigeCount: number)
 		gearsReward = reward,
 		ready = money >= requirement,
 		shortfall = math.max(0, requirement - money),
-		permanentBonus = string.format(
-			"%.2fx Cash",
-			GameMath.prestigeValueMultiplier(prestigeCount, PrestigeConfig.ValuePerPrestige)
-		),
+		permanentBonus = string.format("%.2fx Cash  +%d%% Luck", nextValue, math.floor(nextLuck * 100 + 0.5)),
 		lose = { "Cash", "Normal upgrades", "Area progress" },
 		keep = { "Magnets", "Pets", "Potions", "Gears", "Cosmetics" },
 	}

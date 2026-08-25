@@ -118,6 +118,15 @@ return UILabs.CreateReactStory({
 			height = 62,
 		}),
 		e(Indicators.StatPill, {
+			key = "PillCashRound",
+			value = UI.Format.money(100_000),
+			gradient = Theme.Gradient.Money,
+			font = Theme.Font.Money,
+			textSize = Theme.TextSize.Hero,
+			width = 240,
+			height = 62,
+		}),
+		e(Indicators.StatPill, {
 			key = "PillGears",
 			glyph = "gear",
 			value = UI.Format.comma(42),

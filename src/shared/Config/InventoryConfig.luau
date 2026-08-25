@@ -32,7 +32,7 @@ local magnets = {
 		DisplayName = "Basic Magnet",
 		Description = "A dependable starter magnet.",
 		BaseStrength = 4,
-		BaseRange = 9,
+		BaseRange = 5,
 		ModelName = "MagnetBasic",
 		IconId = "rbxassetid://79829676084935",
 		--- The quietest of the three: a single thin line, nothing inside it, one unhurried pulse.

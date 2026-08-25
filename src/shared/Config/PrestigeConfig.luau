@@ -2,20 +2,22 @@
 
 return table.freeze({
 	--[[
-		Rebirth 1 at $2M with x1.75 growth, from the economy pass. See `plan/ECONOMY_REBALANCE.md`.
+		Next rebirth costs `BaseMoneyRequirement * RequirementGrowth ^ R`, with R = completed rebirths.
+		First rebirth is $2,000,000; the second is $3,100,000; then $4,805,000, and so on.
 
-		THESE TWO MOVE TOGETHER WITH THE REBIRTH BONUS. The cost growth has to outrun the permanent income
-		bonus a rebirth grants, or every rebirth is faster than the last and the ladder collapses inward:
-		x1.75 against +25% value per rebirth works, x1.75 against a bigger bonus would not.
+		THESE TWO MOVE TOGETHER WITH THE REBIRTH BONUS. Value compounds as `1.25 ^ R`. Cost grows as
+		`1.55 ^ R`. Time-to-next therefore scales with (1.55/1.25)^R = 1.24^R, so each rebirth is still
+		a longer grind than the last. If the bonus ever outruns the cost, the ladder collapses inward.
 	]]
 	BaseMoneyRequirement = 2000000,
-	RequirementGrowth = 1.75,
+	RequirementGrowth = 1.55,
 	--[[
 		Permanent, per rebirth, on top of resetting money/areas/upgrades.
 
-		`ValuePerPrestige` is what makes a rebirth worth doing at all; `LuckPerPrestige` is what makes the
-		late game feel different rather than just bigger; `UpgradeLevelsPerPrestige` raises the ceiling so
-		the same upgrades keep going.
+		`ValuePerPrestige` is the increment inside `RebirthValueMultiplier = (1 + ValuePerPrestige) ^ R`
+		-- each rebirth multiplies scrap value by 1.25, not +0.25 linearly. `LuckPerPrestige` is RAW luck
+		added after upgrade/pet luck: `RebirthLuck = R * 0.05`. UpgradeLevelsPerPrestige on each upgrade
+		raises the ceiling so the same upgrades keep going.
 	]]
 	ValuePerPrestige = 0.25,
 	LuckPerPrestige = 0.05,

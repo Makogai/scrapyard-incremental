@@ -35,6 +35,7 @@ local MagnetShopScreen = require(UI.Screens.MagnetShopScreen)
 local ChangelogScreen = require(UI.Screens.ChangelogScreen)
 local InboxScreen = require(UI.Screens.InboxScreen)
 local DailyRewardsScreen = require(UI.Screens.DailyRewardsScreen)
+local PlaytimeRewardsScreen = require(UI.Screens.PlaytimeRewardsScreen)
 local SpinScreen = require(UI.Screens.SpinScreen)
 local AdminScreen = require(UI.Screens.AdminScreen)
 local EggSummonScreen = require(UI.Screens.EggSummonScreen)
@@ -77,6 +78,7 @@ local SCREENS = {
 		daily-reward system and a window with nothing behind it is worse than no window. It does now.
 	]]
 	daily = DailyRewardsScreen,
+	playtime = PlaytimeRewardsScreen,
 	spin = SpinScreen,
 	--- Offered only to admins by the HUD; `AdminService` re-checks every command regardless.
 	admin = AdminScreen,

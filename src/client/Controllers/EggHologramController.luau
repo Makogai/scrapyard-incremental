@@ -8,11 +8,12 @@
 	errored, because the map is edited in Studio and this must not break a playtest):
 
 		Workspace.NewMap
-		  ...
-		  EggSummonPodium                 a Model, anywhere under NewMap (matches `PetService`)
-		    <Area>EggGroup                e.g. VehicleGraveyardEggGroup -- optional grouping
-		      Egg                         Model or BasePart, the thing that floats
-		      Stand                       left alone
+		  FrontYardEggGroup               a Folder or Model, anywhere under NewMap
+		    Egg                           Model or BasePart, the thing that floats
+		    Stand                         left alone
+		  WorkshopYardEggGroup
+		  VehicleGraveyardEggGroup
+		  -- or the older shape: an EggSummonPodium model wrapping those groups
 
 	The egg is found by name: something containing "egg" that is not the group, the stand or the podium
 	base. If nothing matches, the largest child Model is used, because "the big thing on the podium" is the
@@ -30,7 +31,10 @@
 		HologramFloat    number     bob amplitude in studs (0 disables the float)
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local EggPodiums = require(ReplicatedStorage.Shared.Utility.EggPodiums)
 
 local EggHologramController = {}
 
@@ -60,7 +64,7 @@ local BEAM_BASE_SCALE = 0.85
 local BEAM_TIP_SCALE = 0.2
 
 --- Names that are never the egg, however they are cased.
-local NOT_THE_EGG = { "stand", "group", "base", "podium", "plinth", "pedestal" }
+local NOT_THE_EGG = { "stand", "group", "base", "podium", "plinth", "pedestal", "hitbox", "prompt" }
 
 --------------------------------------------------------------------------------
 -- Geometry
@@ -141,10 +145,15 @@ local function findEgg(root: Instance): Instance?
 		if not (child:IsA("Model") or child:IsA("BasePart")) then
 			continue
 		end
-		if
-			not looksLikeTheEgg(child.Name)
-			and string.find(string.lower(child.Name), "stand", 1, true)
-		then
+		local lowered = string.lower(child.Name)
+		local banned = false
+		for _, name in NOT_THE_EGG do
+			if string.find(lowered, name, 1, true) then
+				banned = true
+				break
+			end
+		end
+		if banned then
 			continue
 		end
 		local parts = partsOf(child)
@@ -165,31 +174,16 @@ end
 --[[
 	Every egg to dress, across every podium.
 
-	A podium may hold its egg directly or inside an `<Area>EggGroup`. Both are searched, and the group is
-	returned alongside so its attribute overrides can be read.
+	Each site from `EggPodiums` (an `<Area>EggGroup`, or a lone `EggSummonPodium`) is
+	searched for its egg. The group is returned alongside so its attribute overrides
+	can be read.
 ]]
 local function collectEggs(map: Instance): { { Egg: Instance, Holder: Instance } }
 	local found = {}
-	for _, podium in map:GetDescendants() do
-		if not podium:IsA("Model") or podium.Name ~= "EggSummonPodium" then
-			continue
-		end
-
-		local groups = {}
-		for _, child in podium:GetChildren() do
-			if string.find(string.lower(child.Name), "egggroup", 1, true) then
-				table.insert(groups, child)
-			end
-		end
-		if #groups == 0 then
-			table.insert(groups, podium)
-		end
-
-		for _, group in groups do
-			local egg = findEgg(group)
-			if egg ~= nil then
-				table.insert(found, { Egg = egg, Holder = group })
-			end
+	for _, site in EggPodiums.collect(map) do
+		local egg = findEgg(site)
+		if egg ~= nil then
+			table.insert(found, { Egg = egg, Holder = site })
 		end
 	end
 	return found

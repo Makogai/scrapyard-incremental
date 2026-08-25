@@ -1,8 +1,9 @@
 # Plot upgrades — design
 
-Replaces "areas are regions inside one plot" with "areas are **themes your whole plot can
-become**". Unlocking an area no longer opens a fenced-off corner of your yard; it drops a
-structure on your plot that you hold **E** on to convert the entire plot into that theme.
+Replaces "areas are regions inside one plot" with "areas are **themes your whole plot
+becomes**". Buying Workshop rebuilds the entire plot as the Workshop; buying the Vehicle
+Graveyard does the same. There is no hold-E convert step and no convert-back. Prestige
+returns the yard to the Front Yard with the rest of the reset.
 
 The point is envy. With six players on a map you walk past other yards constantly. A player
 whose plot is still the starting scrapyard, standing next to a full Vehicle Graveyard plot,
@@ -13,18 +14,15 @@ sign.
 
 ## Status
 
-Implemented and Play-verified end to end.
+Implemented. Auto-convert on area unlock shipped 2026-08-21 (Studio Play not re-run for that change).
 
 | | State |
 | --- | --- |
 | `Workspace.PlotVariants` — three editable plots | done |
-| `Workspace.AreaStructures` — named slots, moved to ServerStorage at boot | done |
-| `AreaStructureSlots` on each variant | done |
-| Structure appears for each unlocked area | done |
-| Hold-E prompt (2s) attached from code | done |
-| Conversion: validate, save, teleport clear, rebuild, replace structures | done |
-| `ActivePlotTheme` persisted (schema v13, migration defaults to `FrontYard`) | done |
-| Plot built from the saved theme on join | done |
+| Unlocking an area sets `ActivePlotTheme` and rebuilds | done |
+| Hold-E convert structures / convert-back | removed — theme follows the latest unlock |
+| `ActivePlotTheme` on load is the highest unlocked area | done |
+| Plot built from that theme on join | done |
 | Scrap re-activated after a rebuild | done — was broken, see below |
 | Sign card refreshes after a rebuild | done — was broken, see below |
 
@@ -280,6 +278,12 @@ marker's top) the way `ScrapService` places scrap — a structure that floats or
 broken, and every model will arrive at a different size.
 
 ### 2. Hold E on the structure to convert the plot
+
+**Removed 2026-08-21.** Buying the area now sets `ActivePlotTheme` and rebuilds immediately.
+Convert structures are stripped on refresh so leftover prompts cannot come back. Prestige
+is the only convert-back, because it also strips the unlocks.
+
+The original design (left here so nobody rebuilds it by accident):
 
 A `ProximityPrompt` on the structure's `PrimaryPart`, `HoldDuration` around 2 seconds so it
 cannot be triggered by accident:

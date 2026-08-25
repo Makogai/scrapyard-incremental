@@ -232,7 +232,6 @@ function UIController.Start()
 			local price = GameMath.incrementalUpgradeCost(
 				definition.BaseCost,
 				definition.GrowthRate,
-				definition.CostPower,
 				level,
 				Environment.MaximumMoney
 			)

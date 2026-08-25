@@ -135,7 +135,7 @@ Mock.upgrades = {
 	{
 		-- Already maxed, so the screen always demonstrates the MAXED state.
 		id = "scrap_flow",
-		name = "Scrap Flow",
+		name = "Spawn Rate",
 		glyph = "recycle",
 		accent = "Green",
 		level = 40,

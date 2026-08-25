@@ -1,7 +1,7 @@
 --[[
 	The three HUD pieces the return-to-play systems added, in isolation:
 
-		StatusCluster      bottom-right trio: daily login boost, friend boost, spin wheel
+		StatusCluster      bottom-right: daily, playtime, friend boost, spin wheel
 		TutorialCaption    the current onboarding objective
 		TutorialSpotlight  darkens the screen and leaves one control lit
 
@@ -36,6 +36,8 @@ return UILabs.CreateReactStory({
 		ShowTooltip = UILabs.Boolean(false),
 		DailyStreak = UILabs.Slider(3, 0, 30, 1),
 		DailyClaimable = UILabs.Boolean(true),
+		PlaytimeClaimable = UILabs.Boolean(false),
+		PlaytimeRemaining = UILabs.Slider(420, 0, 3600, 10),
 		TutorialStep = UILabs.Slider(1, 0, #TutorialConfig.Steps, 1),
 	},
 }, function(props)
@@ -87,12 +89,14 @@ return UILabs.CreateReactStory({
 						dailyClaimable = controls.DailyClaimable,
 						--- A fixed wait so the story's countdown line is stable between renders.
 						dailyResetSeconds = 8 * 3600 + 42 * 60,
+						playtimeClaimable = controls.PlaytimeClaimable,
+						playtimeNextRemaining = controls.PlaytimeRemaining,
 						friendCount = controls.Friends,
 						friendBoost = controls.Friends * RewardsConfig.Friends.BoostPerFriend,
 						spinsAvailable = controls.Spins,
 					}),
 				},
-				itemSize = UDim2.fromOffset(190, 90),
+				itemSize = UDim2.fromOffset(250, 90),
 			},
 			{
 				title = "Friend boost — 0, 1, 3 and 10 friends",

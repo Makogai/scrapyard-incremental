@@ -1,9 +1,9 @@
 --[[
-	The daily login calendar.
+	The playtime ladder as its own window.
 
-	Playtime is a separate story in this folder. The controls walk the calendar
-	position and the streak -- whether the dimmed / ringed / locked states read
-	correctly, and whether the hero still dominates once the small cards are ticked.
+	The seconds slider is what to review: locked cards counting down, a READY card
+	with CLAIM, and claimed ticks. The live game interpolates seconds while this
+	window stays open; the slider is the story stand-in for that clock.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,24 +21,27 @@ local e = React.createElement
 return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
-	name = "Daily Rewards",
-	summary = "Daily calendar: two rows of three plus a hero card.",
+	name = "Playtime Rewards",
+	summary = "Playtime ladder: locked countdowns, a claimable card, and claimed ticks.",
 	controls = {
 		Device = UILabs.Choose({ "desktop", "tablet", "mobile" }, 1),
 		GameView = UILabs.Boolean(true),
-		CalendarDay = UILabs.Slider(4, 1, 7, 1),
-		Streak = UILabs.Slider(3, 0, 30, 1),
-		Claimable = UILabs.Boolean(true),
+		PlaytimeSeconds = UILabs.Slider(1100, 0, 7200, 10),
+		ClaimedMilestones = UILabs.Slider(2, 0, 9, 1),
 	},
 }, function(props)
 	local controls = props.controls
 
-	Atoms.dailyCalendarDay(controls.CalendarDay)
-	Atoms.dailyStreak(controls.Streak)
-	Atoms.dailyClaimable(controls.Claimable)
+	Atoms.playtimeSeconds(controls.PlaytimeSeconds)
+	Atoms.playtimeSyncedAt(0)
+	local claimed = {}
+	for index = 1, controls.ClaimedMilestones do
+		claimed[index] = true
+	end
+	Atoms.playtimeClaimed(claimed)
 
 	return e(Harness.Screen, {
-		component = UI.Screens.DailyRewards,
+		component = UI.Screens.PlaytimeRewards,
 		device = controls.Device,
 		gameView = controls.GameView,
 	})

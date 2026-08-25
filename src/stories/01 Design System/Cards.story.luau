@@ -144,7 +144,7 @@ return UILabs.CreateReactStory({
 		}),
 		e(Rows.UpgradeCard, {
 			key = "Maxed",
-			name = "Scrap Flow",
+			name = "Spawn Rate",
 			glyph = "recycle",
 			accent = Theme.Gradient.Green,
 			level = 40,

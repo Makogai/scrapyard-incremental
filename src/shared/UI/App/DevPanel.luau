@@ -39,6 +39,7 @@ local SCREEN_BUTTONS = {
 	{ id = "shop", text = "SHOP" },
 	{ id = "settings", text = "SETTINGS" },
 	{ id = "daily", text = "DAILY" },
+	{ id = "playtime", text = "PLAYTIME" },
 	{ id = "collection", text = "COLLECTION" },
 	{ id = "plot", text = "PLOT" },
 	{ id = "leaderboards", text = "BOARDS" },

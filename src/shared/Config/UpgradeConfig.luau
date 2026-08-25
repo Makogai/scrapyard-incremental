@@ -23,9 +23,8 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Magnet Strength",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 35,
-		GrowthRate = 1.3,
-		CostPower = 1.55,
+		BaseCost = 650,
+		GrowthRate = 1.30,
 		BaseEffect = 4,
 		EffectPerLevel = 1.35,
 		EffectCurve = "Power",
@@ -38,11 +37,16 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Magnet Range",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 38,
-		GrowthRate = 1.32,
-		CostPower = 1.7,
-		BaseEffect = 9,
-		EffectPerLevel = 0.75,
+		--[[
+			Starter magnet is 5 studs (was 9). First buy is $500 so a tight start is a
+			goal, not a wall. +1 stud a level: you pass the old 9-stud start at level 4,
+			and the base cap is 15. EffectCap stays 42 -- that is still the prestige
+			ceiling, because range is BaseRange + (effect - BaseEffect).
+		]]
+		BaseCost = 500,
+		GrowthRate = 1.35,
+		BaseEffect = 5,
+		EffectPerLevel = 1,
 		EffectCurve = "Power",
 		CurvePower = 1,
 		EffectCap = 42,
@@ -53,9 +57,8 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Storage Capacity",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 42,
-		GrowthRate = 1.3,
-		CostPower = 1.55,
+		BaseCost = 800,
+		GrowthRate = 1.30,
 		--[[
 			25 slots at level zero, about +5 a level. Storage is a COUNT of pieces now, not weight.
 
@@ -65,8 +68,9 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		BaseEffect = 25,
 		EffectPerLevel = 5,
 		EffectCurve = "Power",
-		--- Nearly linear on purpose: a slot is a slot, so there is nothing for a curve to express.
-		CurvePower = 1.02,
+		--- Linear: a slot is a slot. A 1.02 curve left fractional slots that the HUD rounded up, so 51 on
+		--- the bar was 50.81 in the check and the last space could never be filled.
+		CurvePower = 1,
 		EffectCap = 1e9,
 		EffectUnit = " slots",
 	}),
@@ -75,21 +79,20 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Movement Speed",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 39,
+		BaseCost = 1200,
 		GrowthRate = 1.34,
-		CostPower = 1.9,
 		BaseEffect = 16,
 		--[[
-			Movement tops out at 26, down from 28.
+			+3 walk speed a level, from Roblox's default 16 up to 46 at the base cap (almost 3x).
+			The 2x Walk Speed pass multiplies AFTER this, so a maxed upgrade plus the pass is 92.
 
-			A soft cap rather than a curve change: past about 26 walk speed the plot stops feeling like a
-			place you move through and starts feeling like a menu, and the collection loop is built around
-			walking between piles.
+			28 felt like a walk, not an upgrade. Prestige raising the level ceiling can still climb
+			toward 64; past that the plot is a blur.
 		]]
-		EffectPerLevel = 0.07,
-		EffectCurve = "Diminishing",
+		EffectPerLevel = 3,
+		EffectCurve = "Power",
 		CurvePower = 1,
-		EffectCap = 26,
+		EffectCap = 64,
 		EffectUnit = " speed",
 	}),
 	ScrapValue = upgrade({
@@ -97,9 +100,8 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Scrap Value",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 95,
-		GrowthRate = 1.38,
-		CostPower = 1.72,
+		BaseCost = 1500,
+		GrowthRate = 1.40,
 		BaseEffect = 1,
 		EffectPerLevel = 0.085,
 		EffectCurve = "Exponential",
@@ -112,9 +114,8 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Collection Speed",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 60,
+		BaseCost = 900,
 		GrowthRate = 1.34,
-		CostPower = 1.65,
 		BaseEffect = 24,
 		EffectPerLevel = 1.8,
 		EffectCurve = "Power",
@@ -124,12 +125,11 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 	}),
 	ScrapFlow = upgrade({
 		Id = "ScrapFlow",
-		DisplayName = "Scrap Flow",
+		DisplayName = "Spawn Rate",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 100,
-		GrowthRate = 1.4,
-		CostPower = 1.8,
+		BaseCost = 2200,
+		GrowthRate = 1.42,
 		BaseEffect = 1,
 		EffectPerLevel = 0.055,
 		EffectCurve = "Reduction",
@@ -142,9 +142,8 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		DisplayName = "Rarity Luck",
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
-		BaseCost = 135,
-		GrowthRate = 1.42,
-		CostPower = 1.85,
+		BaseCost = 3000,
+		GrowthRate = 1.45,
 		BaseEffect = 1,
 		EffectPerLevel = 0.12,
 		EffectCurve = "Power",

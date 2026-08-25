@@ -9,6 +9,7 @@ local AreaRules = require("../src/shared/Utility/AreaRules")
 local AdminConfig = require("../src/shared/Config/AdminConfig")
 local DayClock = require("../src/shared/Utility/DayClock")
 local EventConfig = require("../src/shared/Config/EventConfig")
+local EventSoundConfig = require("../src/shared/Config/EventSoundConfig")
 local TitleConfig = require("../src/shared/Config/TitleConfig")
 local AchievementConfig = require("../src/shared/Config/AchievementConfig")
 local AchievementRules = require("../src/shared/Utility/AchievementRules")
@@ -16,6 +17,7 @@ local PrestigeConfig = require("../src/shared/Config/PrestigeConfig")
 local SocialConfig = require("../src/shared/Config/SocialConfig")
 local InboxConfig = require("../src/shared/Config/InboxConfig")
 local PlotSkinConfig = require("../src/shared/Config/PlotSkinConfig")
+local Format = require("../src/shared/UI/Format")
 
 local passed = 0
 
@@ -43,12 +45,14 @@ expectEqual(GameMath.upgradeCost(45, 1.52, 2, 1e15), 103, "grown upgrade cost")
 expectEqual(GameMath.upgradeCost(-1, 1.5, 0, 1e15), 1e15, "invalid upgrade cost")
 expectNear(GameMath.upgradeEffect(4, 2.5, 3, 54), 11.5, 1e-6, "upgrade effect")
 expectEqual(GameMath.upgradeEffect(4, 2.5, 100, 54), 54, "effect cap")
-expectEqual(GameMath.incrementalUpgradeCost(75, 1.1, 1.55, 0, 1e15), 75, "long-form initial cost")
+expectEqual(GameMath.incrementalUpgradeCost(75, 1.1, 0, 1e15), 75, "long-form initial cost")
 expectEqual(
-	GameMath.incrementalUpgradeCost(75, 1.1, 1.55, 100, 1e15) > 100000,
+	GameMath.incrementalUpgradeCost(75, 1.1, 100, 1e15) > 100000,
 	true,
 	"long-form level 100 cost"
 )
+expectEqual(GameMath.incrementalUpgradeCost(650, 1.30, 0, 1e15), 650, "strength level 1 cost")
+expectEqual(GameMath.incrementalUpgradeCost(650, 1.30, 1, 1e15), 845, "strength level 2 cost")
 expectNear(
 	GameMath.incrementalUpgradeEffect(18, 0.055, 100, "Diminishing", 1, 60),
 	59.828,
@@ -61,6 +65,23 @@ expectNear(
 	0.01,
 	"respawn reduction curve"
 )
+expectEqual(GameMath.incrementalUpgradeEffect(16, 3, 0, "Power", 1, 64), 16, "speed level 0 is default walk")
+expectEqual(GameMath.incrementalUpgradeEffect(16, 3, 1, "Power", 1, 64), 19, "speed level 1")
+expectEqual(GameMath.incrementalUpgradeEffect(16, 3, 10, "Power", 1, 64), 46, "speed level 10 is almost 3x")
+expectEqual(
+	GameMath.incrementalUpgradeEffect(25, 5, 5, "Power", 1, 1e9),
+	50,
+	"storage level 5 is 50 whole slots"
+)
+expectEqual(Format.short(10), "10", "short keeps a trailing zero under a thousand")
+expectEqual(Format.short(100), "100", "short keeps hundreds")
+expectEqual(Format.short(1000), "1K", "short 1000 is 1K")
+expectEqual(Format.short(10_000), "10K", "short 10000 is 10K")
+expectEqual(Format.short(100_000), "100K", "short 100000 keeps the trailing zeros")
+expectEqual(Format.short(150_000), "150K", "short 150000 keeps the trailing zero")
+expectEqual(Format.short(200_000), "200K", "short 200000 keeps both trailing zeros")
+expectEqual(Format.short(1_500), "1.5K", "short trims a decimal zero only")
+expectEqual(Format.money(100_000), "$100K", "money 100000 is $100K")
 expectEqual(GameMath.upgradeMaximumLevel(8, 4, 0), 8, "starting prestige cap")
 expectEqual(GameMath.upgradeMaximumLevel(8, 4, 3), 20, "expanded prestige cap")
 expectNear(
@@ -74,6 +95,65 @@ expectNear(
 	"additive duplicate pet bonuses"
 )
 
+local workshopCommon = {
+	MoneyMultiplier = 1.12,
+	Effects = { Cash = 1.12, Storage = 1.08, CollectionSpeed = 1.05 },
+}
+local ghost = {
+	MoneyMultiplier = 1.40,
+	Premium = true,
+	Effects = {
+		Cash = 1.40,
+		RarityLuck = 1.20,
+		RespawnRate = 1.30,
+		Storage = 1.20,
+		CollectionSpeed = 1.10,
+	},
+}
+local singularity = {
+	MoneyMultiplier = 20,
+	Premium = true,
+	Effects = { Cash = 20, MagnetStrength = 6, CollectionSpeed = 1.25, MagnetRange = 1.20 },
+}
+expectNear(
+	GameMath.petEffectMultipliers({ "Wrench" }, { Wrench = 1 }, { Wrench = workshopCommon }).Storage,
+	1.08,
+	1e-6,
+	"workshop common storage"
+)
+expectNear(
+	GameMath.petEffectMultipliers(
+		{ "Wrench", "Ghost" },
+		{ Wrench = 1, Ghost = 1 },
+		{ Wrench = workshopCommon, Ghost = ghost }
+	).Cash,
+	1.52,
+	1e-6,
+	"workshop common plus ghost cash adds"
+)
+expectNear(
+	GameMath.petEffectMultipliers({ "Singularity" }, { Singularity = 1 }, { Singularity = singularity }).MagnetStrength,
+	6,
+	1e-6,
+	"singularity strength is +500 percent"
+)
+expectNear(
+	GameMath.petEffectMultipliers({ "Singularity" }, { Singularity = 1 }, { Singularity = singularity }).Cash,
+	20,
+	1e-6,
+	"singularity cash is times 20, not crushed by the hatchable cap"
+)
+expectNear(
+	GameMath.petEffectMultipliers(
+		{ "Singularity", "Wrench" },
+		{ Singularity = 1, Wrench = 1 },
+		{ Singularity = singularity, Wrench = workshopCommon }
+	).MagnetStrength,
+	6,
+	1e-6,
+	"singularity no longer copies other pets"
+)
+
 expectEqual(GameMath.scrapValue(100, 15, 3.4, 1e12), 5100, "scrap multipliers")
 expectEqual(GameMath.scrapValue(-1, 15, 3.4, 1e12), 0, "negative scrap value")
 expectEqual(GameMath.canStore(14, 20, 6), true, "exact capacity")
@@ -85,18 +165,47 @@ expectEqual(GameMath.prestigeGearReward(750000, 750000, 100), 1, "first prestige
 expectEqual(GameMath.prestigeGearReward(1000000000, 750000, 100), 100, "prestige reward cap")
 --[[
 	The rebirth bonus replaced the gears->value curve. Linear and unbounded by gears, so a rebirth pays
-	once. Asserted against `PrestigeConfig.ValuePerPrestige` as well as literals, so retuning the config
-	cannot silently leave the readouts quoting an old number.
+	once. Compounding `1.25 ^ R`, not linear. Asserted against `PrestigeConfig.ValuePerPrestige` as well
+	as literals, so retuning the config cannot silently leave the readouts quoting an old number.
 ]]
 expectNear(GameMath.prestigeValueMultiplier(0, 0.25), 1.0, 0.0001, "no rebirth is no bonus")
 expectNear(GameMath.prestigeValueMultiplier(1, 0.25), 1.25, 0.0001, "first rebirth bonus")
-expectNear(GameMath.prestigeValueMultiplier(4, 0.25), 2.0, 0.0001, "fourth rebirth bonus")
+expectNear(GameMath.prestigeValueMultiplier(4, 0.25), 2.44140625, 0.0001, "fourth rebirth bonus")
 expectNear(GameMath.prestigeValueMultiplier(-3, 0.25), 1.0, 0.0001, "negative rebirth guard")
 expectNear(
 	GameMath.prestigeValueMultiplier(2, PrestigeConfig.ValuePerPrestige),
-	1 + 2 * PrestigeConfig.ValuePerPrestige,
+	(1 + PrestigeConfig.ValuePerPrestige) ^ 2,
 	0.0001,
 	"rebirth bonus follows config"
+)
+expectNear(GameMath.prestigeLuckBonus(0, 0.05), 0, 0.0001, "no rebirth is no luck")
+expectNear(GameMath.prestigeLuckBonus(1, 0.05), 0.05, 0.0001, "first rebirth luck")
+expectNear(GameMath.prestigeLuckBonus(4, 0.05), 0.20, 0.0001, "fourth rebirth luck")
+expectNear(
+	GameMath.prestigeLuckBonus(3, PrestigeConfig.LuckPerPrestige),
+	3 * PrestigeConfig.LuckPerPrestige,
+	0.0001,
+	"rebirth luck follows config"
+)
+expectEqual(
+	GameMath.prestigeRequirement(
+		PrestigeConfig.BaseMoneyRequirement,
+		PrestigeConfig.RequirementGrowth,
+		0,
+		1e15
+	),
+	2000000,
+	"first rebirth costs 2 million"
+)
+expectEqual(
+	GameMath.prestigeRequirement(
+		PrestigeConfig.BaseMoneyRequirement,
+		PrestigeConfig.RequirementGrowth,
+		1,
+		1e15
+	),
+	3100000,
+	"second rebirth costs 3.1 million"
 )
 expectNear(
 	GameMath.prestigeRequirement(25000000, 2.2, 3, 1e15),
@@ -243,6 +352,14 @@ expectEqual(
 expectEqual(defaultData.ActivePlotTheme, "FrontYard", "default plot theme")
 expectEqual(defaultData.PetSlotUpgradeLevel, 0, "default pet slot upgrade")
 expectEqual(#defaultData.EquippedPets, 0, "default equipped pets")
+
+local threeEquippedOk, threeEquipped = PlayerDataSchema.validate({
+	SchemaVersion = 18,
+	OwnedPets = { Pup = 1, Zebra = 1, QueenKitty = 1 },
+	EquippedPets = { "Pup", "Zebra", "QueenKitty" },
+}, 2000)
+expectEqual(threeEquippedOk, true, "three equipped pets sanitise")
+expectEqual(#threeEquipped.EquippedPets, 3, "base slots keep three equipped pets on load")
 expectEqual(defaultData.EquippedMagnet, "MagnetBasic", "default equipped magnet")
 expectEqual(defaultData.OwnedMagnets.MagnetBasic, true, "default owned magnet")
 expectEqual(defaultData.Inventory.CashPotion, 0, "default cash potion count")
@@ -271,7 +388,7 @@ expectEqual(migratedOk, true, "version one migration")
 expectEqual(migrated.SchemaVersion, 18, "migrated schema version")
 --- An ancient save arrives with an empty mailbox rather than a nil one, so the screen never sees nil.
 expectEqual(#migrated.Inbox, 0, "a migrated save has an empty mailbox")
-expectEqual(migrated.ActivePlotTheme, "FrontYard", "migrated plot theme defaults to the scrapyard")
+expectEqual(migrated.ActivePlotTheme, "WorkshopYard", "plot theme follows the highest unlocked area")
 expectEqual(migrated.Money, 125, "migrated money")
 expectEqual(migrated.UpgradeLevels.MagnetStrength, 3, "migrated upgrade")
 expectEqual(migrated.UpgradeLevels.MagnetRange, 0, "repaired missing upgrade")
@@ -342,6 +459,9 @@ expectEqual(weakReason, "TooHeavy", "weak magnet reason")
 local fullAllowed, fullReason = CollectionRules.canCollect(4, 3, 18, 20, 3, true, true)
 expectEqual(fullAllowed, false, "full storage rejection")
 expectEqual(fullReason, "StorageFull", "full storage reason")
+local oneSlotLeft, oneSlotReason = CollectionRules.canCollect(4, 1, 50, 51, 1, true, true)
+expectEqual(oneSlotLeft, true, "one empty slot is pickable")
+expectEqual(oneSlotReason, "Collected", "one empty slot reason")
 local lockedAllowed, lockedReason = CollectionRules.canCollect(4, 3, 0, 20, 3, false, true)
 expectEqual(lockedAllowed, false, "locked area rejection")
 expectEqual(lockedReason, "AreaLocked", "locked area reason")
@@ -444,6 +564,7 @@ expectEqual(defaultData.SpinsAvailable, 0, "default spins")
 expectEqual(defaultData.TutorialStep, 0, "default tutorial step")
 expectEqual(defaultData.TutorialComplete, false, "default tutorial incomplete")
 expectEqual(defaultData.FriendBoostCount, 0, "default friend count")
+expectEqual(defaultData.AffordHints.WorkshopYard, nil, "default afford hints empty")
 
 local rewardOk, rewardClean = PlayerDataSchema.validate({
 	SchemaVersion = 14,
@@ -467,6 +588,14 @@ expectEqual(rewardClean.TutorialStep, 5, "tutorial step clamped past the last st
 -- Transient: it describes the server, not the player, so it never survives a load.
 expectEqual(rewardClean.FriendBoostCount, 0, "friend count reset on load")
 
+local hintOk, hintClean = PlayerDataSchema.validate({
+	SchemaVersion = 18,
+	AffordHints = { WorkshopYard = true, AdvancedMagnet = "nope", [""] = true },
+}, 2000)
+expectEqual(hintOk, true, "afford hint sanitisation")
+expectEqual(hintClean.AffordHints.WorkshopYard, true, "fired afford hint kept")
+expectEqual(hintClean.AffordHints.AdvancedMagnet, nil, "non-true afford hint dropped")
+
 --[[
 	Migration from 13. Existing players start with no streak on purpose: a streak they never earned
 	would hand them the day-7 multiplier for free.
@@ -474,14 +603,15 @@ expectEqual(rewardClean.FriendBoostCount, 0, "friend count reset on load")
 local thirteenOk, thirteen = PlayerDataSchema.validate({
 	SchemaVersion = 13,
 	Money = 900,
-	ActivePlotTheme = "WorkshopYard",
+	UnlockedAreas = { WorkshopYard = true },
+	ActivePlotTheme = "FrontYard",
 }, 3000)
 expectEqual(thirteenOk, true, "version thirteen migration")
 expectEqual(thirteen.SchemaVersion, 18, "migrated to eighteen from thirteen")
 expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
-expectEqual(thirteen.ActivePlotTheme, "WorkshopYard", "migration preserves the plot theme")
+expectEqual(thirteen.ActivePlotTheme, "WorkshopYard", "owned workshop rebuilds as workshop")
 
 --[[
 	The event schedule.
@@ -568,6 +698,16 @@ expectEqual(nextWait, 6 * 3600, "six hours from friday noon to the pit")
 --- The arena flag, since `ArenaService` keys the whole feature off it.
 expectEqual(EventConfig.ById.ScrapPit.Arena, true, "the pit is flagged as an arena event")
 expectEqual(EventConfig.ById.ScrapRush.Arena, nil, "an ordinary event is not")
+expectEqual(
+	EventSoundConfig.ById.ScrapPit.AssetId,
+	"93775470439672",
+	"the pit start sting is the authored asset"
+)
+for eventId in EventSoundConfig.ById do
+	if EventConfig.ById[eventId] == nil then
+		error(`EventSoundConfig names unknown event {eventId}`, 2)
+	end
+end
 
 --[[
 	NO TWO WINDOWS MAY OVERLAP, swept at hourly resolution across a whole week.

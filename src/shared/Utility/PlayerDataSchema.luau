@@ -40,7 +40,12 @@ local PET_IDS = {
 local EGG_IDS = { "JunkyardEgg", "WorkshopEgg", "QuantumEgg" }
 local MAXIMUM_OWNED_PER_PET = 999
 local MAXIMUM_PET_SLOT_UPGRADES = 2
-local BASE_PET_SLOTS = 1
+--[[
+	Must match `PetConfig.BaseEquipSlots`. The live equip path reads the config (3);
+	load sanitises against this literal. They drifted to 1 once, and a rejoin dropped
+	every equipped pet after the first.
+]]
+local BASE_PET_SLOTS = 3
 local PASS_PET_SLOTS = 2
 
 local UPGRADE_MAXIMUMS = {
@@ -235,8 +240,8 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		SocialClaims = {},
 		PlotStage = 1,
 		--[[
-			Which area theme the plot is currently built as. Unlocking an area no longer opens
-			a region inside the plot; it lets the player convert the whole plot to that theme.
+			Which area theme the plot is built as. This is always the latest unlocked area --
+			buying Workshop rebuilds the whole yard as Workshop. There is no separate convert step.
 			See docs/PLOT_UPGRADES.md.
 		]]
 		ActivePlotTheme = "FrontYard",
@@ -301,6 +306,12 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		--- 0 = not started. N = step N is the current objective. Past the last step = finished.
 		TutorialStep = 0,
 		TutorialComplete = false,
+
+		--[[
+			One-shot affordance toasts. A key here means that hint has already fired.
+			No schema bump: `validate` rebuilds from `createDefault` and copies the set.
+		]]
+		AffordHints = {},
 
 		--[[
 			Transient: it describes the room, not the player, so it resets to 0 on load. Stored in
@@ -701,17 +712,16 @@ function PlayerDataSchema.validate(
 		then raw.PlotTheme
 		else "ToyScrapyard"
 	--[[
-		WAS NEVER SANITISED, so it was never loaded: `createDefault` set it and the migration set
-		it, but nothing copied it out of `raw`, which meant every player came back as `FrontYard`
-		however many times they had converted their plot. Validated against the real area list so a
-		theme that no longer exists falls back rather than producing a plot nobody can build.
+		THE THEME IS THE LATEST UNLOCK, not a saved convert choice.
+
+		Buying Workshop rebuilds the plot as Workshop; buying the Graveyard rebuilds it again.
+		A convert-back to FrontYard while still owning Workshop is dropped, so players who
+		unlocked an area before this change still get that yard on join.
 	]]
-	local savedTheme = raw.ActivePlotTheme
 	clean.ActivePlotTheme = "FrontYard"
 	for _, areaId in AREA_IDS do
-		if savedTheme == areaId then
+		if clean.UnlockedAreas[areaId] == true then
 			clean.ActivePlotTheme = areaId
-			break
 		end
 	end
 	--[[
@@ -880,6 +890,7 @@ function PlayerDataSchema.validate(
 
 	clean.TutorialStep = boundedInteger(raw.TutorialStep, 0, 0, TUTORIAL_STEP_COUNT + 1)
 	clean.TutorialComplete = boolean(raw.TutorialComplete, false)
+	clean.AffordHints = boundedIdSet(raw.AffordHints)
 
 	--- Always zero on load: it describes the server the player is in, not the player.
 	clean.FriendBoostCount = 0

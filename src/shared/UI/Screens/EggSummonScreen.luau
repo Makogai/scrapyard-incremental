@@ -109,6 +109,7 @@ local function PetCard(props)
 				kind = "pet",
 				model = pet.model,
 				silhouette = not owned,
+				glyph = "paw",
 				size = UDim2.new(1, -12, 0, artHeight),
 				position = UDim2.new(0.5, 0, 0, 6),
 				anchorPoint = Vector2.new(0.5, 0),

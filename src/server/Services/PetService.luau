@@ -6,6 +6,7 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
+local EggPodiums = require(ReplicatedStorage.Shared.Utility.EggPodiums)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local RemoteService = require(script.Parent.RemoteService)
 
@@ -53,6 +54,30 @@ local function placeholderEgg(eggId: string): Model
 end
 
 --[[
+	Egg folder names in Studio do not always match `DisplayName`.
+
+	Junkyard is `Junkyard Egg`. Workshop and Quantum were saved as `WorkshopEgg` /
+	`QuantumEgg` -- the egg id with no space -- so looking up only the display name
+	never found them, and those eggs published placeholders.
+]]
+local function findEggFolder(sourceFolder: Instance, eggId: string): Instance?
+	local egg = PetConfig.Eggs[eggId]
+	local candidates = {
+		egg.DisplayName,
+		egg.Id,
+		egg.ModelName,
+		(string.gsub(egg.DisplayName, " ", "")),
+	}
+	for _, name in candidates do
+		local found = sourceFolder:FindFirstChild(name)
+		if found then
+			return found
+		end
+	end
+	return nil
+end
+
+--[[
 	Publishes one model per egg into `ReplicatedStorage.EggModels`, keyed by egg id
 	so the client can render it in a ViewportFrame without reaching into Workspace.
 ]]
@@ -66,21 +91,57 @@ local function publishEggModels(sourceFolder: Instance?)
 			continue
 		end
 		local definition = PetConfig.Eggs[eggId]
-		local folder = sourceFolder and sourceFolder:FindFirstChild(definition.DisplayName)
+		local folder = if sourceFolder then findEggFolder(sourceFolder, eggId) else nil
 		local authored = folder and folder:FindFirstChild("Egg")
 		if authored and authored:IsA("Model") then
 			local clone = authored:Clone()
 			clone.Name = eggId
 			clone.Parent = repository
 		else
-			warn(
-				`[Pets] No Egg model in Workspace.Pets/{definition.DisplayName} - using a placeholder`
-			)
+			warn(`[Pets] No Egg model in Workspace.Pets/{definition.DisplayName} - using a placeholder`)
 			placeholderEgg(eggId).Parent = repository
 		end
 	end
 end
 
+local function findPremiumPodiumModel(definition: any): Model?
+	local newMap = workspace:FindFirstChild("NewMap")
+	local podium = newMap and newMap:FindFirstChild("FeaturedPodium")
+	if podium == nil then
+		return nil
+	end
+	local names = {
+		definition.ModelName,
+		definition.DisplayName,
+		string.upper(definition.DisplayName),
+	}
+	for _, name in names do
+		local found = podium:FindFirstChild(name, true)
+		if found and found:IsA("Model") then
+			return found
+		end
+	end
+	return nil
+end
+
+local function publishClone(repository: Folder, source: Model, petId: string)
+	if repository:FindFirstChild(petId) then
+		return
+	end
+	local clone = source:Clone()
+	clone.Name = petId
+	clone.Parent = repository
+end
+
+--[[
+	Publishes one model per pet into `ReplicatedStorage.PetModels`, keyed by pet id.
+
+	Name match first (`ModelName`, then `DisplayName`), then leftover models in each
+	egg folder in roster order. Workshop and Quantum were renamed in Studio
+	(Yin Yang, Fracture, ...) without matching config, and a recursive name lookup
+	also cannot tell two models both called `Decore` apart. Slot order is what
+	keeps those clones publishing after a rename.
+]]
 local function publishPetModels()
 	local repository = ReplicatedStorage:FindFirstChild("PetModels") or Instance.new("Folder")
 	repository.Name = "PetModels"
@@ -90,14 +151,78 @@ local function publishPetModels()
 		warn("[Pets] Add pet models beneath Workspace.Pets or ServerStorage.Pets")
 		return
 	end
+
+	local claimed: { [Instance]: boolean } = {}
+
+	--[[
+		Hatchable pets come from Pets/. Premium pets do not -- Singularity used to
+		live there, and that old model is now Sinister Lord's art. If we scan Pets
+		for premium ids first, Singularity keeps publishing the old body.
+	]]
 	for petId, definition in PetConfig.Pets do
+		if definition.Premium == true then
+			continue
+		end
 		local source = sourceFolder:FindFirstChild(definition.ModelName, true)
-		if source and source:IsA("Model") and repository:FindFirstChild(petId) == nil then
-			local clone = source:Clone()
-			clone.Name = petId
-			clone.Parent = repository
+			or sourceFolder:FindFirstChild(definition.DisplayName, true)
+		if source and source:IsA("Model") and claimed[source] ~= true then
+			claimed[source] = true
+			publishClone(repository, source, petId)
 		end
 	end
+
+	--[[
+		Premium models sit on FeaturedPodium, one placeholder each:
+
+		  Singularity Placeholder / Featured Pet / Singularity
+		  Scrap Chrimson Knight Placeholder / Featured Pet / Scrap Chrimson Knight
+		  Sinister Lord Placeholder / Featured Pet / SINISTER LORD
+
+		Clone only. Do not move or destroy the podium original. Pets.Singularity is
+		the old body and is left unused on purpose.
+	]]
+	for petId, definition in PetConfig.Pets do
+		if repository:FindFirstChild(petId) or definition.Premium ~= true then
+			continue
+		end
+		local source = findPremiumPodiumModel(definition)
+		if source and claimed[source] ~= true then
+			claimed[source] = true
+			publishClone(repository, source, petId)
+		else
+			warn(`[Pets] No model for premium pet {petId} (tried {definition.ModelName} / {definition.DisplayName})`)
+		end
+	end
+
+	for _, eggId in PetConfig.EggOrder do
+		local egg = PetConfig.Eggs[eggId]
+		local folder = findEggFolder(sourceFolder, eggId)
+		if folder == nil then
+			warn(`[Pets] No folder for {eggId} under Pets (tried {egg.DisplayName} / {egg.Id})`)
+			continue
+		end
+		local unused = {}
+		for _, child in folder:GetChildren() do
+			if child:IsA("Model") and child.Name ~= "Egg" and claimed[child] ~= true then
+				table.insert(unused, child)
+			end
+		end
+		local nextUnused = 1
+		for _, petId in egg.PetIds do
+			if repository:FindFirstChild(petId) then
+				continue
+			end
+			local source = unused[nextUnused]
+			nextUnused += 1
+			if source and source:IsA("Model") then
+				claimed[source] = true
+				publishClone(repository, source, petId)
+			else
+				warn(`[Pets] No model for {petId} in Pets/{folder.Name}`)
+			end
+		end
+	end
+
 	publishEggModels(sourceFolder)
 	if sourceFolder.Parent == workspace then
 		sourceFolder.Parent = ServerStorage
@@ -105,13 +230,130 @@ local function publishPetModels()
 end
 
 --[[
-	Wires a hold-E prompt onto every egg podium in the map.
+	Which egg a site sells.
+
+	An explicit `EggId` attribute or StringValue wins. Otherwise the instance name
+	is matched against the egg id, its required area, or its display name -- so
+	`FrontYardEggGroup` is the Junkyard egg and `VehicleGraveyardEggGroup` is the
+	Quantum egg without anyone having to set an attribute. Unlabelled leftover
+	podiums still fall back to the starter egg.
+]]
+local function resolveEggId(site: Instance): string
+	local node: Instance? = site
+	while node ~= nil and node ~= workspace do
+		local value = node:FindFirstChild("EggId")
+		local eggId = if value and value:IsA("StringValue") then value.Value else node:GetAttribute("EggId")
+		if typeof(eggId) == "string" and PetConfig.Eggs[eggId] ~= nil then
+			return eggId
+		end
+		local lowered = string.lower(node.Name)
+		for _, candidate in PetConfig.EggOrder do
+			local egg = PetConfig.Eggs[candidate]
+			if
+				string.find(lowered, string.lower(egg.Id), 1, true)
+				or string.find(lowered, string.lower(egg.RequiredArea), 1, true)
+				or string.find(lowered, string.lower((string.gsub(egg.DisplayName, " ", ""))), 1, true)
+			then
+				return candidate
+			end
+		end
+		node = node.Parent
+	end
+	return PetConfig.EggOrder[1]
+end
+
+--[[
+	Wires a hold-E prompt onto every egg site in the map.
 
 	The prompt is created here rather than authored, because the podium is map
-	geometry and this is behaviour. A podium may carry an `EggId` StringValue or
-	attribute to say which egg it summons; without one it sells the first egg in
-	`EggOrder`, which is the starter.
+	geometry and this is behaviour. Each `<Area>EggGroup` is its own site, so three
+	eggs get three prompts. Binding only `EggSummonPodium` put one prompt on the
+	tallest egg and opened the starter roster no matter which model you were facing.
 ]]
+local function worldAabb(parts: { BasePart }): (Vector3?, Vector3?)
+	local min = Vector3.new(math.huge, math.huge, math.huge)
+	local max = Vector3.new(-math.huge, -math.huge, -math.huge)
+	local any = false
+	for _, part in parts do
+		any = true
+		local half = part.Size * 0.5
+		for x = -1, 1, 2 do
+			for y = -1, 1, 2 do
+				for z = -1, 1, 2 do
+					local corner = part.CFrame:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
+					min = min:Min(corner)
+					max = max:Max(corner)
+				end
+			end
+		end
+	end
+	if not any then
+		return nil, nil
+	end
+	return min, max
+end
+
+--[[
+	Invisible volume the prompt lives on, bigger than the egg itself.
+
+	The prompt used to parent to the site's highest part -- often a tiny mesh at the
+	top of a tall egg -- so MaxActivationDistance was measured from over your head
+	and you had to walk into the model. A padded hitbox at the egg's centre is the
+	reach players expect.
+]]
+local function ensureSummonHitbox(site: Instance): BasePart?
+	local existing = site:FindFirstChild("SummonHitbox")
+	if existing and existing:IsA("BasePart") then
+		existing:Destroy()
+	end
+
+	local parts = {}
+	if site:IsA("BasePart") then
+		table.insert(parts, site)
+	end
+	for _, descendant in site:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant.Name ~= "SummonHitbox" then
+			table.insert(parts, descendant)
+		end
+	end
+	local min, max = worldAabb(parts)
+	if min == nil or max == nil then
+		return nil
+	end
+
+	local size = max - min
+	local pad = Vector3.new(10, 4, 10)
+	local hitbox = Instance.new("Part")
+	hitbox.Name = "SummonHitbox"
+	hitbox.Anchored = true
+	hitbox.CanCollide = false
+	hitbox.CanQuery = false
+	hitbox.CanTouch = false
+	hitbox.Massless = true
+	hitbox.Transparency = 1
+	hitbox.Size = Vector3.new(math.max(size.X, 6), math.max(size.Y, 8), math.max(size.Z, 6)) + pad
+	hitbox.CFrame = CFrame.new((min + max) * 0.5)
+	hitbox.Parent = site
+	return hitbox
+end
+
+--[[
+	Podium signs are Studio-authored ("Junkyard Egg", "Quantum Egg") and do not
+	read `PetConfig`. Rewrite any egg-title label under the site, and the prompt.
+]]
+local function relabelEggSite(site: Instance, displayName: string)
+	for _, descendant in site:GetDescendants() do
+		if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+			local lowered = string.lower(descendant.Text)
+			if string.find(lowered, "egg", 1, true) then
+				descendant.Text = displayName
+			end
+		elseif descendant:IsA("ProximityPrompt") then
+			descendant.ObjectText = displayName
+		end
+	end
+end
+
 local function bindSummonPodiums()
 	local map = workspace:WaitForChild("NewMap", 20)
 	if map == nil then
@@ -120,37 +362,28 @@ local function bindSummonPodiums()
 	end
 
 	local bound = 0
-	for _, podium in map:GetDescendants() do
-		if not podium:IsA("Model") or podium.Name ~= "EggSummonPodium" then
-			continue
-		end
-
-		-- Highest part, so the prompt floats over the podium rather than inside it.
-		local anchor: BasePart? = nil
-		for _, part in podium:GetDescendants() do
-			if part:IsA("BasePart") and (anchor == nil or part.Position.Y > anchor.Position.Y) then
-				anchor = part
+	for _, site in EggPodiums.collect(map) do
+		for _, descendant in site:GetDescendants() do
+			if descendant:IsA("ProximityPrompt") then
+				descendant:Destroy()
 			end
 		end
+
+		local anchor = ensureSummonHitbox(site)
 		if anchor == nil then
 			continue
 		end
 
-		local eggIdValue = podium:FindFirstChild("EggId")
-		local eggId = if eggIdValue and eggIdValue:IsA("StringValue")
-			then eggIdValue.Value
-			else podium:GetAttribute("EggId")
-		if typeof(eggId) ~= "string" or PetConfig.Eggs[eggId] == nil then
-			eggId = PetConfig.EggOrder[1]
-		end
+		local eggId = resolveEggId(site)
+		local displayName = PetConfig.Eggs[eggId].DisplayName
+		relabelEggSite(site, displayName)
 
-		local prompt = anchor:FindFirstChildWhichIsA("ProximityPrompt")
-			or Instance.new("ProximityPrompt")
+		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "SummonPrompt"
-		prompt.ObjectText = PetConfig.Eggs[eggId].DisplayName
+		prompt.ObjectText = displayName
 		prompt.ActionText = "Summon Egg"
 		prompt.HoldDuration = 0.5
-		prompt.MaxActivationDistance = 12
+		prompt.MaxActivationDistance = 18
 		prompt.RequiresLineOfSight = false
 		prompt.KeyboardKeyCode = Enum.KeyCode.E
 		prompt.Parent = anchor
@@ -161,8 +394,29 @@ local function bindSummonPodiums()
 		bound += 1
 	end
 
+	--[[
+		Signs sometimes sit beside the group rather than inside it. Catch leftover
+		"Junkyard Egg" / "Quantum Egg" labels anywhere under NewMap.
+	]]
+	for _, descendant in map:GetDescendants() do
+		if not (descendant:IsA("TextLabel") or descendant:IsA("TextButton")) then
+			continue
+		end
+		local lowered = string.lower(descendant.Text)
+		if string.find(lowered, "egg", 1, true) == nil then
+			continue
+		end
+		if string.find(lowered, "junkyard", 1, true) then
+			descendant.Text = PetConfig.Eggs.JunkyardEgg.DisplayName
+		elseif string.find(lowered, "quantum", 1, true) then
+			descendant.Text = PetConfig.Eggs.QuantumEgg.DisplayName
+		end
+	end
+
 	if bound == 0 then
-		warn("[Pets] No EggSummonPodium found in Workspace.NewMap")
+		warn(
+			"[Pets] No egg sites found in Workspace.NewMap. Name a folder FrontYardEggGroup / WorkshopYardEggGroup / VehicleGraveyardEggGroup, or a model EggSummonPodium."
+		)
 	end
 end
 

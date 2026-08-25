@@ -26,6 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local React = require(ReplicatedStorage.Packages.React)
 
 local UI = script.Parent.Parent
+local Assets = require(UI.Assets)
 local FadeBanner = require(UI.Components.FadeBanner)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 
@@ -51,22 +52,35 @@ local RewardToast = {}
 	Only for a SINGLE-item reward. A bundle has no one icon, so it keeps the generic glyph.
 ]]
 function RewardToast.imageFor(reward: { [string]: any }): string?
-	if reward.Items == nil then
-		return nil
-	end
-	local onlyId: string? = nil
-	for itemId in reward.Items do
-		if onlyId ~= nil then
-			return nil
+	if reward.Items ~= nil then
+		local onlyId: string? = nil
+		for itemId in reward.Items do
+			if onlyId ~= nil then
+				onlyId = nil
+				break
+			end
+			onlyId = itemId
 		end
-		onlyId = itemId
+		if onlyId ~= nil then
+			local definition = InventoryConfig.Consumables[onlyId] or InventoryConfig.Magnets[onlyId]
+			local iconId = if definition then definition.IconId else nil
+			if iconId ~= nil and iconId ~= "" then
+				return iconId
+			end
+		end
 	end
-	if onlyId == nil then
-		return nil
+
+	--[[
+		Money-only rewards used to return nil and rely on the `cash` glyph. The glyph
+		was already wired, but the image behind it was a blank gold swatch, so daily
+		cash days, playtime cash, and wheel cash wedges all drew empty wells.
+	]]
+	if reward.Money and reward.Items == nil and reward.Spins == nil then
+		local entry = Assets.icon("cash")
+		return if entry then entry.id else nil
 	end
-	local definition = InventoryConfig.Consumables[onlyId] or InventoryConfig.Magnets[onlyId]
-	local iconId = if definition then definition.IconId else nil
-	return if iconId ~= nil and iconId ~= "" then iconId else nil
+
+	return nil
 end
 
 function RewardToast.glyphFor(reward: { [string]: any }): string

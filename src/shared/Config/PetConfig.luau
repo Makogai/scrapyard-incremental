@@ -2,7 +2,7 @@
 
 local GameTypes = require(script.Parent.Parent.Types.GameTypes)
 
-local rarityEffects = {
+local defaultRarityEffects = {
 	Common = { MagnetStrength = 1.03 },
 	Uncommon = { MagnetRange = 1.05, MovementSpeed = 1.02 },
 	Rare = { Storage = 1.08, CollectionSpeed = 1.06, MagnetStrength = 1.06 },
@@ -13,7 +13,7 @@ local rarityEffects = {
 		Storage = 1.18,
 		CollectionSpeed = 1.14,
 		RespawnRate = 1.14,
-		RarityLuck = 1.18,
+		RarityLuck = 1.10,
 	},
 	Secret = {
 		MagnetStrength = 1.3,
@@ -22,12 +22,88 @@ local rarityEffects = {
 		MovementSpeed = 1.1,
 		CollectionSpeed = 1.3,
 		RespawnRate = 1.3,
-		RarityLuck = 1.4,
+		RarityLuck = 1.12,
+	},
+}
+
+--[[
+	Workshop: efficiency, storage, collection, respawn.
+	Quantum (Vehicle Graveyard): heavy scrap, magnet power, late-game earnings.
+	Junkyard keeps `defaultRarityEffects` until that egg is retuned the same way.
+
+	Hatchable RarityLuck stays under Scrap Crimson Knight's +20%. That premium is
+	the paid luck pet; a Secret you can hatch must not beat the shop line on the
+	stat the shop is selling. Ladder: Rare +6%, Epic +8%, Legendary +10%,
+	Junkyard Secret +12%, Workshop Secret +14%, Quantum Secret +16%, Knight +20%.
+]]
+local eggRarityEffects = {
+	WorkshopEgg = {
+		Common = { Storage = 1.08, CollectionSpeed = 1.05 },
+		Uncommon = { MagnetStrength = 1.10, MagnetRange = 1.07 },
+		Rare = { Storage = 1.14, CollectionSpeed = 1.10, RespawnRate = 1.08 },
+		Epic = {
+			CollectionSpeed = 1.16,
+			RespawnRate = 1.14,
+			MagnetRange = 1.10,
+			RarityLuck = 1.08,
+		},
+		Legendary = {
+			MagnetStrength = 1.24,
+			MagnetRange = 1.20,
+			CollectionSpeed = 1.22,
+			Storage = 1.18,
+			RarityLuck = 1.10,
+			RespawnRate = 1.14,
+		},
+		Secret = {
+			MagnetStrength = 1.60,
+			MagnetRange = 1.35,
+			CollectionSpeed = 1.40,
+			Storage = 1.40,
+			RarityLuck = 1.14,
+			RespawnRate = 1.30,
+		},
+	},
+	QuantumEgg = {
+		Common = { MagnetStrength = 1.12, Storage = 1.08 },
+		Uncommon = { MagnetRange = 1.12, CollectionSpeed = 1.10 },
+		Rare = { MagnetStrength = 1.18, Storage = 1.15, RarityLuck = 1.06 },
+		Epic = {
+			MagnetStrength = 1.22,
+			MagnetRange = 1.18,
+			CollectionSpeed = 1.18,
+			RespawnRate = 1.14,
+			RarityLuck = 1.08,
+		},
+		Legendary = {
+			MagnetStrength = 1.35,
+			MagnetRange = 1.28,
+			CollectionSpeed = 1.28,
+			Storage = 1.24,
+			RarityLuck = 1.10,
+			RespawnRate = 1.20,
+		},
+		Secret = {
+			MagnetStrength = 2.10,
+			MagnetRange = 1.50,
+			CollectionSpeed = 1.55,
+			Storage = 1.55,
+			RarityLuck = 1.16,
+			RespawnRate = 1.40,
+		},
 	},
 }
 
 local function pet(definition: any): GameTypes.PetDefinition
-	local effects = table.clone(rarityEffects[definition.Rarity] or {})
+	local effects
+	if type(definition.Effects) == "table" then
+		effects = table.clone(definition.Effects)
+	elseif definition.Premium == true then
+		effects = {}
+	else
+		local bank = eggRarityEffects[definition.EggId] or defaultRarityEffects
+		effects = table.clone(bank[definition.Rarity] or {})
+	end
 	effects.Cash = definition.MoneyMultiplier
 	definition.Effects = table.freeze(effects)
 	definition.Description = definition.Description
@@ -45,12 +121,14 @@ local rarityColors = table.freeze({
 })
 
 --[[
-	Pet ids match the model names authored under `Workspace.Pets/<Egg DisplayName>/`,
-	so `PetService.publishPetModels` finds each one by `ModelName`. Renaming a pet
-	here without renaming the model leaves it with no model to render.
+	Pet ids stay stable for saves. `ModelName` / `DisplayName` follow the Studio
+	model under `Workspace.Pets/<egg folder>/`. Renaming a pet in Studio without
+	updating those two fields still works: `PetService` binds leftover models to
+	the egg's `PetIds` in roster order. Two models sharing a name (two `Decore`s)
+	cannot be told apart by lookup, so they must not share a name.
 ]]
 local pets = {
-	-- Junkyard Egg: Common through Secret, in roll order.
+	-- Front Yard Egg (id stays JunkyardEgg): Common through Secret, in roll order.
 	Pup = pet({
 		Id = "Pup",
 		DisplayName = "Pup",
@@ -120,112 +198,112 @@ local pets = {
 	-- Workshop Egg
 	WrenchMouse = pet({
 		Id = "WrenchMouse",
-		DisplayName = "Wrench Mouse",
+		DisplayName = "Yin Yang",
 		EggId = "WorkshopEgg",
 		Rarity = "Common",
 		RollWeight = 5500,
-		MoneyMultiplier = 1.22,
-		ModelName = "WrenchMouse",
+		MoneyMultiplier = 1.12,
+		ModelName = "Yin Yang",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Common,
 	}),
 	SpringFrog = pet({
 		Id = "SpringFrog",
-		DisplayName = "Spring Frog",
+		DisplayName = "Skull Reaper",
 		EggId = "WorkshopEgg",
 		Rarity = "Uncommon",
 		RollWeight = 2500,
-		MoneyMultiplier = 1.38,
-		ModelName = "SpringFrog",
+		MoneyMultiplier = 1.22,
+		ModelName = "Skull Reaper",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Uncommon,
 	}),
 	WelderBear = pet({
 		Id = "WelderBear",
-		DisplayName = "Welder Bear",
+		DisplayName = "Advocate",
 		EggId = "WorkshopEgg",
 		Rarity = "Rare",
 		RollWeight = 1200,
-		MoneyMultiplier = 1.65,
-		ModelName = "WelderBear",
+		MoneyMultiplier = 1.38,
+		ModelName = "Advocate",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Rare,
 	}),
 	MotorMole = pet({
 		Id = "MotorMole",
-		DisplayName = "Motor Mole",
+		DisplayName = "Glitch",
 		EggId = "WorkshopEgg",
 		Rarity = "Epic",
 		RollWeight = 600,
-		MoneyMultiplier = 2.1,
-		ModelName = "MotorMole",
+		MoneyMultiplier = 1.65,
+		ModelName = "Glitch",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Epic,
 	}),
 	ChromeWolf = pet({
 		Id = "ChromeWolf",
-		DisplayName = "Chrome Wolf",
+		DisplayName = "Rainbow Shock",
 		EggId = "WorkshopEgg",
 		Rarity = "Legendary",
 		RollWeight = 180,
-		MoneyMultiplier = 3,
-		ModelName = "ChromeWolf",
+		MoneyMultiplier = 2.25,
+		ModelName = "Rainbow Shock",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Legendary,
 	}),
 	CoreDragon = pet({
 		Id = "CoreDragon",
-		DisplayName = "Core Dragon",
+		DisplayName = "Luminance",
 		EggId = "WorkshopEgg",
 		Rarity = "Secret",
 		RollWeight = 20,
-		MoneyMultiplier = 6,
-		ModelName = "CoreDragon",
+		MoneyMultiplier = 3.50,
+		ModelName = "Luminance",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Secret,
 	}),
-	-- Quantum Egg
+	-- Quantum Egg (Vehicle Graveyard)
 	NeonCrab = pet({
 		Id = "NeonCrab",
-		DisplayName = "Neon Crab",
+		DisplayName = "Fracture",
 		EggId = "QuantumEgg",
 		Rarity = "Common",
 		RollWeight = 5500,
-		MoneyMultiplier = 1.65,
-		ModelName = "NeonCrab",
+		MoneyMultiplier = 1.18,
+		ModelName = "Fracture",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Common,
 	}),
 	CircuitOwl = pet({
 		Id = "CircuitOwl",
-		DisplayName = "Circuit Owl",
+		DisplayName = "Decore",
 		EggId = "QuantumEgg",
 		Rarity = "Uncommon",
 		RollWeight = 2500,
-		MoneyMultiplier = 2,
-		ModelName = "CircuitOwl",
+		MoneyMultiplier = 1.30,
+		ModelName = "Decore",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Uncommon,
 	}),
 	PlasmaPanda = pet({
 		Id = "PlasmaPanda",
-		DisplayName = "Plasma Panda",
+		DisplayName = "Immortal One",
 		EggId = "QuantumEgg",
 		Rarity = "Rare",
 		RollWeight = 1200,
-		MoneyMultiplier = 2.6,
-		ModelName = "PlasmaPanda",
+		MoneyMultiplier = 1.50,
+		ModelName = "Immortal One",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Rare,
 	}),
 	MagnetManta = pet({
 		Id = "MagnetManta",
-		DisplayName = "Magnet Manta",
+		DisplayName = "Radiance",
 		EggId = "QuantumEgg",
 		Rarity = "Epic",
 		RollWeight = 600,
-		MoneyMultiplier = 3.5,
-		ModelName = "MagnetManta",
+		MoneyMultiplier = 1.90,
+		ModelName = "Radiance",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Epic,
 	}),
@@ -235,49 +313,71 @@ local pets = {
 		EggId = "QuantumEgg",
 		Rarity = "Legendary",
 		RollWeight = 180,
-		MoneyMultiplier = 5,
-		ModelName = "NovaLion",
+		MoneyMultiplier = 2.60,
+		ModelName = "Nova Lion",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Legendary,
 	}),
+	--[[
+		Premium ladder, 499 / 699 / 999. Each pet sells a different job so a player
+		who buys two is not paying twice for the same stat.
+
+		Singularity is the limited cash + pull pet. It does not have luck, storage,
+		respawn, or walk speed -- those belong to Knight and Lord. Cash is ×8, not
+		×20, so equipping it with Lord does not print another ×20 on top.
+
+		Scrap Crimson Knight is the yard-quality pet: luck, respawn, storage.
+
+		Sinister Lord is the permanent flagship. Best magnet of the three, real cash
+		that is still under Singularity's ×8, plus walk speed which neither other
+		premium has. Luck stays a ribbon under Knight's +20%.
+	]]
 	Singularity = pet({
 		Id = "Singularity",
 		DisplayName = "Singularity",
 		EggId = "Premium",
 		Rarity = "Secret",
 		RollWeight = 0,
-		MoneyMultiplier = 1,
+		MoneyMultiplier = 8,
 		Premium = true,
-		Ability = "CopyStrongestPet",
-		AbilityPower = 2,
-		Description = "Copies twice the bonus effects of your strongest equipped non-premium pet.",
+		Effects = {
+			MagnetStrength = 4,
+			CollectionSpeed = 1.20,
+			MagnetRange = 1.15,
+		},
+		Description = "×8 scrap value, +300% magnet strength, +20% collection speed, +15% range.",
 		ModelName = "Singularity",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Secret,
 	}),
 	NebulaLeviathan = pet({
 		Id = "NebulaLeviathan",
-		DisplayName = "Nebula Leviathan",
+		DisplayName = "The OwOlord",
 		EggId = "QuantumEgg",
 		Rarity = "Secret",
 		RollWeight = 20,
-		MoneyMultiplier = 8,
-		ModelName = "NebulaLeviathan",
+		MoneyMultiplier = 4.25,
+		ModelName = "The OwOlord",
 		IconAssetId = "",
 		FallbackColor = rarityColors.Secret,
 	}),
 	DemonicGhost = pet({
 		Id = "DemonicGhost",
-		DisplayName = "Demonic Ghost",
+		DisplayName = "Scrap Crimson Knight",
 		EggId = "Premium",
 		Rarity = "Secret",
 		RollWeight = 0,
-		MoneyMultiplier = 2.5,
+		MoneyMultiplier = 1.40,
 		Premium = true,
-		Ability = "AmplifyPetBonuses",
-		AbilityPower = 1.35,
-		Description = "Boosts all combined pet bonuses by 35%, with powerful cash and rarity effects.",
-		ModelName = "DemonicGhost",
+		Effects = {
+			RarityLuck = 1.20,
+			RespawnRate = 1.30,
+			Storage = 1.20,
+			CollectionSpeed = 1.10,
+		},
+		Description = "+40% scrap value, +20% luck, +30% respawn speed, +20% storage, +10% collection speed.",
+		--- Studio instance on FeaturedPodium is spelled Chrimson; the display name is not.
+		ModelName = "Scrap Chrimson Knight",
 		IconAssetId = "",
 		FallbackColor = Color3.fromRGB(255, 70, 92),
 	}),
@@ -287,12 +387,18 @@ local pets = {
 		EggId = "Premium",
 		Rarity = "Secret",
 		RollWeight = 0,
-		MoneyMultiplier = 3,
+		MoneyMultiplier = 5,
 		Premium = true,
-		Ability = "AmplifyPetBonuses",
-		AbilityPower = 2,
-		Description = "The ultimate pet: doubles every combined pet bonus while equipped.",
-		ModelName = "SinisterLord",
+		Effects = {
+			MagnetStrength = 5,
+			CollectionSpeed = 1.30,
+			MagnetRange = 1.30,
+			MovementSpeed = 1.18,
+			RarityLuck = 1.08,
+		},
+		Description = "×5 scrap value, +400% magnet strength, +30% collection speed, +30% range, +18% walk speed, +8% luck.",
+		--- Studio instance on FeaturedPodium is all-caps; the display name is not.
+		ModelName = "SINISTER LORD",
 		IconAssetId = "",
 		FallbackColor = Color3.fromRGB(174, 45, 255),
 	}),
@@ -301,7 +407,7 @@ local pets = {
 local eggs = {
 	JunkyardEgg = table.freeze({
 		Id = "JunkyardEgg",
-		DisplayName = "Junkyard Egg",
+		DisplayName = "Front Yard Egg",
 		Price = 4000,
 		RequiredArea = "FrontYard",
 		ModelName = "JunkyardEgg",
@@ -333,7 +439,7 @@ local eggs = {
 	}),
 	QuantumEgg = table.freeze({
 		Id = "QuantumEgg",
-		DisplayName = "Quantum Egg",
+		DisplayName = "Vehicle Graveyard Egg",
 		Price = 220000,
 		RequiredArea = "VehicleGraveyard",
 		ModelName = "QuantumEgg",
@@ -385,12 +491,12 @@ return table.freeze({
 
 	--[[
 		Per-pet multipliers on that, for models whose proportions make the shared
-		number wrong -- a long dragon reads as huge at the same longest-axis size a
-		compact pup reads as fine. 1 means "use the shared value"; anything absent is
-		treated as 1.
+		number wrong. A compact pet like Pup fills the longest-axis box in every
+		direction, so at 1 it reads bigger than a long zebra or dragon. Dragons
+		go the other way. Anything absent is treated as 1.
 	]]
 	FollowerScale = table.freeze({
-		Pup = 1,
+		Pup = 0.7,
 		Zebra = 1,
 		QueenKitty = 1,
 		PastelAngel = 0.9,

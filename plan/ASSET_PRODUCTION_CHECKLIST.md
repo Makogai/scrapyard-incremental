@@ -60,11 +60,11 @@ Variants reuse the same eight models. They need material/color/VFX treatments, n
 
 | Variant ID | Display name | Value | Chance | Required presentation |
 | --- | --- | ---: | ---: | --- |
-| `Normal` | Normal | 1× | 94.5% | Base material and color |
-| `Rare` | Rare | 2× | 3% | Blue highlight plus `RareShimmer` |
-| `Epic` | Epic | 5× | 0.8% | Purple highlight plus `EpicPulse` |
-| `Legendary` | Legendary | 15× | 0.18% | Gold highlight plus `LegendaryBurst` |
-| `Nebula` | Nebula | 75× | 0.02% | Cyan cosmic highlight plus `NebulaAura` |
+| `Normal` | Normal | 1× | 93.825% | Base material and color |
+| `Rare` | Rare | 2× | 5% | Blue highlight plus `RareShimmer` |
+| `Epic` | Epic | 4× | 1% | Purple highlight plus `EpicPulse` |
+| `Legendary` | Legendary | 8× | 0.15% | Gold highlight plus `LegendaryBurst` |
+| `Nebula` | Nebula | 25× | 0.025% | Cyan cosmic highlight plus `NebulaAura` |
 
 Unique final VFX needed: `RareShimmer`, `EpicPulse`, `LegendaryBurst`, and `NebulaAura`. Functional generated highlight/particle treatments are already present.
 

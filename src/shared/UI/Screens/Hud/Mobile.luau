@@ -60,6 +60,7 @@ local function HudMobile(props)
 	-- first band under the strip and the rest of the HUD stacks below it.
 	local topRow = safe.top + 44
 
+	local pitOffset = if state.event and state.event.arena then 52 else 0
 	--- 32-tall tiles plus their 8 gap, so the skin card lands under whatever boosts are actually drawn.
 	local boostLane = #(state.boosts or {}) * 40
 
@@ -106,6 +107,23 @@ local function HudMobile(props)
 			})
 			else nil,
 
+		if state.event and state.event.arena
+			then e(Buttons.Button, {
+				key = "EnterPit",
+				text = "ENTER THE PIT",
+				glyph = "crate",
+				variant = "Danger",
+				textSize = Theme.TextSize.Tiny,
+				size = UDim2.fromOffset(WIDTH - MARGIN * 2, 40),
+				lip = 4,
+				position = UDim2.new(0.5, 0, 0, topRow + 90),
+				anchorPoint = Vector2.new(0.5, 0),
+				onClick = function()
+					actions.teleport("Pit")
+				end,
+			})
+			else nil,
+
 		-- Boosts share the right edge with the drawer, so they step aside for it.
 		if not open
 			then e(Parts.BoostTimers, {
@@ -113,7 +131,7 @@ local function HudMobile(props)
 				boosts = state.boosts,
 				width = 138,
 				height = 32,
-				position = UDim2.new(1, -MARGIN, 0, topRow + 96),
+				position = UDim2.new(1, -MARGIN, 0, topRow + 96 + pitOffset),
 				anchorPoint = Vector2.new(1, 0),
 			})
 			else nil,
@@ -135,7 +153,7 @@ local function HudMobile(props)
 				compact = true,
 				plotTheme = state.plotTheme,
 				entitlements = state.entitlements,
-				position = UDim2.new(1, -MARGIN, 0, topRow + 96 + boostLane),
+				position = UDim2.new(1, -MARGIN, 0, topRow + 96 + pitOffset + boostLane),
 				anchorPoint = Vector2.new(1, 0),
 				onBuy = function()
 					actions.purchase(PlotSkinConfig.Pass, "Pass")
@@ -193,6 +211,8 @@ local function HudMobile(props)
 				dailyBoostPercent = state.dailyBoostPercent,
 				dailyClaimable = state.dailyClaimable,
 				dailyResetSeconds = state.dailyResetSeconds,
+				playtimeClaimable = state.playtimeClaimable,
+				playtimeNextRemaining = state.playtimeNextRemaining,
 				friendCount = state.friendCount,
 				friendBoost = state.friendBoost,
 				spinsAvailable = state.spinsAvailable,
@@ -203,6 +223,9 @@ local function HudMobile(props)
 				zIndex = 11,
 				onOpenDaily = function()
 					actions.openScreen("daily")
+				end,
+				onOpenPlaytime = function()
+					actions.openScreen("playtime")
 				end,
 				onOpenSpin = function()
 					actions.openScreen("spin")

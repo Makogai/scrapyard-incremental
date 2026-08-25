@@ -177,7 +177,7 @@ local function HudDesktop(props)
 				anchorPoint = Vector2.new(0, 1),
 			}),
 			--[[
-				BOTTOM RIGHT: daily login boost, friend boost, spin wheel. Bare outlined glyphs with their
+				BOTTOM RIGHT: daily login, playtime, friend boost, spin wheel. Bare outlined glyphs with their
 				value underneath and a popup on hover -- the same class of readout as the potion tiles,
 				which is why they share this corner and the boosts sit directly above them.
 			]]
@@ -187,6 +187,8 @@ local function HudDesktop(props)
 				dailyBoostPercent = state.dailyBoostPercent,
 				dailyClaimable = state.dailyClaimable,
 				dailyResetSeconds = state.dailyResetSeconds,
+				playtimeClaimable = state.playtimeClaimable,
+				playtimeNextRemaining = state.playtimeNextRemaining,
 				friendCount = state.friendCount,
 				friendBoost = state.friendBoost,
 				spinsAvailable = state.spinsAvailable,
@@ -194,6 +196,9 @@ local function HudDesktop(props)
 				anchorPoint = Vector2.new(1, 1),
 				onOpenDaily = function()
 					actions.openScreen("daily")
+				end,
+				onOpenPlaytime = function()
+					actions.openScreen("playtime")
 				end,
 				onOpenSpin = function()
 					actions.openScreen("spin")

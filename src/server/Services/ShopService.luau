@@ -32,26 +32,50 @@ local function connectWalkIn(zone: BasePart, callback: (Player) -> ())
 	end)
 end
 
+local function childNamed(parent: Instance, names: { string }): Instance?
+	for _, name in names do
+		local found = parent:FindFirstChild(name)
+		if found then
+			return found
+		end
+	end
+	return nil
+end
+
+local function bindZone(root: Instance?, zoneName: string, label: string, callback: (Player) -> ())
+	if root == nil then
+		warn(`[ShopService] {label} is missing under NewMap -- walk-in for it is off`)
+		return
+	end
+	local zone = root:FindFirstChild(zoneName, true)
+	if zone == nil or not zone:IsA("BasePart") then
+		warn(`[ShopService] {label} has no {zoneName} part -- walk-in for it is off`)
+		return
+	end
+	connectWalkIn(zone, callback)
+end
+
 function ShopService.Start()
-	local map = assert(workspace:FindFirstChild("NewMap"), "Authored NewMap missing")
-	local magnetShop = assert(map:FindFirstChild("Magnet Shop"), "Magnet Shop missing")
-	local areaShop = assert(map:FindFirstChild("AreaShop"), "AreaShop missing")
-	local exclusiveShop = assert(map:FindFirstChild("Shop"), "Generic Shop missing")
-	local magnetZone =
-		assert(magnetShop:FindFirstChild("CHS_Shop", true), "Magnet CHS_Shop missing") :: BasePart
-	local areaZone =
-		assert(areaShop:FindFirstChild("CHS_Shop", true), "Area CHS_Shop missing") :: BasePart
-	local exclusiveZone =
-		assert(exclusiveShop:FindFirstChild("CHS_Shop", true), "Shop CHS_Shop missing") :: BasePart
-	connectWalkIn(magnetZone, function(player)
-		RemoteService.GetEvent("OpenMagnetShop"):FireClient(player)
-	end)
-	connectWalkIn(areaZone, function(player)
-		RemoteService.GetEvent("OpenAreaShop"):FireClient(player)
-	end)
-	connectWalkIn(exclusiveZone, function(player)
-		RemoteService.GetEvent("OpenExclusiveShop"):FireClient(player)
-	end)
+	local map = workspace:FindFirstChild("NewMap")
+	if map == nil then
+		warn("[ShopService] Authored NewMap missing -- walk-in shops are off, remote buys still work")
+	else
+		--[[
+			Names as authored. `Magnet Shop` used to be the lookup; the map now has `MagnetShop`.
+			An assert here used to abort the entire server bootstrap, which is why pets stopped
+			loading and ENTER THE PIT did nothing -- everything after ShopService.Start never ran.
+		]]
+		bindZone(childNamed(map, { "Magnet Shop", "MagnetShop" }), "CHS_Shop", "Magnet Shop", function(player)
+			RemoteService.GetEvent("OpenMagnetShop"):FireClient(player)
+		end)
+		bindZone(childNamed(map, { "AreaShop", "Area Shop" }), "CHS_Shop", "Area shop", function(player)
+			RemoteService.GetEvent("OpenAreaShop"):FireClient(player)
+		end)
+		bindZone(childNamed(map, { "Shop", "Exclusive Shop" }), "CHS_Shop", "Exclusive shop", function(player)
+			RemoteService.GetEvent("OpenExclusiveShop"):FireClient(player)
+		end)
+	end
+
 	RemoteService.GetEvent("ShopAction").OnServerEvent:Connect(function(player, action, magnetId)
 		if
 			action ~= "BuyMagnet"

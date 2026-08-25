@@ -73,18 +73,13 @@ Assets.Icons = {
 	star = "",
 
 	-- currencies and progression
-	coin = "rbxassetid://104065626751462",
 	--[[
-		`cash` is what every money reward asks for -- the daily calendar's cash days, the playtime
-		milestones, two achievements -- and it had no entry here, so all of them fell through to the
-		procedural coin glyph while the potion and magnet days beside them drew real art. Three
-		line-drawn cards next to four painted ones is what read as "the reward icons are missing".
-
-		Pointed at the coin art deliberately: it is the money icon the HUD already uses, so a cash
-		reward and the cash counter look like the same currency. Give it its own asset here if a
-		banknote is ever drawn.
+		Painted gold coin. The old id (`104065626751462`, `Images/34_264__gold`) was a gold
+		swatch, not a coin -- cash days on the daily calendar, playtime rungs, and the
+		wheel rendered as empty wells next to real potion art.
 	]]
-	cash = "rbxassetid://104065626751462",
+	coin = "rbxassetid://130780043686108",
+	cash = "rbxassetid://130780043686108",
 	gear = "rbxassetid://18209577633",
 	robux = "rbxassetid://140667728219031",
 	upgrade = "rbxassetid://132836771612353",

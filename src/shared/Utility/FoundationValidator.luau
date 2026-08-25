@@ -69,7 +69,6 @@ function FoundationValidator.validate()
 		positive(upgrade.BaseMaximumLevel, `{upgradeId}.BaseMaximumLevel`)
 		positive(upgrade.LevelsPerPrestige, `{upgradeId}.LevelsPerPrestige`)
 		positive(upgrade.BaseCost, `{upgradeId}.BaseCost`)
-		positive(upgrade.CostPower, `{upgradeId}.CostPower`)
 		assert(
 			upgrade.GrowthRate >= 1 and GameMath.isFinite(upgrade.GrowthRate),
 			`{upgradeId}.GrowthRate must be at least one`

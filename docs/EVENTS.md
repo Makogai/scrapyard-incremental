@@ -127,8 +127,8 @@ while the banner turned cyan and dropped its "Next event:" prefix.
 
 ## THE PIT — the one event that is a place
 
-Every other event multiplies a number. The Pit opens a walled arena in empty space south of the map,
-fills it with scrap **nobody owns**, and lets everyone in the server race for the same pieces. Friday
+Every other event multiplies a number. The Pit opens the authored `Workspace.Event Area`,
+fills its spawn nodes with scrap **nobody owns**, and lets everyone in the server race for the same pieces. Friday
 18:00–22:00 UTC, and startable by hand from the admin panel like any other.
 
 It exists because of a gap: everything else in this game happens on your own plot, alone. Your scrap is
@@ -143,34 +143,32 @@ reason two players in one server never interact with the same object. The Pit is
 | **The area lock does not apply** | A brand-new player can pull a scrap car in there. That is the draw. Magnet **strength** still gates it, so the upgrade tree keeps its meaning |
 | **It refills to a target instead of respawning per piece** | A crowd stripping one side of a shared hoard must not leave that side permanently bare, and nobody should be able to camp a respawn point |
 
-### Geometry is generated, not authored
+### Geometry is authored
 
-`ArenaService.build` makes a cylinder floor, a ring of 30 wall slabs with neon caps, a landing pad and
-four rim lights — about 1,080 parts. Authoring it in Studio would mean a permanent 1,000-part model
-replicating to every client all week for the sake of a Friday evening, and changing `ArenaConfig`'s
-radius would mean rebuilding it by hand.
+The arena is `Workspace.Event Area`. Players land on `Event Area Spawn Point.PitSpawn` (an
+invisible upright pad on top of the spawn sculpture). Scrap stands on parts inside
+`PitScrapSpawns` — duplicate `Spawn01` in Studio and drag the copy where you want the next pile.
 
-**The rim lights are dim on purpose.** The first pass ran four lights at 2.4 brightness over 84 studs,
-which is four overlapping lights on every square foot of a 120-stud bowl: the floor went flat grey and
-every piece of scrap rendered pure white. Scrap art is mid-grey metal, so it has nowhere to go when
-overexposed — and being able to tell one piece from another is the entire reason to light the place.
+`ArenaService` does not build or destroy the area. It only parents a `PitScrap` folder while the
+event is live and clears it when it ends. Anyone still inside is sent back to their plot first.
+
+One spawn node means one piece of scrap until you add more. `TargetScrap` is a cap, not a promise
+to fill a generated disc.
 
 ### Getting in and out
 
 An `ENTER THE PIT` button appears on the HUD under the event banner, and only while an arena event is
-live. The teleport destination is checked server-side against `ArenaService.IsOpen()` — the floor is
-destroyed when the event ends, so a stale request would drop somebody into empty space. When it closes,
-anyone still inside is put back on their own plot **before** the geometry is destroyed; otherwise they
-fall through the void until Roblox resets them, which reads as the game breaking rather than the event
-ending.
+live. The teleport destination is checked server-side against `ArenaService.IsOpen()`. When it closes,
+anyone still inside the Event Area is put back on their own plot **before** the scrap is cleared.
+
+The start sting lives in `EventSoundConfig` (`ScrapPit` → asset `93775470439672`). Paste a new id
+there to change it; other events stay silent until you add a row. The client plays it when
+`EventState.LiveId` changes, not when someone joins mid-event.
 
 ### Verified live
 
-Started from the admin panel: the arena built at (250, 65, −560) with 1,078 parts and 90/90 pieces
-across 17 scrap types. Walking a magnet round the floor collected 12 pieces — including an **Axle**,
-which is Vehicle Graveyard scrap on a Front Yard plot, so the area bypass works — while `TooHeavy`
-rejections fired for the pieces past the magnet's strength. Count went 90 → 86 with the refill topping
-it back up.
+The generated disc at (250, 65, −560) is gone. The Pit now binds `Workspace.Event Area`. Save the
+place after adding spawn nodes; they live in the Studio file, not in Rojo.
 
 ---
 
@@ -179,8 +177,9 @@ it back up.
 | Piece | Owns |
 | --- | --- |
 | `EventConfig` | the schedule and the multipliers. Pure, no dependencies |
+| `EventSoundConfig` | start stings, keyed by event id. Swap `AssetId` to change the cue |
 | `ArenaConfig` | the Pit's design: where, how big, how much scrap, and the three rules above |
-| `ArenaService` | building it, filling it, tearing it down, and evacuating |
+| `ArenaService` | binding the authored Event Area, filling spawn nodes, clearing scrap, evacuating |
 | `PlayerStateService.derivedStats` | applying multipliers. Calls `EventConfig` directly — no service coupling |
 | `PlayerStateService.publicSnapshot` | telling the client which event is live and when it ends |
 | `EventService` | noticing turnover: re-push snapshots, announce once |

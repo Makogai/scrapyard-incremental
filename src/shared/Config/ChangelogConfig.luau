@@ -32,6 +32,198 @@ return table.freeze({
 			that the build changed. There is no second list to keep in step.
 		]]
 		table.freeze({
+			Version = "0.4.12",
+			Date = "2026-08-24",
+			Title = "Egg prompts",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The first egg is now Front Yard Egg, the second Workshop Egg, and the third Vehicle Graveyard Egg. Hold-E reach is larger, and podium signs are rewritten from config.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.11",
+			Date = "2026-08-24",
+			Title = "Pets stay equipped",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Rejoining used to unequip all but one pet. All three starter slots now survive a leave.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.10",
+			Date = "2026-08-24",
+			Title = "Pet follower colours",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Equipped pets keep their real colours (the red wash was a Highlight fill) and hover at the same height instead of following each model's pivot.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.9",
+			Date = "2026-08-22",
+			Title = "Afford hints",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The first time you can afford the Workshop Yard or a stronger magnet, a toast points you at the Area Shop or Magnet Shop. Each hint fires once.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.8",
+			Date = "2026-08-22",
+			Title = "Tighter starter magnet",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "The Basic Magnet now starts at 5 studs. Range upgrades are +1 stud and $500, then grow at 1.35x, so the old 9-stud start is level 4 and the base cap is 15.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.7",
+			Date = "2026-08-22",
+			Title = "Premium podium models",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Singularity, Scrap Crimson Knight, and Sinister Lord now use their Featured Podium models. The old Singularity body is Sinister Lord's.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.6",
+			Date = "2026-08-22",
+			Title = "Premium pet ladder",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Sinister Lord is the 999 flagship: ×5 scrap value, +400% magnet strength, walk speed, and a stronger pull. Singularity stays the limited 499 cash pet at ×8 value and +300% strength. Scrap Crimson Knight stays the luck and storage pet.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.5",
+			Date = "2026-08-22",
+			Title = "Scrap Crimson Knight",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Demonic Ghost is now Scrap Crimson Knight, and uses the Featured Podium model.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.4",
+			Date = "2026-08-22",
+			Title = "Hatchable luck sits under Ghost",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Hatchable pet luck no longer beats Demonic Ghost. Secrets are +12% / +14% / +16% (Junkyard / Workshop / Quantum). Legendaries cap at +10%. Ghost stays +20%.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.3",
+			Date = "2026-08-22",
+			Title = "Pit teleport and pets",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "ENTER THE PIT lands on the Event Area floor. It was dropping you inside the spawn sculpture, which looked like the button did nothing.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Workshop and Quantum pets show their models again after the Studio rename (Yin Yang, Fracture, and the rest).",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "A renamed MagnetShop was aborting the whole server start, which is why pets and the Pit button died together.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.2",
+			Date = "2026-08-22",
+			Title = "The Pit uses Event Area",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "THE PIT now uses the Event Area in the world. Hold ENTER THE PIT while it is on and you land on the Event Area spawn. Duplicate the red Spawn01 pad to add more loot spots.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.4.1",
+			Date = "2026-08-21",
+			Title = "Scrap Rarity Tuning",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Rarer scrap is more common, and pays less: Rare 5% ×2, Epic 1% ×4, Legendary 0.15% ×8, Nebula 0.025% ×25. Normal scrap is still $45–$1,750.",
+				}),
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Rebirth cost now grows ×1.55 each time ($2M, then $3.1M, then $4.805M). Each rebirth permanently multiplies scrap value by 1.25 and adds +5% luck.",
+				}),
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Workshop and Vehicle Graveyard pets have new boosts. Premium pets no longer copy or amplify the team: Singularity is +500% magnet strength, Demonic Ghost is +40% scrap value, Sinister Lord is +200% strength.",
+				}),
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Upgrade prices start higher and grow simply: each level costs the last one times a growth rate. Magnet Strength is $650 then ×1.30, Rarity Luck is $3,000 then ×1.45. Scrap Flow is now called Spawn Rate.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Buying the Workshop or Vehicle Graveyard now converts your whole plot automatically. There is no hold-E to switch themes, and no way to switch back except a rebirth.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Cash amounts that end in zero now show the zero: $100K no longer reads as $1K.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "AUTO SELL now dumps the scrap you are carrying the moment you buy it, and whenever your bag is full. You no longer have to walk to the crusher once first.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Storage is whole slots. A bar that said 51 while you could only carry 50 was rounding a fraction; the last space now fills.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Scrap that sits uncollected for about 80 seconds despawns and a new random piece takes its place.",
+				}),
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Movement Speed is +3 per level and maxes near 46 (almost 3x default). The 2x Walk Speed pass now actually doubles that, including after you respawn.",
+				}),
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Singularity now gives ×20 scrap value, on top of +500% magnet strength. Paid pet cash is no longer flattened to the hatchable +100% cap.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Hub leaderboards now show player names. Empty Studio stores still list whoever is in the server, instead of ten blank rows.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Each area egg is now its own hold-E: Front Yard opens Junkyard pets, Vehicle Graveyard opens Quantum pets. Before, only the tallest egg worked and it always showed the starter roster.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Equipping Pup no longer puts it upside down or at the wrong size. Followers now face and scale from the pet's face, not its exporter pivot.",
+				}),
+			}),
+		}),
+		table.freeze({
 			Version = "0.4.0",
 			Date = "2026-08-12",
 			Title = "Economy Rebalance",

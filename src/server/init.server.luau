@@ -36,6 +36,7 @@ local PlaytimeRewardService = require(script.Services.PlaytimeRewardService)
 local SpinService = require(script.Services.SpinService)
 local FriendBoostService = require(script.Services.FriendBoostService)
 local TutorialService = require(script.Services.TutorialService)
+local AffordHintService = require(script.Services.AffordHintService)
 local EventService = require(script.Services.EventService)
 local AchievementService = require(script.Services.AchievementService)
 
@@ -84,6 +85,7 @@ PlaytimeRewardService.Start()
 SpinService.Start()
 FriendBoostService.Start()
 TutorialService.Start()
+AffordHintService.Start()
 --[[
 	Events last, and only for the announcement side: the multipliers are already live because
 	`EventConfig` is a pure function of the clock, so a failure here costs a popup, not a payout.

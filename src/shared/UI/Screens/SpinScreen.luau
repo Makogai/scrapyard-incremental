@@ -202,8 +202,40 @@ local function SpinScreen(props)
 
 		This is the one piece of maths the screen and the wheel component must agree on.
 	]]
-	local targetIndex = if roll then roll.Index else 1
-	local landing = -((targetIndex - 0.5) * step) - FULL_TURNS * 360
+	--[[
+		Each roll adds another six turns on top of wherever the wheel already sits.
+
+		The first spin works because the spring starts at 0 and travels to
+		`landing` (~−2160°). After that it is still sitting on that angle, so a
+		second spin whose target is another ~−2160° only nudges a few degrees --
+		which is the "it does not spin the second time" bug. Clearing the roll
+		used to retarget 0 as well, so the wheel unwound backwards when the
+		banner dropped, then the next click fought that rewind.
+
+		`spinsRun` is how many times we have entered `spinning` this mount, and
+		the spring is never sent back to 0. Idle drift only plays before the
+		first roll; afterwards the wheel holds the last wedge until the next
+		click, then takes six more turns from there.
+	]]
+	local settledIndex, setSettledIndex = React.useState(1)
+	local spinsRun, setSpinsRun = React.useState(0)
+
+	React.useEffect(function()
+		if roll and type(roll.Index) == "number" then
+			setSettledIndex(roll.Index)
+		end
+	end, { if roll then roll.Index else nil })
+
+	React.useEffect(function()
+		if spinning then
+			setSpinsRun(function(n)
+				return n + 1
+			end)
+		end
+	end, { spinning })
+
+	local targetIndex = if roll then roll.Index else settledIndex
+	local landing = -((targetIndex - 0.5) * step) - spinsRun * FULL_TURNS * 360
 
 	--[[
 		Two rotation sources, and only one is live at a time: a slow idle drift, and the spring that
@@ -211,13 +243,58 @@ local function SpinScreen(props)
 		angle is exact -- an idle offset still ticking underneath would leave the pointer a degree or two
 		off whichever wedge won.
 	]]
-	local idle = Motion.useSpin(IDLE_DEGREES_PER_SECOND, not active)
-	local landed = Motion.useSpring(if active then landing else 0, SPIN_SPRING)
-	local rotation = if active then landed else idle
+	local idle = Motion.useSpin(IDLE_DEGREES_PER_SECOND, not active and spinsRun == 0)
+	local landed = Motion.useSpring(landing, SPIN_SPRING)
+	local rotation = if active or spinsRun > 0 then landed else idle
+
+	--[[
+		The winner flash used to key off `revealed`, and `revealed` is a timer
+		(`AnimationSeconds`) rather than the spring. The wedge lit up while the
+		wheel was still turning toward it. Wait until the pointer is actually on
+		that wedge -- a few degrees of the landing angle -- before flashing or
+		showing the banner. The timer can still flip the phase; the light waits.
+	]]
+	local onWedge, setOnWedge = React.useState(false)
+
+	React.useEffect(function()
+		if spinning then
+			setOnWedge(false)
+		end
+	end, { spinning })
+
+	React.useEffect(function()
+		if not revealed then
+			return
+		end
+		local finished = false
+		local function mark()
+			if not finished then
+				finished = true
+				setOnWedge(true)
+			end
+		end
+		local current = landed:getValue()
+		if type(current) == "number" and math.abs(current - landing) <= 4 then
+			mark()
+			return
+		end
+		local disconnect = Motion.heartbeat:Connect(function()
+			local value = landed:getValue()
+			if type(value) == "number" and math.abs(value - landing) <= 4 then
+				mark()
+			end
+		end)
+		-- Overdamped springs creep the last degree forever; do not wait them out.
+		local timeout = task.delay(2, mark)
+		return function()
+			disconnect:Disconnect()
+			task.cancel(timeout)
+		end
+	end, { revealed, landing })
 
 	--- The prize banner, built from the segment the server actually landed on.
 	local won = nil
-	if revealed then
+	if revealed and onWedge then
 		for _, segment in ipairs(segments) do
 			if segment.Id == roll.SegmentId then
 				won = segment
@@ -275,7 +352,7 @@ local function SpinScreen(props)
 				extent = extent,
 				--- The pointer only kicks while it turns, and the winner only pulses once it has stopped.
 				spinning = spinning,
-				winner = if revealed then targetIndex else nil,
+				winner = if revealed and onWedge then targetIndex else nil,
 				position = UDim2.new(0.5, 0, 0.5, -30),
 				anchorPoint = Vector2.new(0.5, 0.5),
 				zIndex = 3,

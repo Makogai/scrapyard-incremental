@@ -47,11 +47,13 @@ local PET_EFFECT_KEYS = {
 	`CopyStrongestPet` adds the best pet's effects again, so a deliberate build stacks well past what the
 	economy is balanced for.
 
-	Capped on CASH only. The other effects -- range, collection, storage, luck -- have their own ceilings
-	further along the chain, and cash is the one that compounds directly into every price in the game.
+	Capped on CASH from hatchable pets only. Premium pets add their cash AFTER that
+	ceiling, so a paid pet advertised as ×8 actually pays ×8 instead of being crushed
+	down to the same +100% as a hatchable secret. The other effects -- range, collection,
+	storage, luck -- have their own ceilings further along the chain.
 
 	Long term the answer to pet power creep is a duplicate sink (5 identical -> Shiny at 1.4x, and so on)
-	rather than raising this. Do not "fix" a pet that feels weak by moving this number.
+	rather than raising this. Do not "fix" a hatchable pet that feels weak by moving this number.
 ]]
 local MAXIMUM_PET_CASH_BONUS = 1.0
 
@@ -61,6 +63,7 @@ function GameMath.petEffectMultipliers(
 	petDefinitions: { [string]: any }
 ): { [string]: number }
 	local bonuses = {}
+	local premiumCash = 0
 	local strongestEffects = nil
 	local strongestScore = -1
 	local bonusAmplifier = 1
@@ -75,7 +78,11 @@ function GameMath.petEffectMultipliers(
 			local score = 0
 			for _, key in PET_EFFECT_KEYS do
 				local bonus = math.max(0, (effects[key] or 1) - 1)
-				bonuses[key] += bonus
+				if key == "Cash" and definition.Premium == true then
+					premiumCash += bonus
+				else
+					bonuses[key] += bonus
+				end
 				score += bonus
 			end
 			if definition.Premium ~= true and score > strongestScore then
@@ -98,7 +105,7 @@ function GameMath.petEffectMultipliers(
 	for _, key in PET_EFFECT_KEYS do
 		local total = bonuses[key] * bonusAmplifier
 		if key == "Cash" then
-			total = math.min(total, MAXIMUM_PET_CASH_BONUS)
+			total = math.min(total, MAXIMUM_PET_CASH_BONUS) + premiumCash
 		end
 		result[key] = 1 + total
 	end
@@ -158,24 +165,26 @@ end
 function GameMath.incrementalUpgradeCost(
 	baseCost: number,
 	growthRate: number,
-	costPower: number,
 	currentLevel: number,
 	maximumCurrency: number
 ): number
+	--[[
+		UpgradeCost(levelBeingPurchased) = BaseCost × Growth ^ (levelBeingPurchased - 1)
+
+		`currentLevel` is how many levels the player already has, so buying the next one is
+		`BaseCost × Growth ^ currentLevel`. Level 1 is BaseCost, level 2 is BaseCost × Growth.
+	]]
 	if
 		not GameMath.isFinite(baseCost)
 		or not GameMath.isFinite(growthRate)
-		or not GameMath.isFinite(costPower)
 		or not GameMath.isFinite(currentLevel)
 		or baseCost <= 0
 		or growthRate < 1
-		or costPower <= 0
 		or currentLevel < 0
 	then
 		return maximumCurrency
 	end
-	local level = math.floor(currentLevel)
-	local cost = baseCost * (level + 1) ^ costPower * growthRate ^ math.sqrt(level)
+	local cost = baseCost * growthRate ^ math.floor(currentLevel)
 	return math.max(1, math.floor(GameMath.clampFinite(cost, 1, maximumCurrency, maximumCurrency)))
 end
 
@@ -296,13 +305,12 @@ function GameMath.scaledPrestigeGearReward(
 end
 
 --[[
-	The permanent income multiplier from having rebirthed, and the ONLY payoff a rebirth grants.
+	Permanent scrap-value multiplier from completed rebirths: `(1 + perPrestige) ^ R`.
 
-	Linear, not exponential: `1 + count * perPrestige`. Rebirth 1 is x1.25, rebirth 4 is x2.00. It has to
-	stay slower than `RequirementGrowth` (x1.75 per rebirth) or each rebirth arrives sooner than the last
-	and the ladder collapses inward -- see the comment those two share in `PrestigeConfig`.
+	R is completed rebirths. `perPrestige` is the increment 0.25, so this is `1.25 ^ R`: rebirth 1 is
+	x1.25, rebirth 4 is x2.44. It has to stay slower than `RequirementGrowth` (x1.55 per rebirth) or
+	each rebirth arrives sooner than the last -- see the comment those two share in `PrestigeConfig`.
 
-	Replaced `gearValueMultiplier`, which paid for the same action a second time on an exponential curve.
 	One function, used by `derivedStats` and by every readout that quotes the number, so the HUD cannot
 	claim a multiplier the server does not apply.
 ]]
@@ -311,8 +319,22 @@ function GameMath.prestigeValueMultiplier(prestigeCount: number, valuePerPrestig
 		return 1
 	end
 	local count = math.max(0, math.floor(prestigeCount))
-	local multiplier = 1 + count * math.max(0, valuePerPrestige)
+	local multiplier = (1 + math.max(0, valuePerPrestige)) ^ count
 	return GameMath.clampFinite(multiplier, 1, 1e15, 1)
+end
+
+--[[
+	Raw rarity luck granted by completed rebirths: `R * luckPerPrestige`.
+
+	Added onto upgrade/pet luck, not multiplied through it -- a player with 2x upgrade luck and two
+	rebirths has 2.10 luck from those sources, not 2.20. Potions and events still multiply the sum.
+]]
+function GameMath.prestigeLuckBonus(prestigeCount: number, luckPerPrestige: number): number
+	if not GameMath.isFinite(prestigeCount) or not GameMath.isFinite(luckPerPrestige) then
+		return 0
+	end
+	local count = math.max(0, math.floor(prestigeCount))
+	return GameMath.clampFinite(count * math.max(0, luckPerPrestige), 0, 1e15, 0)
 end
 
 return table.freeze(GameMath)

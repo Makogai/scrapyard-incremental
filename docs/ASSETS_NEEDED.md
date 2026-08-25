@@ -58,13 +58,14 @@ Highest value first — the top group appears on almost every screen.
 	sign = "",       -- plot sign
 ```
 
-Already in and working: `gameLogo`, `arrow`, `coin`, `gear`, `robux`, `upgrade`,
+Already in and working: `gameLogo`, `arrow`, `coin`, `cash`, `gear`, `robux`, `upgrade`,
 `recycle`, `magnet`, `potion`, `scrap`, `lock`, `paw`, `pin`, `home`, `basket`,
 `bag`, `book`, `sliders`.
 
 There are also glyph names the drawing code knows but `Assets.Icons` has no key for:
-`cash`, `gears`, `storage`, `prestige`, `pet`, `area`, `inventory`. If you have art
-for one, adding the key is all it takes — no other change.
+`gears`, `storage`, `prestige`, `pet`, `area`, `inventory`. If you have art
+for one, adding the key is all it takes — no other change. `cash` shares the
+painted coin with `coin` (`rbxassetid://130780043686108`).
 
 ## 2. Game pass icons — 4 left
 

@@ -528,9 +528,12 @@ end
 --------------------------------------------------------------------------------
 
 function Indicators.StatRow(props)
+	local compact = props.compact == true
+	local iconSize = if compact then 18 else 26
+	local textSize = if compact then Theme.TextSize.Tiny else (props.textSize or Theme.TextSize.Body)
 	return e(P.Panel, {
 		key = props.key or "Stat",
-		size = props.size or UDim2.new(1, 0, 0, 44),
+		size = props.size or UDim2.new(1, 0, 0, if compact then 38 else 44),
 		layoutOrder = props.layoutOrder,
 		radius = Theme.Radius.Small,
 		color = Theme.Color.PanelDark,
@@ -538,13 +541,13 @@ function Indicators.StatRow(props)
 		strokeThickness = Theme.Stroke.Chip,
 		studs = false,
 		children = P.compact(
-			P.padding({ x = 10 }, "Inset"),
+			P.padding({ x = if compact then 6 else 10 }, "Inset"),
 			if props.glyph
 				then e(Icon, {
 					key = "Icon",
 					glyph = props.glyph,
 					plain = true,
-					size = UDim2.fromOffset(26, 26),
+					size = UDim2.fromOffset(iconSize, iconSize),
 					position = UDim2.new(0, 2, 0.5, 0),
 					anchorPoint = Vector2.new(0, 0.5),
 					zIndex = 3,
@@ -553,18 +556,19 @@ function Indicators.StatRow(props)
 			e(P.Label, {
 				key = "Name",
 				text = props.label,
-				textSize = props.textSize or Theme.TextSize.Body,
+				textSize = textSize,
 				font = Theme.Font.Bold,
 				color = Theme.Color.Gray,
 				align = Enum.TextXAlignment.Left,
-				size = UDim2.new(0.55, if props.glyph then -32 else 0, 1, 0),
-				position = UDim2.fromOffset(if props.glyph then 34 else 0, 0),
+				truncate = Enum.TextTruncate.AtEnd,
+				size = UDim2.new(0.55, if props.glyph then -(iconSize + 6) else 0, 1, 0),
+				position = UDim2.fromOffset(if props.glyph then iconSize + 8 else 0, 0),
 				zIndex = 3,
 			}),
 			e(P.Label, {
 				key = "Value",
 				text = props.value,
-				textSize = props.textSize or Theme.TextSize.Body,
+				textSize = textSize,
 				color = props.valueColor or Theme.Color.White,
 				align = Enum.TextXAlignment.Right,
 				size = UDim2.fromScale(0.45, 1),

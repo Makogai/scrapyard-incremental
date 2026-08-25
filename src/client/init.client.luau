@@ -14,6 +14,7 @@ local PetFollowerController = require(script.Controllers.PetFollowerController)
 local PlotSignController = require(script.Controllers.PlotSignController)
 local TutorialArrowController = require(script.Controllers.TutorialArrowController)
 local EventBillboardController = require(script.Controllers.EventBillboardController)
+local EventSoundController = require(script.Controllers.EventSoundController)
 local TitleController = require(script.Controllers.TitleController)
 local GlobalChatController = require(script.Controllers.GlobalChatController)
 local EggHologramController = require(script.Controllers.EggHologramController)
@@ -61,6 +62,11 @@ TutorialArrowController.Start()
 	attributes the server publishes, so it needs neither the store nor the Bridge.
 ]]
 EventBillboardController.Start()
+--[[
+	Same EventState folder as the billboard. Independent of the React UI: a start sting is
+	world audio, not a window, and it must still play if the HUD is closed.
+]]
+EventSoundController.Start()
 --[[
 	Titles over heads and in chat. Reads Player attributes, so it needs neither the store nor the
 	Bridge -- and it draws OTHER players' titles, which is the whole point of them.

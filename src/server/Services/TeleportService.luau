@@ -33,8 +33,8 @@ local function destinationFor(player: Player, destinationId: string): BasePart?
 		THE PIT, and only while it is open.
 
 		Checked here rather than trusted from the client: the destination id arrives over a remote, and
-		"send me to the arena" is worth lying about the moment the arena stops existing -- the floor is
-		destroyed when the event ends, so a stale request would drop somebody into empty space.
+		"send me to the arena" is worth lying about the moment the event ends -- SpawnPart is nil while
+		the Pit is closed, so a stale request cannot drop somebody into the empty Event Area.
 	]]
 	if destinationId == ArenaConfig.DestinationId then
 		return ArenaService.SpawnPart()

@@ -176,6 +176,12 @@ Atoms.dailyStreak = Charm.atom(0)
 Atoms.dailyCalendarDay = Charm.atom(1)
 Atoms.dailyClaimable = Charm.atom(false)
 Atoms.playtimeSeconds = Charm.atom(0)
+--[[
+	`os.clock()` when the last banked playtime landed. The store adds elapsed time on
+	top so an open rewards window ticks every second instead of waiting for the next
+	server bank (or a remount). Stories leave this at 0 so the slider stays still.
+]]
+Atoms.playtimeSyncedAt = Charm.atom(0)
 Atoms.playtimeClaimed = Charm.atom({} :: { [number]: boolean })
 Atoms.spinsAvailable = Charm.atom(0)
 Atoms.tutorialStep = Charm.atom(0)
@@ -354,6 +360,7 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.PlaytimeSecondsToday) == "number" then
 		Atoms.playtimeSeconds(snapshot.PlaytimeSecondsToday)
+		Atoms.playtimeSyncedAt(os.clock())
 	end
 	if type(snapshot.PlaytimeClaimed) == "table" then
 		Atoms.playtimeClaimed(snapshot.PlaytimeClaimed)

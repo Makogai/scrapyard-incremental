@@ -101,6 +101,45 @@ local function facing(model: Model): Vector3
 end
 
 --[[
+	Bounding box of the parts you can actually see.
+
+	Workshop and Quantum pets carry invisible Root / AnimatedFace / helper
+	meshes at Transparency 1. `GetBoundingBox` includes those, so the camera
+	backs up to frame empty volume and the real silhouette shrinks to a speck
+	-- which is what made the second egg look like it had no outlines.
+]]
+local function visibleBounds(model: Model): (CFrame, Vector3)
+	local minX, minY, minZ = math.huge, math.huge, math.huge
+	local maxX, maxY, maxZ = -math.huge, -math.huge, -math.huge
+	local found = false
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part.Transparency < 0.9 then
+			found = true
+			local cf = part.CFrame
+			local size = part.Size
+			for _, sx in { -0.5, 0.5 } do
+				for _, sy in { -0.5, 0.5 } do
+					for _, sz in { -0.5, 0.5 } do
+						local world = cf * Vector3.new(size.X * sx, size.Y * sy, size.Z * sz)
+						minX = math.min(minX, world.X)
+						minY = math.min(minY, world.Y)
+						minZ = math.min(minZ, world.Z)
+						maxX = math.max(maxX, world.X)
+						maxY = math.max(maxY, world.Y)
+						maxZ = math.max(maxZ, world.Z)
+					end
+				end
+			end
+		end
+	end
+	if not found then
+		return model:GetBoundingBox()
+	end
+	local centre = Vector3.new((minX + maxX) * 0.5, (minY + maxY) * 0.5, (minZ + maxZ) * 0.5)
+	return CFrame.new(centre), Vector3.new(maxX - minX, maxY - minY, maxZ - minZ)
+end
+
+--[[
 	Makes a model render as one solid black shape: no colour, no texture, no eyes.
 
 	Recolouring alone is not enough -- lighting still picks out every edge, which
@@ -116,6 +155,13 @@ local function silhouette(model: Model)
 			part.Material = Enum.Material.SmoothPlastic
 			part.Reflectance = 0
 			part.CastShadow = false
+			-- MeshPart textures ignore part colour, so a Rainbow Shock silhouette
+			-- would still paint its rainbow and read as the real pet, not an outline.
+			if part:IsA("MeshPart") then
+				part.TextureID = ""
+			end
+		elseif part:IsA("SpecialMesh") then
+			part.TextureId = ""
 		elseif
 			part:IsA("Decal")
 			or part:IsA("Texture")
@@ -181,7 +227,7 @@ function ModelView.View(props)
 			sizes all fill the same box, and far enough back that the whole extent fits
 			the field of view -- nothing important gets cropped.
 		]]
-		local origin, extent = model:GetBoundingBox()
+		local origin, extent = visibleBounds(model)
 		local centre = origin.Position
 		local radius = math.max(extent.Magnitude * 0.5, 0.5)
 		local distance = (radius / math.tan(math.rad(FIELD_OF_VIEW * 0.5))) * (props.zoom or 0.94)
@@ -258,6 +304,7 @@ function ModelView.View(props)
 					Silhouettes get zero light. With no ambient and no light colour every
 					surface renders black whatever its material, which is what makes the
 					shape read as a shape rather than as the real pet dimmed down.
+					Same treatment as the first egg -- a flat black stamp, no rim mesh.
 				]]
 				Ambient = if props.silhouette
 					then Color3.new(0, 0, 0)

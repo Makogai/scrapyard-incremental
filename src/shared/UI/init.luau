@@ -77,6 +77,7 @@ return {
 		Shop = require(Screens.ShopScreen),
 		Settings = require(Screens.SettingsScreen),
 		DailyRewards = require(Screens.DailyRewardsScreen),
+		PlaytimeRewards = require(Screens.PlaytimeRewardsScreen),
 		Spin = require(Screens.SpinScreen),
 		Admin = require(Screens.AdminScreen),
 		Collection = require(Screens.CollectionScreen),

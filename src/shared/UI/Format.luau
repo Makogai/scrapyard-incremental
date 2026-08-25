@@ -40,8 +40,12 @@ function Format.short(value: number): string
 		text = string.format("%.2f", scaled)
 	end
 
-	-- trim a trailing ".0" / ".00" so "5.00M" reads as "5M"
-	text = string.gsub(string.gsub(text, "%.?0+$", ""), "%.$", "")
+	-- Trim trailing zeros after a decimal so "5.00M" reads as "5M" and "1.50K" as "1.5K".
+	-- Only touch the fractional part: `%.?0+$` also ate integer zeros, so 100K became 1K.
+	if string.find(text, ".", 1, true) then
+		text = string.gsub(text, "0+$", "")
+		text = string.gsub(text, "%.$", "")
+	end
 
 	return sign .. text .. SUFFIXES[tier + 1]
 end

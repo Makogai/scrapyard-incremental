@@ -1,22 +1,22 @@
 --!strict
 --[[
 	ArenaService.luau
-	Builds THE PIT while its event runs, fills it with scrap nobody owns, and takes it away afterwards.
+	Opens THE PIT on the authored `Workspace.Event Area` while its event runs, fills the
+	authored spawn nodes with scrap nobody owns, and clears it afterwards.
 
 	See `ArenaConfig` for the design and the numbers. This file is the machinery:
 
 		- watch the event schedule for anything flagged `Arena`
-		- build the floor, the wall ring, the pad and the lights when one opens
-		- keep it topped up to `TargetScrap` while it is open
-		- tear it down when it closes, and put anybody still inside back on their own plot
+		- bind the authored Event Area (spawn pad + loot nodes) when one opens
+		- keep empty nodes topped up to `TargetScrap` while it is open
+		- clear the scrap when it closes, and put anybody still inside back on their own plot
 
-	NOTHING IS AUTHORED IN STUDIO. The arena is generated, and that is deliberate: it exists for a few
-	hours a week, it sits in empty space off the edge of the map, and a Studio-authored version would be a
-	permanent 2,000-part model replicating to every client all week for the sake of a Friday evening.
-	Generating it also means `ArenaConfig` can change its size and the geometry follows.
+	THE GEOMETRY IS AUTHORED. It used to be a generated cylinder in the void; the map now has a real
+	Event Area, so this service must not build or destroy it. Scrap is the only thing that comes and
+	goes with the event.
 
 	IT POLLS, like `EventService` does, and for the same reasons: a server that starts mid-event has to
-	build the arena on the way up, and a schedule edited during a session has to be noticed. A `task.delay`
+	open the arena on the way up, and a schedule edited during a session has to be noticed. A `task.delay`
 	to the boundary is tighter and wrong in both cases.
 ]]
 
@@ -33,11 +33,13 @@ local ArenaService = {}
 --- How often the schedule is checked, matching `EventService` so the two turn over together.
 local POLL_SECONDS = 5
 
-local ARENA_NAME = "ScrapPitArena"
-
 local arena: Model? = nil
 local scrapFolder: Folder? = nil
 local started = false
+local missingAreaWarned = false
+local missingMarkersWarned = false
+local openArena: () -> ()
+local closeArena: () -> ()
 
 --- The live arena event, or nil. One place asks the question so the answer cannot differ between callers.
 local function arenaEvent(): EventConfig.EventDefinition?
@@ -48,180 +50,141 @@ local function arenaEvent(): EventConfig.EventDefinition?
 	return nil
 end
 
---- Whether the Pit is open right now. Read by `TeleportService` before it will send anyone there.
-function ArenaService.IsOpen(): boolean
-	return arena ~= nil and arena.Parent ~= nil and arenaEvent() ~= nil
-end
-
---[[
-	Where a player lands: an invisible upright part on the pad.
-
-	A PART rather than a CFrame, because that is what `TeleportService.destinationFor` deals in and the Pit
-	should not be the one destination that needs its own code path there.
-
-	It cannot be the pad itself. The pad is a cylinder, and a cylinder has to be rotated 90 degrees to lie
-	flat -- teleporting to that CFrame would lay the player down on their side.
-]]
-function ArenaService.SpawnPart(): BasePart?
-	if not ArenaService.IsOpen() then
-		return nil
+local function findArea(): Model?
+	local direct = workspace:FindFirstChild(ArenaConfig.AreaName)
+	if direct and direct:IsA("Model") then
+		return direct
 	end
-	local model = arena
-	local spawnPart = if model then model:FindFirstChild("PitSpawn") else nil
-	return if spawnPart and spawnPart:IsA("BasePart") then spawnPart else nil
-end
-
-local function makePart(name: string, parent: Instance): Part
-	local part = Instance.new("Part")
-	part.Name = name
-	part.Anchored = true
-	part.Material = Enum.Material.Metal
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	part.Parent = parent
-	return part
-end
-
---[[
-	The arena, built from scratch.
-
-	A cylinder floor and a ring of wall slabs. The slabs are boxes rather than a mesh because a box is one
-	part with no asset to load, and thirty of them at this radius read as a curve -- the wall is 12 studs
-	long per segment against a 60-stud radius, so the flat spots are smaller than a player.
-]]
-local function build(): Model
-	local model = Instance.new("Model")
-	model.Name = ARENA_NAME
-
-	local origin = ArenaConfig.Origin
-
-	local floor = makePart("PitFloor", model)
-	floor.Shape = Enum.PartType.Cylinder
-	--- A cylinder's length runs along X, so it has to be turned on its side to lie flat.
-	floor.Size = Vector3.new(
-		ArenaConfig.FloorThickness,
-		ArenaConfig.FloorRadius * 2,
-		ArenaConfig.FloorRadius * 2
-	)
-	floor.CFrame = CFrame.new(origin) * CFrame.Angles(0, 0, math.rad(90))
-	floor.Color = Color3.fromRGB(58, 62, 74)
-	floor.Material = Enum.Material.Concrete
-	model.PrimaryPart = floor
-
-	--[[
-		The pad players land on: a darker disc in the middle, kept clear of scrap.
-
-		Raised a hair above the floor rather than flush, or the two coplanar faces z-fight.
-	]]
-	local pad = makePart("PitPad", model)
-	pad.Shape = Enum.PartType.Cylinder
-	pad.Size = Vector3.new(0.4, ArenaConfig.PadRadius * 2, ArenaConfig.PadRadius * 2)
-	pad.CFrame = CFrame.new(origin + Vector3.new(0, ArenaConfig.FloorThickness / 2 + 0.2, 0))
-		* CFrame.Angles(0, 0, math.rad(90))
-	pad.Color = Color3.fromRGB(255, 87, 87)
-	pad.Material = Enum.Material.Neon
-	pad.Transparency = 0.55
-	pad.CanCollide = false
-
-	--- The teleport target: upright, invisible, and out of the way of everything else.
-	local spawnPart = makePart("PitSpawn", model)
-	spawnPart.Size = Vector3.new(4, 1, 4)
-	spawnPart.CFrame = CFrame.new(origin + Vector3.new(0, ArenaConfig.FloorThickness / 2 + 0.5, 0))
-	spawnPart.Transparency = 1
-	spawnPart.CanCollide = false
-	spawnPart.CanQuery = false
-
-	local walls = Instance.new("Folder")
-	walls.Name = "PitWalls"
-	walls.Parent = model
-
-	local segments = ArenaConfig.WallSegments
-	--- Chord length for one segment, plus a little overlap so the corners do not show daylight.
-	local segmentLength = 2 * math.pi * ArenaConfig.FloorRadius / segments * 1.06
-	for index = 1, segments do
-		local angle = (index - 1) / segments * math.pi * 2
-		local outward = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local wall = makePart(`PitWall{index}`, walls)
-		wall.Size = Vector3.new(ArenaConfig.WallThickness, ArenaConfig.WallHeight, segmentLength)
-		wall.CFrame = CFrame.new(
-			origin
-				+ outward * ArenaConfig.FloorRadius
-				+ Vector3.new(0, ArenaConfig.WallHeight / 2 + ArenaConfig.FloorThickness / 2, 0)
-		) * CFrame.Angles(0, -angle, 0)
-		wall.Color = Color3.fromRGB(44, 74, 120)
-
-		--- A neon cap along the top, every third segment lit, so the ring reads at night.
-		local cap = makePart(`PitWallCap{index}`, walls)
-		cap.Size = Vector3.new(ArenaConfig.WallThickness + 0.6, 1.2, segmentLength)
-		cap.CFrame = wall.CFrame * CFrame.new(0, ArenaConfig.WallHeight / 2 + 0.6, 0)
-		cap.Material = Enum.Material.Neon
-		cap.Color = if index % 3 == 0
-			then Color3.fromRGB(255, 87, 87)
-			else Color3.fromRGB(33, 229, 245)
-		cap.CanCollide = false
+	local nested = workspace:FindFirstChild(ArenaConfig.AreaName, true)
+	if nested and nested:IsA("Model") then
+		return nested
 	end
-
-	--[[
-		Four lights on the rim, not one in the middle.
-
-		A single central light leaves the wall faces flat and the scrap under it shadowless. Four around
-		the edge cross-light the floor, which is where everything the player cares about is lying.
-	]]
-	for index = 1, 4 do
-		local angle = (index - 1) / 4 * math.pi * 2
-		local host = makePart(`PitLampPost{index}`, model)
-		host.Size = Vector3.new(1.4, 12, 1.4)
-		host.Transparency = 1
-		host.CanCollide = false
-		host.CFrame = CFrame.new(
-			ArenaConfig.Origin
-				+ Vector3.new(math.cos(angle), 0, math.sin(angle)) * (ArenaConfig.FloorRadius - 6)
-				+ Vector3.new(0, ArenaConfig.WallHeight * 0.7, 0)
-		)
-		--[[
-			Dim, and short-ranged enough that the four do not all reach the middle.
-
-			The first pass ran these at 2.4 brightness over 84 studs, which is four overlapping lights on
-			every square foot of a 120-stud bowl: the floor went flat grey and every piece of scrap
-			rendered white. Scrap art is mostly mid-grey metal, so it has nowhere to go when overexposed --
-			and the whole reason to light the arena is to be able to tell one piece from another.
-		]]
-		local light = Instance.new("PointLight")
-		light.Brightness = 0.9
-		light.Range = ArenaConfig.FloorRadius * 0.8
-		light.Color = Color3.fromRGB(255, 232, 205)
-		light.Shadows = true
-		light.Parent = host
-	end
-
-	return model
+	return nil
 end
 
---- A point on the floor that is not on the pad. Rejection sampling: the pad is small next to the disc.
-local function rollFloorPoint(): Vector3
-	local origin = ArenaConfig.Origin
-	for _ = 1, 24 do
-		--- sqrt for an even spread; without it everything crowds the middle, which is the pad.
-		local distance = ArenaConfig.FloorRadius * math.sqrt(math.random())
-		local angle = math.random() * math.pi * 2
-		if distance > ArenaConfig.PadRadius + 2 and distance < ArenaConfig.FloorRadius - 6 then
-			return origin
-				+ Vector3.new(
-					math.cos(angle) * distance,
-					ArenaConfig.FloorThickness / 2,
-					math.sin(angle) * distance
-				)
+local function spawnMarkers(area: Model): { BasePart }
+	local folder = area:FindFirstChild(ArenaConfig.ScrapSpawnFolderName)
+	if folder == nil then
+		return {}
+	end
+	local markers = {}
+	for _, child in folder:GetChildren() do
+		if child:IsA("BasePart") then
+			table.insert(markers, child)
+		elseif child:IsA("Model") then
+			local part = child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart", true)
+			if part then
+				table.insert(markers, part)
+			end
 		end
 	end
-	--- Every roll landed on the pad or the wall. Take the ring between them and be done.
-	local angle = math.random() * math.pi * 2
-	local distance = (ArenaConfig.PadRadius + ArenaConfig.FloorRadius) / 2
-	return origin
-		+ Vector3.new(
-			math.cos(angle) * distance,
-			ArenaConfig.FloorThickness / 2,
-			math.sin(angle) * distance
-		)
+	return markers
+end
+
+--[[
+	Where to put a generated pad if Studio has not authored `PitSpawn`.
+
+	Beside the spawn model, never on a loot node. Those pads are scrap piles; standing
+	players on Spawn01 is what this used to do after the sculpture-collision fix.
+]]
+local function fallbackSpawnCFrame(area: Model, spawnModel: Instance?): CFrame
+	local origin = if spawnModel and spawnModel:IsA("Model")
+		then spawnModel:GetPivot().Position
+		else area:GetPivot().Position
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	if spawnModel then
+		params.FilterDescendantsInstances = { spawnModel }
+	end
+	local offsets = {
+		Vector3.new(-16, 40, 0),
+		Vector3.new(0, 40, -16),
+		Vector3.new(16, 40, 0),
+		Vector3.new(0, 40, 16),
+		Vector3.new(0, 80, 0),
+	}
+	for _, offset in offsets do
+		local hit = workspace:Raycast(origin + offset, Vector3.new(0, -200, 0), params)
+		if hit then
+			return CFrame.new(hit.Position + Vector3.new(0, 3, 0))
+		end
+	end
+	return CFrame.new(origin + Vector3.new(0, 6, 0))
+end
+
+--[[
+	The teleport target: an upright, invisible part.
+
+	A PART rather than a CFrame, because that is what `TeleportService.destinationFor` deals in.
+	The authored `PitSpawn` under Event Area Spawn Point is the destination. This used to
+	overwrite that part onto the first loot node every open, which is why ENTER THE PIT
+	dropped people on scrap.
+
+	Authored collision on the spawn model is left alone. A leftover workaround used to
+	force `CanCollide = false` on every tall part in here, so Studio collision never
+	survived Play and players fell through the pad they had just turned on.
+]]
+local function ensureSpawnPart(area: Model): BasePart?
+	local spawnModel = area:FindFirstChild(ArenaConfig.SpawnModelName, true)
+	local host: Instance = if spawnModel then spawnModel else area
+
+	local existing = host:FindFirstChild(ArenaConfig.SpawnPartName, true)
+	if existing and existing:IsA("BasePart") then
+		existing.CanCollide = false
+		return existing
+	end
+
+	local created = Instance.new("Part")
+	created.Name = ArenaConfig.SpawnPartName
+	created.Size = Vector3.new(8, 0.5, 8)
+	created.Anchored = true
+	created.CanCollide = false
+	created.CanQuery = false
+	created.CanTouch = false
+	created.Transparency = 1
+	created.CFrame = fallbackSpawnCFrame(area, spawnModel)
+	created.Parent = host
+	return created
+end
+
+--- Whether the Pit is open right now. Read by `TeleportService` before it will send anyone there.
+function ArenaService.IsOpen(): boolean
+	return arenaEvent() ~= nil and findArea() ~= nil
+end
+
+function ArenaService.SpawnPart(): BasePart?
+	if arenaEvent() == nil then
+		return nil
+	end
+	--[[
+		Open on the teleport itself.
+
+		The HUD button appears as soon as the snapshot says the Pit is live. The old
+		loop waited up to five seconds before binding the Event Area, so the first
+		clicks did nothing. Binding here means ENTER THE PIT works on the first press.
+	]]
+	if arena == nil then
+		openArena()
+	end
+	local model = arena
+	if model == nil then
+		return nil
+	end
+	return ensureSpawnPart(model)
+end
+
+--[[
+	Bind or unbind to match the live schedule.
+
+	`EventService.Republish` calls this when an admin starts or stops an event, so the
+	Pit does not lag the HUD banner by a poll.
+]]
+function ArenaService.Sync()
+	if arenaEvent() ~= nil then
+		openArena()
+	else
+		closeArena()
+	end
 end
 
 local weightedTotal = 0
@@ -241,17 +204,28 @@ local function rollScrapId(): string
 end
 
 --[[
-	Add up to `count` pieces, skipping points that land on top of something already there.
+	Add up to `count` pieces onto empty authored spawn nodes.
 
-	The spacing check is against the scrap folder's own children rather than through `ScrapService`,
-	because the only thing that matters here is "is this spot free" and the folder is the cheapest
-	possible answer.
+	One node, one piece: with a single pad the arena holds a single scrap until more pads are
+	duplicated in Studio. Occupied means another public piece is already within MinimumSpacing.
 ]]
 local function fill(count: number)
 	local folder = scrapFolder
-	if folder == nil then
+	local model = arena
+	if folder == nil or model == nil then
 		return
 	end
+	local markers = spawnMarkers(model)
+	if #markers == 0 then
+		if not missingMarkersWarned then
+			missingMarkersWarned = true
+			warn(
+				`[ArenaService] No spawn nodes in {ArenaConfig.AreaName}/{ArenaConfig.ScrapSpawnFolderName}. Duplicate Spawn01 in Studio to add loot pads.`
+			)
+		end
+		return
+	end
+
 	local existing = {}
 	for _, piece in folder:GetChildren() do
 		local position = if piece:IsA("Model")
@@ -263,67 +237,43 @@ local function fill(count: number)
 		end
 	end
 
-	for _ = 1, count do
-		local point = nil
-		for _ = 1, 8 do
-			local candidate = rollFloorPoint()
-			local clear = true
-			for _, other in existing do
-				local flat = (Vector3.new(candidate.X, 0, candidate.Z) - Vector3.new(
-					other.X,
-					0,
-					other.Z
-				)).Magnitude
-				if flat < ArenaConfig.MinimumSpacing then
-					clear = false
-					break
-				end
-			end
-			if clear then
-				point = candidate
+	local spawned = 0
+	for _, marker in markers do
+		if spawned >= count then
+			break
+		end
+		local point = marker.Position
+		local clear = true
+		for _, other in existing do
+			local flat = (Vector3.new(point.X, 0, point.Z) - Vector3.new(other.X, 0, other.Z)).Magnitude
+			if flat < ArenaConfig.MinimumSpacing then
+				clear = false
 				break
 			end
 		end
-		if point == nil then
-			--- The floor is full enough that eight tries found nowhere. Stop rather than stack.
-			return
-		end
-		--[[
-			Luck 1: the arena's rarity roll is the BASE one for everybody.
-
-			Rolling it against whoever happens to trigger the refill would mean the hoard's contents
-			depended on which player's luck stat got there first, which is indefensible in a shared space.
-		]]
-		if ScrapService.SpawnPublic(rollScrapId(), point, 1) ~= nil then
+		if clear and ScrapService.SpawnPublic(rollScrapId(), point, 1) ~= nil then
 			table.insert(existing, point)
+			spawned += 1
 		end
 	end
 end
 
 --[[
-	Put everybody standing in the arena back on their own plot.
+	Put everybody standing in the Event Area back on their own plot.
 
-	Called when the Pit closes. Without it the floor is destroyed under their feet and they fall through
-	the void until Roblox resets them, which reads as the game breaking rather than the event ending.
+	Called when the Pit closes. The area itself stays in the world, but the shared hoard is gone, so
+	anyone left inside would be standing in an empty event map. Home is their plot spawn, the same
+	destination `TeleportService` uses for MyPlot.
 ]]
-local function evacuate()
-	local origin = ArenaConfig.Origin
-	local reach = ArenaConfig.FloorRadius + ArenaConfig.WallThickness + 8
+local function evacuate(area: Model)
+	local cf, size = area:GetBoundingBox()
+	local half = size * 0.5 + Vector3.new(8, 20, 8)
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
 		if root ~= nil and root:IsA("BasePart") then
-			local flat = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(
-				origin.X,
-				0,
-				origin.Z
-			)).Magnitude
-			if flat <= reach then
-				--[[
-					Moved the same way `TeleportService` moves anyone: onto their plot's own spawn pad. Done
-					inline rather than through a new `PlotService.TeleportHome`, because one caller does not
-					justify a new public API on a service five other things depend on.
-				]]
+			local delta = cf:PointToObjectSpace(root.Position)
+			if math.abs(delta.X) <= half.X and math.abs(delta.Y) <= half.Y and math.abs(delta.Z) <= half.Z then
 				local plot = PlotService.GetPlot(player)
 				local home = if plot then plot:FindFirstChild("PlayerSpawn") else nil
 				if home ~= nil and home:IsA("BasePart") and character ~= nil then
@@ -334,35 +284,55 @@ local function evacuate()
 	end
 end
 
-local function open()
+openArena = function()
 	if arena ~= nil then
 		return
 	end
-	local model = build()
+	local model = findArea()
+	if model == nil then
+		if not missingAreaWarned then
+			missingAreaWarned = true
+			warn(
+				`[ArenaService] {ArenaConfig.AreaName} was not in Workspace. The Pit cannot open until that model exists.`
+			)
+		end
+		return
+	end
+
+	ensureSpawnPart(model)
+
+	local leftover = model:FindFirstChild("PitScrap")
+	if leftover then
+		leftover:Destroy()
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "PitScrap"
 	folder.Parent = model
-	model.Parent = workspace
 
 	arena = model
 	scrapFolder = folder
 	ScrapService.SetPublicFolder(folder)
-	--- Built full, not empty: the first player through the door should find a hoard.
-	fill(ArenaConfig.TargetScrap)
+	--- One piece per empty node, capped at TargetScrap.
+	local filled, fillError = pcall(fill, ArenaConfig.TargetScrap)
+	if not filled then
+		warn(`[ArenaService] Pit loot failed to spawn: {fillError}`)
+	end
 end
 
-local function close()
+closeArena = function()
 	local model = arena
 	if model == nil then
 		return
 	end
-	--- People first: the floor is about to stop existing.
-	evacuate()
+	evacuate(model)
 	ScrapService.ClearPublic()
 	ScrapService.SetPublicFolder(nil)
+	local folder = scrapFolder
+	if folder then
+		folder:Destroy()
+	end
 	arena = nil
 	scrapFolder = nil
-	model:Destroy()
 end
 
 function ArenaService.Start()
@@ -371,15 +341,19 @@ function ArenaService.Start()
 	end
 	started = true
 
+	if arenaEvent() ~= nil then
+		task.defer(openArena)
+	end
+
 	task.spawn(function()
 		local sinceRefill = 0
 		while true do
 			task.wait(POLL_SECONDS)
 			local live = arenaEvent()
 			if live ~= nil and arena == nil then
-				open()
+				openArena()
 			elseif live == nil and arena ~= nil then
-				close()
+				closeArena()
 			end
 
 			if arena ~= nil then

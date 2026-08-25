@@ -31,7 +31,10 @@ local e = React.createElement
 
 local function Icon(props)
 	-- An explicit image beats the asset table, which beats the procedural glyph.
-	local art = if props.image then { id = props.image } else Assets.icon(props.glyph)
+	-- An empty string is "no art", not a broken ImageLabel that hides the glyph.
+	local art = if type(props.image) == "string" and props.image ~= ""
+		then { id = props.image }
+		else Assets.icon(props.glyph)
 	local glyphComponent = if type(props.glyph) == "string"
 		then Glyphs.get(props.glyph)
 		else props.glyph

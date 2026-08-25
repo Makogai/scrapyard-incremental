@@ -105,6 +105,17 @@ local function seedMock()
 	Atoms.upgradeLevels(levels)
 	Atoms.ownedMagnets(owned)
 	Atoms.inventory(inventory)
+	local petsOwned = {
+		Pup = 2,
+		MythicAutumnDragon = 1,
+		Singularity = 1,
+	}
+	for _, pet in ipairs(Mock.pets) do
+		if pet.owned then
+			petsOwned[pet.id] = 1
+		end
+	end
+	Atoms.ownedPets(petsOwned)
 
 	local areas = {}
 	for _, area in ipairs(Mock.areas) do
@@ -650,6 +661,12 @@ local function mockActions()
 		Atoms.money(Atoms.money() + 2500)
 	end
 
+	function self.claimPlaytime(milestoneIndex: number)
+		local claimed = table.clone(Atoms.playtimeClaimed())
+		claimed[milestoneIndex] = true
+		Atoms.playtimeClaimed(claimed)
+	end
+
 	function self.spinWheel()
 		if Atoms.spinsAvailable() <= 0 or Atoms.spinRoll() ~= nil then
 			return
@@ -852,7 +869,12 @@ function Store.use()
 		room the client is already in, and a snapshot that goes stale as people join is worse than no
 		list. Two seconds is often enough for a panel nobody is watching continuously.
 	]]
-	local roster = Hooks.useTicker(2)
+	--[[
+		Once a second, so HUD countdowns and the playtime ladder move while a window
+		stays open. The server still banks playtime on its own tick and still owns claims;
+		this is only the display clock.
+	]]
+	local roster = Hooks.useTicker(1)
 	local players = React.useMemo(function()
 		local list = {}
 		for _, player in PlayersService:GetPlayers() do
@@ -868,7 +890,30 @@ function Store.use()
 	local dailyCalendarDay = useAtom(Atoms.dailyCalendarDay)
 	local dailyClaimable = useAtom(Atoms.dailyClaimable)
 	local playtimeSeconds = useAtom(Atoms.playtimeSeconds)
+	local playtimeSyncedAt = useAtom(Atoms.playtimeSyncedAt)
 	local playtimeClaimed = useAtom(Atoms.playtimeClaimed)
+	--[[
+		Banked seconds plus time since that bank, so the open window counts up instead of
+		freezing on the last snapshot. Stories leave `playtimeSyncedAt` at 0 so a slider
+		does not drift.
+	]]
+	local livePlaytime = playtimeSeconds
+	if playtimeSyncedAt > 0 then
+		livePlaytime += math.max(0, os.clock() - playtimeSyncedAt)
+	end
+	local playtimeClaimable = false
+	local playtimeNextRemaining = 0
+	for _, milestone in ipairs(RewardsConfig.Playtime.Milestones) do
+		if playtimeClaimed[milestone.Index] ~= true then
+			local remaining = milestone.Seconds - livePlaytime
+			if remaining <= 0 then
+				playtimeClaimable = true
+			else
+				playtimeNextRemaining = remaining
+			end
+			break
+		end
+	end
 	local spinsAvailable = useAtom(Atoms.spinsAvailable)
 	local spinRoll = useAtom(Atoms.spinRoll)
 	local friendCount = useAtom(Atoms.friendCount)
@@ -1190,9 +1235,11 @@ function Store.use()
 		dailyResetSeconds = DayClock.secondsUntilNextDay(os.time()),
 		dailyCalendarDay = dailyCalendarDay,
 		dailyClaimable = dailyClaimable,
-		playtimeSeconds = playtimeSeconds,
+		playtimeSeconds = livePlaytime,
 		playtimeClaimed = playtimeClaimed,
 		playtimeMilestones = RewardsConfig.Playtime.Milestones,
+		playtimeClaimable = playtimeClaimable,
+		playtimeNextRemaining = playtimeNextRemaining,
 		spinsAvailable = spinsAvailable,
 		spinRoll = spinRoll,
 		spinSegments = RewardsConfig.Spin.Segments,

@@ -38,9 +38,9 @@ local passes = {
 	--[[
 		PERMANENT DOUBLE WALK SPEED, applied in `derivedStats` alongside the MovementSpeed upgrade.
 
-		A multiplier rather than a flat bonus, so it keeps mattering as the upgrade climbs -- and it is
-		applied BEFORE the upgrade's `EffectCap`, which is what stops the pass from being silently eaten by
-		a cap the player has already reached.
+		A multiplier on the upgrade's result, so it keeps mattering as the upgrade climbs. Applied
+		AFTER the upgrade's own cap: doubling first and then clamping to 64 would make the pass
+		invisible once the upgrade was maxed.
 	]]
 	PermanentSpeed = table.freeze({
 		Id = "PermanentSpeed",
@@ -125,7 +125,7 @@ local passes = {
 		Id = "SingularityPet",
 		MarketplaceId = 1949722487,
 		DisplayName = "Singularity Pet",
-		Description = "Copies twice the effects of your strongest equipped normal pet.",
+		Description = "×8 scrap value, +300% magnet strength, +20% collection speed, +15% range.",
 		DisplayPrice = 499,
 		Color = Color3.fromRGB(49, 224, 255),
 		--[[
@@ -141,8 +141,8 @@ local passes = {
 	DemonicGhostPet = table.freeze({
 		Id = "DemonicGhostPet",
 		MarketplaceId = 1952894699,
-		DisplayName = "Demonic Ghost Pet",
-		Description = "Increases every combined pet bonus by 35%.",
+		DisplayName = "Scrap Crimson Knight Pet",
+		Description = "+40% scrap value, +20% luck, +30% respawn speed, +20% storage, +10% collection speed.",
 		DisplayPrice = 699,
 		Color = Color3.fromRGB(255, 65, 88),
 	}),
@@ -150,7 +150,7 @@ local passes = {
 		Id = "SinisterLordPet",
 		MarketplaceId = 1952486693,
 		DisplayName = "Sinister Lord Pet",
-		Description = "Ultimate premium pet that doubles all combined pet bonuses.",
+		Description = "×5 scrap value, +400% magnet strength, +30% collection speed, +30% range, +18% walk speed, +8% luck.",
 		DisplayPrice = 999,
 		Color = Color3.fromRGB(171, 54, 255),
 	}),
@@ -228,8 +228,8 @@ local products = {
 	RobuxUpgradeScrapFlow = table.freeze({
 		Id = "RobuxUpgradeScrapFlow",
 		MarketplaceId = 3709008986,
-		DisplayName = "Scrap Flow +1",
-		Description = "Instantly add one level of Scrap Flow, no scrap cash needed.",
+		DisplayName = "Spawn Rate +1",
+		Description = "Instantly add one level of Spawn Rate, no scrap cash needed.",
 		DisplayPrice = 29,
 		--- Which upgrade a purchase of this product raises. Read by `GrantDeveloperProduct`.
 		UpgradeId = "ScrapFlow",

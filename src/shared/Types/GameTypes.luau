@@ -69,7 +69,6 @@ export type UpgradeDefinition = {
 	LevelsPerPrestige: number,
 	BaseCost: number,
 	GrowthRate: number,
-	CostPower: number,
 	BaseEffect: number,
 	EffectPerLevel: number,
 	EffectCurve: "Power" | "Diminishing" | "Exponential" | "Reduction",

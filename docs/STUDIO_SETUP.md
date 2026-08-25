@@ -63,16 +63,34 @@ Do not enable production-store testing from Studio. Successful DataStore round-t
 
 ## Egg summon podiums
 
-`EggSummonPodium` (a Model, anywhere under `Workspace.NewMap`) is picked up by two things:
-`PetService` binds the hold-E prompt to its highest part, and `EggHologramController` dresses its egg.
+Each area egg is its own site. `PetService` binds a hold-E prompt to the highest part
+of that site, and `EggHologramController` dresses its egg.
 
-The hologram wants:
+The names that count (Folder or Model, anywhere under `Workspace.NewMap`):
 
 ```
-EggSummonPodium
-  VehicleGraveyardEggGroup      -- optional; any child whose name contains "EggGroup"
-    Egg                         -- Model or BasePart, the thing that floats
-    Stand                       -- left alone
+NewMap
+  FrontYardEggGroup            Junkyard Egg (Pup, Zebra, ...)
+    Egg
+    Stand
+  WorkshopYardEggGroup         Workshop Egg
+  VehicleGraveyardEggGroup     Quantum Egg
+```
+
+The group name is the egg: `FrontYard` → Junkyard, `WorkshopYard` → Workshop,
+`VehicleGraveyard` → Quantum. You can also set an `EggId` attribute or StringValue
+(`JunkyardEgg` / `WorkshopEgg` / `QuantumEgg`) if you want to override the name.
+
+A leftover Model named `EggSummonPodium` still works when it does not contain groups.
+Do not put one prompt on a parent that wraps all three eggs -- that is what made only
+the tallest egg hold-E, and always open the Junkyard roster.
+
+The hologram wants, inside each group:
+
+```
+FrontYardEggGroup
+  Egg                         -- Model or BasePart, the thing that floats
+  Stand                       -- left alone
 ```
 
 The egg is found by name (something containing "egg", excluding stand/base/group/podium/plinth/pedestal),
@@ -178,10 +196,11 @@ Consequences worth knowing:
    a rename does not cost players their pets, but a new rename needs the same
    treatment.
 
-Egg podiums are map geometry named `EggSummonPodium` anywhere under
-`Workspace.NewMap`. `PetService` attaches the hold-E prompt itself, so no authored
-prompt is needed. A podium may carry an `EggId` StringValue or attribute to say
-which egg it summons; without one it summons the first entry in `PetConfig.EggOrder`.
+Egg podiums are map geometry: a Folder or Model named `<Area>EggGroup` anywhere under
+`Workspace.NewMap` (`FrontYardEggGroup`, `WorkshopYardEggGroup`, `VehicleGraveyardEggGroup`).
+`PetService` attaches the hold-E prompt itself, so no authored prompt is needed. The group
+name picks the egg; an `EggId` StringValue or attribute overrides it. A model named
+`EggSummonPodium` is only used when it is not already inside one of those groups.
 
 ## The richest-player pedestal
 

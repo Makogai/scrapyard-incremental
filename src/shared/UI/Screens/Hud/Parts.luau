@@ -10,7 +10,7 @@
 		BoostTimers     active potion timers
 		EventBanner     temporary event strip
 		ContextActions  teleport home / sell / auto-collect status
-		StatusCluster   bottom-right trio: daily login boost, friend boost, spin wheel
+		StatusCluster   bottom-right: daily, playtime, friend boost, spin wheel
 		PlotSkinOffer   right-edge lava skin card for the area you are standing on
 		TutorialSpotlight darkens the screen and leaves one control lit
 		TutorialCaption the current onboarding objective
@@ -1474,12 +1474,41 @@ function Parts.DailyBoost(props)
 end
 
 --[[
-	The three of them as one cluster, laid out rather than hand-positioned so a fourth status icon
-	costs one entry instead of four offsets.
+	Today's playtime ladder. Same shape as DailyBoost: READY when a rung can be claimed,
+	otherwise the wait until the next one. Opens its own window -- it used to hide behind
+	a tab on the calendar, which is why nobody found it.
+]]
+function Parts.PlaytimeRewards(props)
+	local claimable = props.claimable == true
+	local remaining = props.nextRemaining or 0
 
-	Order is deliberate: DAILY first because it is the one with something to claim, then the friend
-	boost, then the wheel. Reading left to right that is "what can I collect, what am I earning, what
-	can I gamble".
+	return e(StatusIcon, {
+		key = props.key or "PlaytimeRewards",
+		glyph = props.glyph or "clock",
+		extent = props.extent,
+		value = if claimable then "READY" elseif remaining > 0 then Format.timer(remaining) else "DONE",
+		valueColor = if claimable then Theme.Color.Positive else Theme.Color.Gray,
+		attention = claimable,
+		tipTitle = "PLAYTIME",
+		tipBody = if claimable
+			then "A playtime reward is ready. Open the ladder and claim it."
+			elseif remaining > 0
+			then `Keep playing -- next reward in {Format.timer(remaining)}.`
+			else "Every playtime reward for today is claimed. Come back tomorrow.",
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		layoutOrder = props.layoutOrder,
+		zIndex = props.zIndex,
+		tooltipVisible = props.tooltipVisible,
+		onClick = props.onClick,
+	})
+end
+
+--[[
+	The four of them as one cluster, laid out rather than hand-positioned.
+
+	Order is deliberate: DAILY and PLAYTIME first because they are the ones with
+	something to claim, then the friend boost, then the wheel.
 ]]
 function Parts.StatusCluster(props)
 	local extent = props.extent or 46
@@ -1487,7 +1516,7 @@ function Parts.StatusCluster(props)
 
 	return e(P.Group, {
 		key = props.key or "StatusCluster",
-		size = UDim2.fromOffset(extent * 3 + gap * 2, extent + 16),
+		size = UDim2.fromOffset(extent * 4 + gap * 3, extent + 16),
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
@@ -1508,6 +1537,14 @@ function Parts.StatusCluster(props)
 				layoutOrder = 1,
 				onClick = props.onOpenDaily,
 			}),
+			e(Parts.PlaytimeRewards, {
+				key = "PlaytimeRewards",
+				claimable = props.playtimeClaimable,
+				nextRemaining = props.playtimeNextRemaining,
+				extent = extent,
+				layoutOrder = 2,
+				onClick = props.onOpenPlaytime,
+			}),
 			--[[
 				NO `onClick`. The friend boost is a status readout whose interaction is the hover popup --
 				wiring it to open some other window would be a lie about what the icon is.
@@ -1521,13 +1558,13 @@ function Parts.StatusCluster(props)
 				count = props.friendCount,
 				boost = props.friendBoost,
 				extent = extent,
-				layoutOrder = 2,
+				layoutOrder = 3,
 			}),
 			e(Parts.SpinWheel, {
 				key = "SpinWheel",
 				spins = props.spinsAvailable,
 				extent = extent,
-				layoutOrder = 3,
+				layoutOrder = 4,
 				onClick = props.onOpenSpin,
 			}),
 		},

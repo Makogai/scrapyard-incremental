@@ -22,8 +22,10 @@ local ITEMS = {
 	{ label = "Magnet - locked", kind = "magnet", id = "blood" },
 	{ label = "Potion", kind = "potion", id = "cash" },
 	{ label = "Potion - none owned", kind = "potion", id = "god" },
-	{ label = "Pet", kind = "pet", id = "gear_bot" },
-	{ label = "Pet - locked", kind = "pet", id = "void_vulture" },
+	{ label = "Pet", kind = "pet", id = "Pup" },
+	{ label = "Pet - secret", kind = "pet", id = "MythicAutumnDragon" },
+	{ label = "Pet - singularity", kind = "pet", id = "Singularity" },
+	{ label = "Pet - locked", kind = "pet", id = "NebulaLeviathan" },
 }
 
 local LABELS = {}
@@ -35,7 +37,7 @@ return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
 	name = "Item Details",
-	summary = "Magnet, potion and pet details in owned, equipped and locked states.",
+	summary = "Magnet, potion and pet details. Secret and Singularity pets show a two-column stat grid.",
 	controls = {
 		Item = UILabs.Choose(LABELS, 2),
 		Device = UILabs.Choose({ "desktop", "tablet", "mobile" }, 1),

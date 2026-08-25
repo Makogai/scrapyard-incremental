@@ -243,12 +243,21 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 	}),
 }
 
+--[[
+	Rarity odds are weights out of VariantRollTotal (100,000), so the percentages below are exact.
+
+	Normal 93.825% / Rare 5% / Epic 1% / Legendary 0.15% / Nebula 0.025%.
+	Payouts: ×1 / ×2 / ×4 / ×8 / ×25.
+
+	Luck does not change Normal's weight. It raises every other tier by luck^LuckExponent and then the
+	roll is re-normalised, so invested luck shrinks Normal's share rather than minting extra pieces.
+]]
 local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
 	Normal = table.freeze({
 		Id = "Normal",
 		DisplayName = "Normal",
 		ValueMultiplier = 1,
-		SpawnWeight = 9600,
+		SpawnWeight = 93825,
 		LuckExponent = 0,
 		Color = Color3.fromRGB(155, 165, 170),
 	}),
@@ -256,7 +265,7 @@ local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
 		Id = "Rare",
 		DisplayName = "Rare",
 		ValueMultiplier = 2,
-		SpawnWeight = 300,
+		SpawnWeight = 5000,
 		LuckExponent = 1,
 		Color = Color3.fromRGB(73, 157, 255),
 		EffectName = "RareShimmer",
@@ -264,8 +273,8 @@ local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
 	Epic = table.freeze({
 		Id = "Epic",
 		DisplayName = "Epic",
-		ValueMultiplier = 5,
-		SpawnWeight = 80,
+		ValueMultiplier = 4,
+		SpawnWeight = 1000,
 		LuckExponent = 1.5,
 		Color = Color3.fromRGB(185, 83, 255),
 		EffectName = "EpicPulse",
@@ -273,8 +282,8 @@ local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
 	Legendary = table.freeze({
 		Id = "Legendary",
 		DisplayName = "Legendary",
-		ValueMultiplier = 15,
-		SpawnWeight = 18,
+		ValueMultiplier = 8,
+		SpawnWeight = 150,
 		LuckExponent = 2,
 		Color = Color3.fromRGB(255, 188, 46),
 		EffectName = "LegendaryBurst",
@@ -282,8 +291,8 @@ local variantById: { [GameTypes.VariantId]: GameTypes.VariantDefinition } = {
 	Nebula = table.freeze({
 		Id = "Nebula",
 		DisplayName = "Nebula",
-		ValueMultiplier = 75,
-		SpawnWeight = 2,
+		ValueMultiplier = 25,
+		SpawnWeight = 25,
 		LuckExponent = 2.6,
 		Color = Color3.fromRGB(90, 255, 225),
 		EffectName = "NebulaAura",
@@ -317,19 +326,30 @@ return table.freeze({
 	SlotsPerScrap = 1,
 	MinimumRespawnFraction = 0.42,
 	--[[
+		How long an uncollected piece may sit before it despawns and a new random one takes its
+		place. Collection respawn is unchanged -- this is only so a pile you walk past does not
+		stay the same cans forever. Spread is a fraction of the wait, so a whole pile does not
+		pop at once. Arena scrap is not refreshed this way.
+
+		80 seconds, not ~20: the first pass left pieces vanishing while you were still walking
+		across the yard.
+	]]
+	IdleRefreshSeconds = 80,
+	IdleRefreshSpread = 0.2,
+	--[[
 		The highest total luck multiplier that may feed the rarity exponents.
 
 		Rarity weights are `weight x luck ^ exponent` with 2.6 on Nebula, so luck compounds much faster
-		than it reads: at luck 4 Nebula is 1 in 319, at luck 10 it is 1 in 22. Every source multiplies --
-		upgrade, potion, event, pets, rebirths -- and no single one of them looks unreasonable, which is
-		exactly why the ceiling belongs on the product rather than on any of them.
+		than it reads. Every source multiplies -- upgrade, potion, event, pets, rebirths -- and no single
+		one of them looks unreasonable, which is exactly why the ceiling belongs on the product rather
+		than on any of them.
 
-		At 6 the best-case Nebula rate is about 1 in 64, which is a genuine jackpot a heavily invested
-		player sees a few times an hour.
+		At the cap of 6, Nebula is about 1 in 66 from a 0.025% base. That is still a jackpot a heavily
+		invested player sees a few times an hour.
 	]]
 	MaximumLuckMultiplier = 6,
 	ById = table.freeze(scrapById),
 	Variants = table.freeze(variantById),
 	VariantOrder = table.freeze({ "Normal", "Rare", "Epic", "Legendary", "Nebula" }),
-	VariantRollTotal = 10000,
+	VariantRollTotal = 100000,
 })

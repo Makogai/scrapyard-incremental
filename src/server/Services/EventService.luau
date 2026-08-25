@@ -28,6 +28,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
+local ArenaService = require(script.Parent.ArenaService)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local RemoteService = require(script.Parent.RemoteService)
 
@@ -125,6 +126,12 @@ function EventService.Republish()
 	lastEventId = id
 	publish()
 	PlayerStateService.PushAll()
+	--[[
+		The Pit binds here too. The HUD button appears as soon as this snapshot lands, and
+		waiting for ArenaService's own poll left ENTER THE PIT as a no-op for up to five
+		seconds after an admin started Scrap Pit.
+	]]
+	ArenaService.Sync()
 	if changed then
 		announce(definition)
 	end
@@ -154,6 +161,7 @@ function EventService.Start()
 		--- Snapshot first, popup second: the HUD should already be right when the popup names it.
 		publish()
 		PlayerStateService.PushAll()
+		ArenaService.Sync()
 		if not first then
 			announce(definition)
 		end

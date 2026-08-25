@@ -133,9 +133,9 @@ local function derivedStats(data: { [string]: any })
 	--[[
 		THE PERMANENT REBIRTH BONUS, which is the entire reason to rebirth.
 
-		Money, areas and upgrades all reset, so without this a prestige is a pure loss. +25% value per
-		rebirth compounds against the x1.75 cost growth -- the growth has to be the faster of the two or
-		each rebirth gets easier than the last, which is why those two numbers live next to each other in
+		Money, areas and upgrades all reset, so without this a prestige is a pure loss. Value compounds
+		as 1.25^R against the x1.55 cost growth -- the growth has to be the faster of the two or each
+		rebirth gets easier than the last, which is why those two numbers live next to each other in
 		`PrestigeConfig` with a comment saying so.
 
 		This is now the ONLY thing a rebirth pays. Gears used to multiply income on top of it and no longer
@@ -162,10 +162,22 @@ local function derivedStats(data: { [string]: any })
 	if data.Entitlements.StoragePlus == true then
 		storageCapacity *= 1.5
 	end
+	--[[
+		SLOTS ARE WHOLE. Pets and the storage pass multiply this into a fraction, and the HUD rounds
+		that fraction for display -- 50.81 became "51" on the bar while pickup still used 50.81, so
+		the last space could never be filled. Round here so the number you see is the number you can
+		carry.
+	]]
+	storageCapacity = math.max(1, math.floor(storageCapacity + 0.5))
 	local collectionSpeed = effect("CollectionSpeed")
 	local respawnMultiplier = effect("ScrapFlow")
 	collectionSpeed *= petEffects.CollectionSpeed
-	respawnMultiplier *= petEffects.RespawnRate
+	--[[
+		Pet RespawnRate is "faster" as a multiplier above 1, same shape as strength or luck.
+		`RespawnMultiplier` is a DIVISOR of time -- lower is faster -- so invert the pet bonus here.
+		Without this, +30% respawn speed made scrap take 30% longer to come back.
+	]]
+	respawnMultiplier /= math.max(petEffects.RespawnRate, 0.01)
 	collectionSpeed *= EventConfig.multiplierAt("CollectionSpeed", now)
 	respawnMultiplier *= EventConfig.multiplierAt("RespawnRate", now)
 	if magnetPotion then
@@ -206,13 +218,70 @@ local function derivedStats(data: { [string]: any })
 	}
 end
 
+local function applyWalkSpeed(player: Player, data: { [string]: any })
+	local character = player.Character
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	if humanoid then
+		local target = derivedStats(data).MovementSpeed
+		if math.abs(humanoid.WalkSpeed - target) > 0.05 then
+			humanoid.WalkSpeed = target
+		end
+	end
+end
+
+--[[
+	Roblox writes WalkSpeed AGAIN after we set it.
+
+	Buying a speed upgrade looked like it worked for a second, then snapped back to 16: the
+	avatar's HumanoidDescription applies about a second after spawn (and again after a
+	wardrobe change) and overwrites whatever we put on the Humanoid. Listen for that write
+	and put the upgrade back. The epsilon keeps this from looping when we are the writer.
+]]
+local walkSpeedBinds: { [Player]: RBXScriptConnection } = {}
+
+local function unbindWalkSpeed(player: Player)
+	local connection = walkSpeedBinds[player]
+	if connection then
+		connection:Disconnect()
+		walkSpeedBinds[player] = nil
+	end
+end
+
+local function bindWalkSpeed(player: Player, character: Model)
+	unbindWalkSpeed(player)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid == nil then
+		local found = character:WaitForChild("Humanoid", 8)
+		humanoid = if found and found:IsA("Humanoid") then found else nil
+	end
+	if humanoid == nil then
+		return
+	end
+	walkSpeedBinds[player] = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+		local session = sessions[player]
+		if session then
+			applyWalkSpeed(player, session.Data)
+		end
+	end)
+	local session = sessions[player]
+	if session then
+		applyWalkSpeed(player, session.Data)
+	end
+end
+
 function PlayerStateService.GetLuckMultiplier(player: Player): number
 	local session = sessions[player]
 	if session == nil then
 		return 1
 	end
 	local boosts = session.Data.ActiveBoosts
+	local prestigeCount = math.max(0, math.floor(session.Data.PrestigeCount or 0))
+	--[[
+		Permanent per-rebirth luck is RAW: added onto upgrade/pet luck before potions and events
+		multiply. `RebirthLuck = R * 0.05`. See `GameMath.prestigeLuckBonus`.
+	]]
 	local multiplier = derivedStats(session.Data).RarityLuck
+		+ GameMath.prestigeLuckBonus(prestigeCount, PrestigeConfig.LuckPerPrestige)
 	if boosts.LuckBoostEndsAt > os.time() then
 		multiplier *= InventoryConfig.Consumables.LuckPotion.LuckMultiplier
 	end
@@ -221,9 +290,6 @@ function PlayerStateService.GetLuckMultiplier(player: Player): number
 	end
 	--- Lucky Hour, from the same schedule the scrap-value events come from.
 	multiplier *= EventConfig.multiplierAt("Luck", os.time())
-	--- Permanent per-rebirth luck, the other half of what prestige buys.
-	local prestigeCount = math.max(0, math.floor(session.Data.PrestigeCount or 0))
-	multiplier *= 1 + prestigeCount * PrestigeConfig.LuckPerPrestige
 
 	--[[
 		THE CEILING ON TOTAL LUCK, and it is not decoration.
@@ -376,6 +442,16 @@ function PlayerStateService.GrantEntitlement(
 		data.OwnedPets[premiumPetId] = math.max(1, data.OwnedPets[premiumPetId] or 0)
 	end
 	pushState(player, data)
+	--[[
+		AUTO SELL starts earning on the purchase, not the next pickup.
+
+		The pass only dumps a full bag, and a full bag cannot collect, so a player who bought it
+		because they were already full stayed stuck until they walked to the crusher anyway.
+		Selling the load they are carrying is the thing they paid for.
+	]]
+	if entitlementId == "AutoSell" then
+		PlayerStateService.TrySell(player)
+	end
 	return true, `{definition.DisplayName} unlocked!`
 end
 
@@ -835,9 +911,13 @@ function PlayerStateService.GetRewardState(player: Player): { [string]: any }?
 		SpinLastGrantDay = data.SpinLastGrantDay,
 		TutorialStep = data.TutorialStep,
 		TutorialComplete = data.TutorialComplete,
+		AffordHints = table.clone(data.AffordHints or {}),
 		Money = data.Money,
+		PrestigeCount = data.PrestigeCount,
 		TotalScrapCollected = data.TotalScrapCollected,
 		UpgradeLevels = table.clone(data.UpgradeLevels),
+		UnlockedAreas = table.clone(data.UnlockedAreas),
+		OwnedMagnets = table.clone(data.OwnedMagnets),
 	}
 end
 
@@ -928,6 +1008,28 @@ function PlayerStateService.GrantDailySpins(player: Player, today: number, count
 	return true
 end
 
+--[[
+	Stamp that an affordance toast has fired. Saved immediately so a crash cannot
+	show the same card again next join. False when the id is already marked.
+]]
+function PlayerStateService.MarkAffordHint(player: Player, hintId: string): boolean
+	local session = sessions[player]
+	if session == nil or typeof(hintId) ~= "string" or hintId == "" then
+		return false
+	end
+	local hints = session.Data.AffordHints
+	if typeof(hints) ~= "table" then
+		hints = {}
+		session.Data.AffordHints = hints
+	end
+	if hints[hintId] == true then
+		return false
+	end
+	hints[hintId] = true
+	saveSession(player, false)
+	return true
+end
+
 function PlayerStateService.SetTutorialProgress(
 	player: Player,
 	step: number,
@@ -988,6 +1090,7 @@ end
 
 pushState = function(player: Player, data: { [string]: any })
 	player:SetAttribute("EquippedPets", HttpService:JSONEncode(data.EquippedPets))
+	applyWalkSpeed(player, data)
 	--[[
 		Roblox's own player list, updated from the same funnel as everything else.
 
@@ -1036,6 +1139,17 @@ saveSession = function(player: Player, releaseSession: boolean): boolean
 end
 
 local function onPlayerAdded(player: Player)
+	--[[
+		Bound BEFORE the data load. Character can spawn while DataStores yield, and a connection
+		added afterwards would miss that spawn -- which is how the 2x speed pass looked like it
+		did nothing: derived stats said 32, WalkSpeed stayed at 16 until they bought an upgrade.
+	]]
+	player.CharacterAdded:Connect(function(character)
+		bindWalkSpeed(player, character)
+	end)
+	player.CharacterAppearanceLoaded:Connect(function(character)
+		bindWalkSpeed(player, character)
+	end)
 	local succeeded, data, loadError = DataService.Load(player.UserId)
 	if not succeeded or data == nil then
 		warn(
@@ -1065,15 +1179,21 @@ local function onPlayerAdded(player: Player)
 	]]
 	LeaderstatsService.Publish(player, data)
 	grantStaffTitles(player, data)
-	local character = player.Character
-	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
-	if humanoid then
-		humanoid.WalkSpeed = derivedStats(data).MovementSpeed
+	--[[
+		A full bag plus AUTO SELL on join would otherwise sit until they walked to the crusher:
+		nothing can be collected, so the pickup-time sell never runs.
+	]]
+	PlayerStateService.AutoSellIfFull(player)
+	if player.Character then
+		bindWalkSpeed(player, player.Character)
+	else
+		applyWalkSpeed(player, data)
 	end
 end
 
 local function onPlayerRemoving(player: Player)
 	lastActiveAt[player] = nil
+	unbindWalkSpeed(player)
 	if sessions[player] == nil then
 		return
 	end
@@ -1332,10 +1452,7 @@ function PlayerStateService.TryCollect(
 		re-sends a snapshot that is already correct rather than risking one that is not.
 	]]
 	if data.Entitlements.AutoSell == true then
-		local capacity = derivedStats(data).StorageCapacity
-		if data.StoredWeight >= capacity then
-			PlayerStateService.TrySell(player)
-		end
+		PlayerStateService.AutoSellIfFull(player)
 	end
 	pushState(player, data)
 	if notifyRemote and not wasDiscovered then
@@ -1410,6 +1527,26 @@ function PlayerStateService.TrySell(player: Player): (boolean, number)
 	return true, award
 end
 
+--[[
+	Dump a full bag if this player owns AUTO SELL.
+
+	Used when collection is blocked by a full bag -- otherwise the pass never fires, because
+	`TryCollect` is the only other seller and a full bag cannot collect. Returns whether a
+	sale happened, so the magnet can retry the same piece.
+]]
+function PlayerStateService.AutoSellIfFull(player: Player): boolean
+	local session = sessions[player]
+	if session == nil or session.Data.Entitlements.AutoSell ~= true then
+		return false
+	end
+	local data = session.Data
+	if data.StoredWeight < derivedStats(data).StorageCapacity then
+		return false
+	end
+	local sold = PlayerStateService.TrySell(player)
+	return sold
+end
+
 function PlayerStateService.TryPurchaseUpgrade(player: Player, upgradeId: string): (boolean, string)
 	local session = sessions[player]
 	local definition = UpgradeConfig.ById[upgradeId]
@@ -1431,7 +1568,6 @@ function PlayerStateService.TryPurchaseUpgrade(player: Player, upgradeId: string
 	local price = GameMath.incrementalUpgradeCost(
 		definition.BaseCost,
 		definition.GrowthRate,
-		definition.CostPower,
 		currentLevel,
 		Environment.MaximumMoney
 	)
@@ -1480,6 +1616,12 @@ function PlayerStateService.TryUnlockArea(player: Player, areaId: string): (bool
 		data.UnlockedScrapTypes[scrapId] = true
 	end
 	data.PlotStage = math.max(data.PlotStage, definition.Order)
+	--[[
+		Buying an area IS converting the plot. The hold-E structures used to be a second step, which
+		meant a player could own the Workshop and still be standing in the Front Yard. The theme
+		follows the latest unlock; prestige puts it back to FrontYard with the rest of the reset.
+	]]
+	data.ActivePlotTheme = areaId
 	pushState(player, data)
 	return true, `{definition.DisplayName} unlocked!`
 end
@@ -1523,6 +1665,7 @@ function PlayerStateService.AdminMutate(
 			end
 		end
 		data.PlotStage = math.max(data.PlotStage, #AreaConfig.Order)
+		data.ActivePlotTheme = AreaConfig.Order[#AreaConfig.Order]
 	elseif command == "MaxUpgrades" then
 		for upgradeId, definition in UpgradeConfig.ById do
 			data.UpgradeLevels[upgradeId] = GameMath.upgradeMaximumLevel(
@@ -1616,6 +1759,9 @@ function PlayerStateService.AdminMutate(
 			the player's purchase history a lie.
 		]]
 		data.Entitlements[definition.Id] = true
+		if definition.Id == "AutoSell" then
+			PlayerStateService.TrySell(player)
+		end
 	elseif command == "GrantTitle" then
 		local definition = if itemId then TitleConfig.resolve(itemId) else nil
 		if definition == nil then

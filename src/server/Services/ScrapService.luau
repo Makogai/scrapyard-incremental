@@ -786,7 +786,10 @@ function ScrapService.SpawnPublic(
 	local variantId = weightedVariant(luckMultiplier)
 	local authored = ScrapVariants.Get(scrapId, variantId)
 	local baseArt = authored or ScrapVariants.Get(scrapId, "Normal")
-	local template = baseArt or templates:FindFirstChild(definition.ModelName)
+	local template = baseArt
+	if template == nil and templates ~= nil then
+		template = templates:FindFirstChild(definition.ModelName)
+	end
 	if template == nil then
 		return nil
 	end
@@ -891,7 +894,53 @@ local function countPlotScrap(plot: Model): number
 	return count
 end
 
-local function spawnAt(player: Player, plot: Model, marker: BasePart)
+local spawnAt: (Player, Model, BasePart) -> ()
+
+--[[
+	An uncollected piece eventually despawns and a new random one takes its place.
+
+	Without this a pile you walked past stayed the same cans until you picked them, so the
+	yard stopped looking like a random scrap pile. Collection respawn is a separate delay
+	on the magnet path. Arena scrap is not refreshed: the pit tops up to a count.
+]]
+local function refreshStanding(player: Player, record: ScrapRecord)
+	local instance = record.Instance
+	if activeByInstance[instance] ~= record or instance.Parent == nil then
+		return
+	end
+	if record.ReservedUserId ~= nil then
+		task.delay(1, function()
+			refreshStanding(player, record)
+		end)
+		return
+	end
+	local marker = record.Marker
+	local plot = record.Plot
+	activeByInstance[instance] = nil
+	instance:Destroy()
+	if
+		player.Parent ~= nil
+		and marker ~= nil
+		and marker.Parent ~= nil
+		and plot ~= nil
+		and PlotService.IsOwner(player, plot)
+	then
+		spawnAt(player, plot, marker)
+	end
+end
+
+local function scheduleIdleRefresh(player: Player, record: ScrapRecord)
+	if record.OwnerUserId == 0 then
+		return
+	end
+	local spread = ScrapConfig.IdleRefreshSpread
+	local waitFor = ScrapConfig.IdleRefreshSeconds * ((1 - spread) + math.random() * spread * 2)
+	task.delay(waitFor, function()
+		refreshStanding(player, record)
+	end)
+end
+
+spawnAt = function(player: Player, plot: Model, marker: BasePart)
 	local folder = foldersByPlot[plot]
 	if
 		folder == nil
@@ -1030,7 +1079,7 @@ local function spawnAt(player: Player, plot: Model, marker: BasePart)
 		)
 		gameplayEffect:FireAllClients("NebulaSpawn", player.DisplayName, scrapId, areaId)
 	end
-	activeByInstance[instance] = {
+	local record: ScrapRecord = {
 		Instance = instance,
 		Marker = marker,
 		Plot = plot,
@@ -1042,6 +1091,8 @@ local function spawnAt(player: Player, plot: Model, marker: BasePart)
 		FootprintRadius = footprintRadius,
 		RejectedAt = {},
 	}
+	activeByInstance[instance] = record
+	scheduleIdleRefresh(player, record)
 end
 
 local function scrapRootFromPart(part: BasePart): Instance?
@@ -1171,6 +1222,19 @@ local function queryPlayer(player: Player)
 			checked += 1
 			local eligible, reason =
 				PlayerStateService.CanCollect(player, record.ScrapId, record.AreaId, public)
+			if not eligible and reason == "StorageFull" then
+				--[[
+					AUTO SELL has to fire HERE, not only after a successful pickup.
+
+					A full bag is refused by `CanCollect`, so `TryCollect` never runs and the pass
+					that is supposed to dump a full bag would never dump one. Sell, then ask again
+					so this same piece can be reserved in the same query.
+				]]
+				if PlayerStateService.AutoSellIfFull(player) then
+					eligible, reason =
+						PlayerStateService.CanCollect(player, record.ScrapId, record.AreaId, public)
+				end
+			end
 			if eligible then
 				reserve(
 					player,

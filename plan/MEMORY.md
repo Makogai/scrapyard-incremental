@@ -1,6 +1,6 @@
 # Project Memory
 
-Last updated: 2026-08-09
+Last updated: 2026-08-22
 
 ## Identity
 
@@ -32,7 +32,7 @@ Last updated: 2026-08-09
 - Workspace and StarterGui remain Studio-authored/partially managed by Rojo.
 - Gears are the single MVP prestige currency.
 - Initial scrap roster: Can, Bolt, Plate, Tire, Appliance, Engine Part, Car Door, Scrap Car.
-- Variants: Normal 1x, Silver 2x, Gold 5x, Rainbow 15x.
+- Variants: Normal 1x, Rare 2x, Epic 4x, Legendary 8x, Nebula 25x. Base odds 93.825 / 5 / 1 / 0.15 / 0.025 percent.
 - Do not build detailed terrain until Phase 5; use named primitive placeholders first.
 
 ## Phase 0 Completed Work
@@ -294,12 +294,69 @@ No Snowman-specific runtime source remains. Historical references exist only in 
 
 ## Exact Next Action
 
-Replaced the rejected hybrid UI with `PackGameplayUI`, using direct clones of the imported pack's HUD, Upgrades, Settings, Rebirth, Shop, Index, and Currencies objects. The exact six-button HUD composition, wide Settings utility button, stat stack, frames, rows, sliders, toggles, cards, headers, and close controls are retained. The former `ScrapyardUI` was removed from StarterGui and archived at `ServerStorage/LegacyUIArchive`. The 12 untouched reference ScreenGuis remain in `ServerStorage/PremiumUIReference`.
+JunkyardEgg display name is Front Yard Egg; QuantumEgg is Vehicle Graveyard Egg. Egg hold-E sits on a padded invisible hitbox with 18-stud reach. Authored podium signs that still said Junkyard/Quantum are rewritten on bind. Changelog 0.4.12.
 
-The progression loop now uses prestige-expanded upgrade caps, starts magnet range at 9 studs, and targets a $350K first prestige. Workshop/Vehicle cost $12.5K/$125K and Advanced Magnet costs $60K.
+Load sanitiser `BASE_PET_SLOTS` is 3, matching `PetConfig.BaseEquipSlots`. It was still 1, so a rejoin trimmed EquippedPets to one. Changelog 0.4.11.
 
-An authored Pet Hatchery and pet menu now support three six-pet eggs, Common through Secret odds, 50-roll Legendary pity, 500-roll Secret pity, additive cash buffs, duplicate equipment, one base slot, two permanent cash slot upgrades, and two `ExtraPetSlots` pass slots.
+Equipped pet followers strip authored Highlights/lights (the red wash) and hover from the visual bottom, not the exporter pivot. Premium pets keep an outline with no fill. Changelog 0.4.10.
 
-Run the phone/tablet device matrix against the new UI (item 1 in `plan/UI_MIGRATION.md`). Only after it passes, delete `PackUIController` and archive `PackGameplayUI`. The live Play session is done and recorded.
+ScrapyardPlot FrontYard spawn markers were all in two rows at the entrance (z -150 to -188). They are now spread front / mid / back across the floor so the starter yard is not empty behind the first piles. Still 8 FrontYard points; Workshop and Graveyard markers still unlock later. Studio save required -- this is authored geometry.
 
-Phase 8 hardening still owes the final phone/tablet matrix, disposable-key load failure drill, fresh-profile economy timing run, and manual two-client/12-player local-server soak. Do not mark release-ready until those evidence rows are complete, and re-run the device matrix against the new UI.
+One-shot affordance toasts: Workshop Yard and Advanced Magnet. Server polls every 2s, fires `Notify` once, stamps `AffordHints` on the save. Already owning the thing skips the toast. No HUD tiles yet -- that waits on the other developer. Changelog 0.4.9.
+
+Premium models come from `NewMap.FeaturedPodium` placeholders, not `Workspace.Pets`. Singularity uses the new podium model; the old `Pets.Singularity` body is now Sinister Lord (`SINISTER LORD`). Knight stays `Scrap Chrimson Knight`. Boosts unchanged from 0.4.6. Changelog 0.4.7.
+
+Premium pet prices stay 499 / 699 / 999. Singularity is the limited cash pet (×8 value, +300% strength). Scrap Crimson Knight is luck / respawn / storage. Sinister Lord is the permanent flagship (×5 value, +400% strength, +18% walk speed). Do not put ×20 cash on two premiums -- they add. Changelog 0.4.6.
+
+Demonic Ghost display name is Scrap Crimson Knight (`Id` still `DemonicGhost`). Changelog 0.4.5.
+
+Hatchable RarityLuck is under that premium's +20%: Junkyard Secret +12%, Workshop Secret +14%, Quantum Secret +16%, Legendaries +10%. Changelog 0.4.4.
+
+Each wheel spin adds another six turns from the last landing angle. The winner flash and prize banner wait until the pointer is on the wedge. Cash reward art is the painted coin `rbxassetid://130780043686108`. Workshop/Quantum silhouettes use the same flat black stamp as Junkyard.
+
+Daily and playtime rewards are separate windows (calendar vs clock icons on the HUD). Playtime seconds interpolate on a 1s ticker so the open window counts down. Event start audio is `EventSoundConfig` (Pit = `93775470439672`).
+
+Scrap Normal base values were already the live table ($45 MetalCan through $1,750 ScrapCar). Rarity odds and payouts were retuned in `ScrapConfig`: Normal 93.825% ×1, Rare 5% ×2, Epic 1% ×4, Legendary 0.15% ×8, Nebula 0.025% ×25, with `VariantRollTotal` 100,000.
+
+Rebirth cost is `$2,000,000 × 1.55 ^ R`. Permanent value is `1.25 ^ R`. Luck is raw `R × 0.05`.
+
+Workshop and Quantum (Vehicle Graveyard) pets now use per-rarity boost tables. Premium pets no longer copy/amplify the team.
+
+Upgrade cash cost is `BaseCost × Growth ^ currentLevel`. Level 1 prices: Strength $650, Range $500, Storage $800, Speed $1,200, Value $1,500, Collection $900, Spawn Rate $2,200, Luck $3,000. Basic Magnet starts at 5 studs; range is +1/level (level 4 = old 9, level 10 = 15). Growth 1.35. EffectCap still 42. Changelog 0.4.8. Scrap Flow display name is Spawn Rate. Combined pet cash still capped at +100%. Junkyard pets not retuned.
+
+Movement Speed is Power +2 per level from 16 to a cap of 28 (level 1 = 18 walk speed). The old diminishing +0.07 curve was unnoticeable.
+
+Buying Workshop / Vehicle Graveyard now sets `ActivePlotTheme` and rebuilds the plot. Hold-E convert structures and convert-back are gone. On load, theme is the highest unlocked area.
+
+`Format.short` was eating integer trailing zeros (`%.?0+$`), so $100K showed as $1K. Trim now only applies to the decimal part.
+
+AUTO SELL sells the current load on purchase, on join if the bag is already full, and when the magnet is blocked by a full bag (not only after a pickup that fills it).
+
+Movement Speed is +3 per level from 16 (level 1 = 19, level 10 = 46, cap 64). The 2x Walk Speed pass multiplies after the upgrade and is applied on purchase, on every state push, and on CharacterAdded (it previously never wrote WalkSpeed).
+
+Singularity MoneyMultiplier is 8. Hatchable pet cash is still capped at +100%; premium cash adds after that cap.
+
+Pet inspect uses a two-column compact stat grid in a scrolling viewport (168px) so every bonus is visible.
+
+WalkSpeed is re-applied whenever the Humanoid's WalkSpeed changes, because HumanoidDescription overwrites it ~1s after spawn/upgrade. Uncollected plot scrap idle-refreshes after ~80s.
+
+Hub leaderboards (`LeaderboardService`) find `Leaderboard_TopPlaytime` / `TopRebirths` / `TopRobux` anywhere under Workspace, fill or build the SurfaceGui rows, resolve usernames from the live player then `GetNameFromUserIdAsync`, and fall back to whoever is connected when the OrderedDataStore is empty.
+
+Egg sites are each `<Area>EggGroup` under NewMap. Equipped followers pose from `AnimatedFace` (`PetModelPose`); Pup's `FollowerScale` is 0.7.
+
+The Pit uses authored `Workspace.Event Area`. Players land on the authored `Event Area Spawn Point.PitSpawn` — loot nodes in `PitScrapSpawns` are scrap only. The area is never destroyed; only the `PitScrap` folder comes and goes with the event.
+
+## 2026-08-22 — Pets and Pit teleport
+
+Root cause of both regressions: `ShopService.Start` asserted `NewMap["Magnet Shop"]` (space). The map now has `MagnetShop`. That throw aborted server bootstrap, so `PetService`, `ArenaService`, `TeleportService`, events, and return-to-play never started.
+
+Also fixed, because they were real once bootstrap ran again:
+
+- Workshop/Quantum Studio models were renamed (Yin Yang, Fracture, Decore, …) and no longer matched `PetConfig.ModelName`. Publish now matches name, then leftover models in egg-folder roster order. Display names follow the art. Duplicate Quantum `Decore` renamed to `Nova Lion` in Studio.
+- ENTER THE PIT uses the authored `PitSpawn`. Do not rewrite spawn-model `CanCollide`: that leftover workaround was why players fell through parts they had set solid in Studio.
+- Changelog 0.4.3.
+
+**Save the Studio place** — PitSpawn move, spawn-sculpture collision, and the Nova Lion rename are place instances, not Rojo.
+
+Verified in Play: 19 pet models published (all hatchable plus Singularity); ScrapPit override opened; character PivotTo Event Area floor at Y≈1027.
+

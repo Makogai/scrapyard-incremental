@@ -6,12 +6,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
+local PetModelPose = require(ReplicatedStorage.Shared.Utility.PetModelPose)
 
 local PetFollowerController = {}
 local followers: { [Player]: { Model } } = {}
 local connections: { [Player]: RBXScriptConnection } = {}
+local faceRotations: { [Model]: CFrame } = {}
+local hoverOffsets: { [Model]: Vector3 } = {}
 
-local function prepare(model: Model)
+local function prepare(model: Model, petId: string)
+	PetModelPose.stripStudioFx(model)
 	for _, item in model:GetDescendants() do
 		if item:IsA("BasePart") then
 			item.Anchored = true
@@ -22,27 +26,31 @@ local function prepare(model: Model)
 		end
 	end
 	--[[
-		Scaled to a target size along the longest axis, so pets of wildly different
-		proportions all read as the same "pet sized" thing behind the player.
+		Scaled to a target size along the longest STANDING axis.
+
+		`GetExtentsSize` is in pivot space. Pup is stored upside down with a
+		different pivot from the other Junkyard pets, so that box was nothing like
+		the pet you actually see -- it came out the wrong size AND on its head.
+		`PetModelPose` stands it up using `AnimatedFace` first, then we measure.
 
 		The target is `PetConfig.FollowerLongestAxis` with an optional per-pet
-		multiplier from `PetConfig.FollowerScale` -- a long dragon looks enormous at
-		the same longest-axis size that suits a compact pup. Both are config, so
-		tuning this needs no code change.
-
-		Unlike the old version this scales *down or up*: it used to only shrink
-		models already larger than the target, which left small ones untouched and
-		inconsistent.
+		multiplier from `PetConfig.FollowerScale`. Pass the pet id, not `model.Name`:
+		followers are renamed `{player}_{id}_{index}` before this runs, so looking
+		up by the instance name never hit the table.
 	]]
-	local size = model:GetExtentsSize()
+	local faceRotation = PetModelPose.faceRotationInPivot(model)
+	faceRotations[model] = faceRotation
+	local size = PetModelPose.standingExtents(model, faceRotation)
 	local largest = math.max(size.X, size.Y, size.Z)
 	if largest <= 0 then
+		hoverOffsets[model] = Vector3.zero
 		return
 	end
 
-	local multiplier = PetConfig.FollowerScale[model.Name] or 1
+	local multiplier = PetConfig.FollowerScale[petId] or 1
 	local target = PetConfig.FollowerLongestAxis * multiplier
 	model:ScaleTo(model:GetScale() * target / largest)
+	hoverOffsets[model] = PetModelPose.hoverLocalOffset(model, faceRotation)
 end
 
 local function fallbackModel(petId: string): Model
@@ -71,6 +79,8 @@ local function clear(player: Player)
 	local existing = followers[player]
 	if existing then
 		for _, model in existing do
+			faceRotations[model] = nil
+			hoverOffsets[model] = nil
 			model:Destroy()
 		end
 	end
@@ -121,14 +131,21 @@ local function rebuild(player: Player)
 				else fallbackModel(petId)
 			model.Name = `{player.Name}_{petId}_{index}`
 			model:SetAttribute("PetFollower", true)
-			prepare(model)
+			local prepared, prepareError = pcall(prepare, model, petId)
+			if not prepared then
+				warn(`[PetFollower] {petId} pose/scale failed: {prepareError}`)
+			end
 			if definition.Premium then
+				--[[
+					Outline only. A filled Highlight is a wash over every part, which is
+					why premium pets (and any authored Highlight cloned off the model)
+					looked red or pink instead of their own colours.
+				]]
 				local glow = Instance.new("Highlight")
 				glow.Name = "PremiumGlow"
-				glow.FillColor = definition.FallbackColor
-				glow.FillTransparency = 0.55
-				glow.OutlineColor = Color3.new(1, 1, 1)
-				glow.OutlineTransparency = 0.15
+				glow.FillTransparency = 1
+				glow.OutlineColor = definition.FallbackColor
+				glow.OutlineTransparency = 0.35
 				glow.DepthMode = Enum.HighlightDepthMode.Occluded
 				glow.Parent = model
 			end
@@ -180,7 +197,16 @@ function PetFollowerController.Start()
 					+ root.CFrame.RightVector * side
 					- root.CFrame.LookVector * behind
 					+ Vector3.new(0, 1.9 + bob, 0)
-				local target = CFrame.lookAt(position, position + root.CFrame.LookVector)
+				local target = PetModelPose.worldPivot(
+					model,
+					position,
+					root.CFrame.LookVector,
+					faceRotations[model]
+				)
+				local hoverOffset = hoverOffsets[model]
+				if hoverOffset then
+					target = target * CFrame.new(-hoverOffset)
+				end
 				local current = model:GetPivot()
 				model:PivotTo(current:Lerp(target, math.clamp(12 * deltaTime, 0, 1)))
 			end
