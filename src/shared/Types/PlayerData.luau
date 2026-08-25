@@ -23,6 +23,11 @@ export type PlayerData = {
 	SchemaVersion: number,
 	Money: number,
 	Gears: number,
+	--[[
+		THE PIT's event currency. Earned only from Pit pickups and wrecks, spent only at the Pit
+		shop, and it BANKS across weeks -- a Friday you skip still leaves last week's slag.
+	]]
+	Slag: number,
 	TotalScrapCollected: number,
 	StoredWeight: number,
 	StoredValue: number,

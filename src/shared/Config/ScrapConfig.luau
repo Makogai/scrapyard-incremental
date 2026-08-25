@@ -241,6 +241,68 @@ local scrapById: { [GameTypes.ScrapId]: GameTypes.ScrapDefinition } = {
 		RespawnSeconds = 12,
 		ModelName = "ScrapCar",
 	}),
+	--[[
+		THE PIT'S OWN SCRAP. Never on a plot: `AreaIds` is empty and `PitOnly` is the flag
+		`ScrapService` / the validator both read. Strength is the ticket -- you can SEE a Robot
+		Arm on the floor with a starter magnet, and the reject flash is the reason to come back
+		next Friday with a better one.
+	]]
+	Drone = scrap({
+		Id = "Drone",
+		DisplayName = "Drone",
+		Weight = 8,
+		BaseValue = 420,
+		RequiredMagnetStrength = 8,
+		AreaIds = {},
+		SpawnWeight = 40,
+		RespawnSeconds = 5,
+		ModelName = "Drone",
+		PitOnly = true,
+		SlagValue = 2,
+	}),
+	Submarine = scrap({
+		Id = "Submarine",
+		DisplayName = "Submarine",
+		Weight = 32,
+		BaseValue = 1600,
+		RequiredMagnetStrength = 16,
+		AreaIds = {},
+		SpawnWeight = 28,
+		RespawnSeconds = 7,
+		ModelName = "Submarine",
+		PitOnly = true,
+		SlagValue = 5,
+	}),
+	LavaCoreScrap = scrap({
+		Id = "LavaCoreScrap",
+		DisplayName = "Lava Core",
+		Weight = 55,
+		BaseValue = 3400,
+		RequiredMagnetStrength = 28,
+		AreaIds = {},
+		SpawnWeight = 18,
+		RespawnSeconds = 9,
+		ModelName = "LavaCoreScrap",
+		PitOnly = true,
+		SlagValue = 10,
+	}),
+	RobotArm = scrap({
+		Id = "RobotArm",
+		DisplayName = "Robot Arm",
+		Weight = 95,
+		BaseValue = 9000,
+		RequiredMagnetStrength = 50,
+		AreaIds = {},
+		SpawnWeight = 8,
+		RespawnSeconds = 12,
+		--[[
+			Studio name has a space. `ScrapVariants` and `ServerStorage.ScrapModels` both look
+			up `ModelName` exactly, so this must match the authored instance.
+		]]
+		ModelName = "Robot Arm",
+		PitOnly = true,
+		SlagValue = 25,
+	}),
 }
 
 --[[
@@ -348,6 +410,12 @@ return table.freeze({
 		invested player sees a few times an hour.
 	]]
 	MaximumLuckMultiplier = 6,
+	--[[
+		Pit-only ids, in strength order. The collection index appends this after the plot
+		areas so a Drone is not listed as Front Yard scrap, and achievements that ask
+		"have they found every Pit piece" walk this list rather than guessing.
+	]]
+	PitOrder = table.freeze({ "Drone", "Submarine", "LavaCoreScrap", "RobotArm" }),
 	ById = table.freeze(scrapById),
 	Variants = table.freeze(variantById),
 	VariantOrder = table.freeze({ "Normal", "Rare", "Epic", "Legendary", "Nebula" }),

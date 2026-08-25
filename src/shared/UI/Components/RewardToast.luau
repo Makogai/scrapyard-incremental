@@ -62,7 +62,8 @@ function RewardToast.imageFor(reward: { [string]: any }): string?
 			onlyId = itemId
 		end
 		if onlyId ~= nil then
-			local definition = InventoryConfig.Consumables[onlyId] or InventoryConfig.Magnets[onlyId]
+			local definition = InventoryConfig.Consumables[onlyId]
+				or InventoryConfig.Magnets[onlyId]
 			local iconId = if definition then definition.IconId else nil
 			if iconId ~= nil and iconId ~= "" then
 				return iconId
@@ -71,12 +72,12 @@ function RewardToast.imageFor(reward: { [string]: any }): string?
 	end
 
 	--[[
-		Money-only rewards used to return nil and rely on the `cash` glyph. The glyph
-		was already wired, but the image behind it was a blank gold swatch, so daily
-		cash days, playtime cash, and wheel cash wedges all drew empty wells.
+		Money-only prizes (daily cash days, playtime rungs, wheel wedges) use the
+		pack coin. The Pit shop cash crates set Glyph = "cash" themselves so they
+		draw the bill stack instead.
 	]]
 	if reward.Money and reward.Items == nil and reward.Spins == nil then
-		local entry = Assets.icon("cash")
+		local entry = Assets.icon("coin")
 		return if entry then entry.id else nil
 	end
 

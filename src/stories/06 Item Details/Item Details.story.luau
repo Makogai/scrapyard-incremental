@@ -37,7 +37,7 @@ return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
 	name = "Item Details",
-	summary = "Magnet, potion and pet details. Secret and Singularity pets show a two-column stat grid.",
+	summary = "Magnet, potion and pet details. Hatchable Secrets show their own scrap-value share toward the +100% egg-pet cap.",
 	controls = {
 		Item = UILabs.Choose(LABELS, 2),
 		Device = UILabs.Choose({ "desktop", "tablet", "mobile" }, 1),

@@ -3,8 +3,9 @@
 	EggSummonScreen.luau
 	The egg podium window: what is inside this egg, and the button to roll it.
 
-	Opened by the hold-E prompt on `Workspace.NewMap.EggSummonPodium`, which fires
-	`OpenEggSummon` with the egg's id.
+	Opened by the hold-E prompt on a `*EggGroup` under
+	`Workspace.NewMap.FeaturedPodium.EggSummonPodium`, which fires `OpenEggSummon`
+	with the egg's id.
 
 	Two rows rather than one line of six, so the cards stay big enough to read on a
 	phone:

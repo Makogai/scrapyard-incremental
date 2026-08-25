@@ -8,6 +8,8 @@
 		CurrencyStack   cash / gears / event tokens
 		StorageMeter    SCRAP STORAGE bar with estimated value and FULL state
 		BoostTimers     active potion timers
+		WreckMeter      Pit wreck HP, above storage while the wreck is live
+		                (cyan / SHIELDED while the overload node is up)
 		EventBanner     temporary event strip
 		ContextActions  teleport home / sell / auto-collect status
 		StatusCluster   bottom-right: daily, playtime, friend boost, spin wheel
@@ -221,7 +223,7 @@ end
 	Cash keeps its original look exactly -- `Theme.Font.Money` and
 	`Theme.Gradient.Money` were both lifted off the authored `MoneyValue` label.
 
-	props: cash, gears, prestige, width, compact
+	props: cash, gears, prestige, slag, width, compact
 ]]
 function Parts.CurrencyStack(props)
 	local width = props.width or 216
@@ -253,6 +255,24 @@ function Parts.CurrencyStack(props)
 			textSize = if compact then Theme.TextSize.Body else Theme.TextSize.Value,
 			layoutOrder = 2,
 		}),
+	}
+	if (props.slag or 0) > 0 then
+		table.insert(
+			rows,
+			e(Indicators.StatPill, {
+				key = "Slag",
+				glyph = "slag",
+				value = Format.comma(props.slag),
+				iconGradient = Theme.Gradient.Orange,
+				width = width,
+				height = height,
+				textSize = if compact then Theme.TextSize.Body else Theme.TextSize.Value,
+				layoutOrder = 3,
+			})
+		)
+	end
+	table.insert(
+		rows,
 		e(Indicators.StatPill, {
 			key = "Cash",
 			-- No icon: the authored HUD's cash readout was the number alone, and
@@ -263,9 +283,9 @@ function Parts.CurrencyStack(props)
 			width = width,
 			height = cashHeight,
 			textSize = if cashHeight < 62 then Theme.TextSize.Heading else Theme.TextSize.Hero,
-			layoutOrder = 3,
-		}),
-	}
+			layoutOrder = 4,
+		})
+	)
 
 	local gap = props.gap or 8
 	local count = #rows
@@ -274,7 +294,7 @@ function Parts.CurrencyStack(props)
 		key = props.key or "Currencies",
 		size = if horizontal
 			then UDim2.fromOffset(count * width + (count - 1) * gap, height)
-			else UDim2.fromOffset(width, height * 2 + cashHeight + gap * 2),
+			else UDim2.fromOffset(width, height * (count - 1) + cashHeight + gap * (count - 1)),
 		position = props.position,
 		anchorPoint = props.anchorPoint,
 		zIndex = props.zIndex,
@@ -787,6 +807,45 @@ function Parts.StorageMeter(props)
 		strokeThickness = Theme.Stroke.Card,
 		studSpacing = 26,
 		children = children,
+	})
+end
+
+--------------------------------------------------------------------------------
+-- WreckMeter
+--------------------------------------------------------------------------------
+
+--[[
+	The Pit wreck's integrity, sitting just above the storage meter so you do not
+	have to zoom out and look at the robot's crown. Hidden when max is 0.
+]]
+function Parts.WreckMeter(props)
+	local current = props.integrity or 0
+	local maximum = props.max or 0
+	if maximum <= 0 then
+		return nil
+	end
+	local height = props.height or 30
+	local shielded = props.shielded == true
+	return e(P.Group, {
+		key = props.key or "Wreck",
+		size = props.size or UDim2.fromOffset(360, height),
+		position = props.position,
+		anchorPoint = props.anchorPoint,
+		zIndex = props.zIndex,
+		children = {
+			e(Indicators.ProgressBar, {
+				key = "Bar",
+				value = current,
+				max = maximum,
+				height = height,
+				gradient = if shielded then Theme.Gradient.Cyan else Theme.Gradient.Gold,
+				text = if shielded
+					then `SHIELDED  {Format.comma(math.ceil(current))} / {Format.comma(maximum)}`
+					else `WRECK  {Format.comma(math.ceil(current))} / {Format.comma(maximum)}`,
+				size = UDim2.fromScale(1, 1),
+				zIndex = 2,
+			}),
+		},
 	})
 end
 
@@ -1486,14 +1545,16 @@ function Parts.PlaytimeRewards(props)
 		key = props.key or "PlaytimeRewards",
 		glyph = props.glyph or "clock",
 		extent = props.extent,
-		value = if claimable then "READY" elseif remaining > 0 then Format.timer(remaining) else "DONE",
+		value = if claimable
+			then "READY"
+			elseif remaining > 0 then Format.timer(remaining)
+			else "DONE",
 		valueColor = if claimable then Theme.Color.Positive else Theme.Color.Gray,
 		attention = claimable,
 		tipTitle = "PLAYTIME",
 		tipBody = if claimable
 			then "A playtime reward is ready. Open the ladder and claim it."
-			elseif remaining > 0
-			then `Keep playing -- next reward in {Format.timer(remaining)}.`
+			elseif remaining > 0 then `Keep playing -- next reward in {Format.timer(remaining)}.`
 			else "Every playtime reward for today is claimed. Come back tomorrow.",
 		position = props.position,
 		anchorPoint = props.anchorPoint,

@@ -162,8 +162,47 @@ live. The teleport destination is checked server-side against `ArenaService.IsOp
 anyone still inside the Event Area is put back on their own plot **before** the scrap is cleared.
 
 The start sting lives in `EventSoundConfig` (`ScrapPit` → asset `93775470439672`). Paste a new id
-there to change it; other events stay silent until you add a row. The client plays it when
+there to change the cue; other events stay silent until you add a row. The client plays it when
 `EventState.LiveId` changes, not when someone joins mid-event.
+
+### Pit-only scrap
+
+The Pit no longer drops yard junk. Four authored types spawn only there, never on a plot:
+
+| Piece | Strength | Role |
+| --- | --- | --- |
+| **Drone** | 8 | Common, anyone with a bit of strength |
+| **Submarine** | 16 | Advanced magnet |
+| **Lava Core** | 28 | Salvage / Quantum + pets |
+| **Robot Arm** | 50 | Jackpot. Hardest pull in the game |
+
+Models live in `Workspace.EventScrap` as `Drone`, `Submarine`, `LavaCoreScrap` (or `Lava Core`),
+and `Robot Arm`, and are adopted into `ServerStorage.ScrapModels` at boot. Size and rotation stay
+authored.
+
+### Slag and the Pit shop
+
+Pickups pay **slag** (banks across weeks) on top of scrap cash. Spend it by walking into
+**Event Shop** inside the Pit (same walk-in as Magnet Shop / Area Shop). There is no HUD shop
+button. The client sends an offer id; the server charges slag and grants the row. Buys are
+refused unless the Pit is open and the player is standing in the Event Area.
+
+### The wreck
+
+One wreck at a time. Place a part named **`WreckAnchor`** under `Event Area` on the floor where
+players can reach it. The art is the Workspace model named **`RobotWreck` only** — never Submarine
+or any other Pit scrap. **Every part of that model must be Anchored** (imported MeshParts often
+are not). An unanchored wreck falls through the world on Play before it can be cloned, which is
+why Submarine used to appear and RobotWreck appeared as nothing. Colours stay authored, scaled to
+a landmark (~48 studs). The live wreck is a collidable clone on that anchor. HP is on the HUD
+above the bag bar, and as a small plate at chest height that stays readable across the Pit.
+Chip range is the player's magnet reach (capped at 16 studs inside the Event Area). Integrity
+is high enough that one starter cannot finish it in a minute. After a slice of damage a
+**shield** pauses chipping until someone magnets the single glowing **OVERLOAD** node on a
+Pit scrap pad (not Hold E). The node then hops to another pad. Dropping the shield spills
+extra public chunks at the wreck and at the node. When it breaks it bursts, then spills
+public Pit chunks and pays slag to whoever was chipping. Spawn pads should cover the
+whole Event Area floor, not a tight cluster.
 
 ### Verified live
 
@@ -178,8 +217,11 @@ place after adding spawn nodes; they live in the Studio file, not in Rojo.
 | --- | --- |
 | `EventConfig` | the schedule and the multipliers. Pure, no dependencies |
 | `EventSoundConfig` | start stings, keyed by event id. Swap `AssetId` to change the cue |
-| `ArenaConfig` | the Pit's design: where, how big, how much scrap, and the three rules above |
+| `ArenaConfig` | the Pit's design: where, how much scrap, pit-only weights, wreck numbers |
+| `PitShopConfig` | slag shop rows: id, price, grants. Client sends the id |
 | `ArenaService` | binding the authored Event Area, filling spawn nodes, clearing scrap, evacuating |
+| `WreckService` | one wreck, chip-away integrity, shield + overload node, public chunks and slag on break |
+| `ShopService` | Event Shop walk-in (`CHS_Shop`), `BuyPitItem` (in the Event Area while open) |
 | `PlayerStateService.derivedStats` | applying multipliers. Calls `EventConfig` directly — no service coupling |
 | `PlayerStateService.publicSnapshot` | telling the client which event is live and when it ends |
 | `EventService` | noticing turnover: re-push snapshots, announce once |
@@ -202,8 +244,8 @@ during Scrap Rush would otherwise announce it to everyone who joined afterwards 
 
 ## Not done yet
 
-- **No exclusive rewards.** These events change multipliers only. Audit item 4 in the roadmap wants a
-  seasonal event with cosmetics that do not reset progress; this schedule is the hook to hang it on.
+- **No event pet yet.** Titles come from achievements (`PIT DIVER` for finding every Pit scrap). A
+  Pit pet can be a shop row later, weaker than Sinister Lord, once the model exists.
 - **No anticipation.** Nothing counts down to the weekend anywhere but the banner. A "starts in 2 days"
   line in the shop or on the daily modal would use `EventConfig.nextAt` and cost very little.
 - **One-off events have no path.** Deliberate — see the trade at the top. Add `Announce` plus a manual

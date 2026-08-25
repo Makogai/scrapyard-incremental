@@ -5,8 +5,10 @@
 
 	Two phases, driven by the `eggRoll` atom:
 
-		shaking   the egg alone on a dimmed screen, rattling, building up
-		revealed  a burst, then the pet turning slowly with its name and rarity
+		shaking   the egg rattling on a dimmed screen. A triple or penta hatch
+		          puts that many eggs in a row, same rattle, then the reveal.
+		revealed  a burst, then the pet turning slowly with its name and rarity.
+		          Several pets land in one row.
 
 	The HUD is hidden for the duration -- `App` stops drawing it while this is up.
 	That is the point of a takeover: nothing competes with the reveal, and there is
@@ -34,30 +36,58 @@ local ModelView = require(UI.Components.ModelView)
 local e = React.createElement
 
 --- How hard the egg rattles, and how fast.
-local SHAKE_DEGREES = 9
-local SHAKE_PERIOD = 0.09
+local SHAKE_DEGREES = 14
+local SHAKE_PERIOD = 0.11
 
 --[[
-	The egg, rattling. Rotation is driven straight off the heartbeat rather than a
-	spring: a shake wants a hard reversal at each end, and a spring rounds exactly
-	that off.
+	One egg in the row. Rotation comes from the parent so a triple or penta hatch
+	rattles as one, not as five clocks that drift apart.
+]]
+local function ShakingEggSlot(props)
+	local size = props.size or 280
+
+	return e("Frame", {
+		key = props.key or "Slot",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(size, size),
+		Position = props.position,
+		AnchorPoint = props.anchorPoint,
+		LayoutOrder = props.layoutOrder,
+	}, {
+		e("Frame", {
+			key = "Pivot",
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 1),
+			Position = UDim2.fromScale(0.5, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Rotation = props.rotation,
+		}, {
+			e(ModelView.View, {
+				key = "Egg",
+				kind = "egg",
+				model = props.eggId,
+				size = UDim2.fromScale(1, 1),
+				zoom = 0.7,
+			}),
+		}),
+	})
+end
+
+--[[
+	The shake takeover. One egg stays the original centred hatch. A triple or penta
+	hatch puts that many of the same mesh in a row, all driven off one rattle.
 ]]
 local function ShakingEgg(props)
+	local batch = math.max(1, props.count or 1)
+	local extent = if batch >= 5 then 210 elseif batch >= 3 then 240 else 280
+	local gap = if batch >= 5 then 12 else 18
 	local rotation, setRotation = React.useBinding(0)
 
 	React.useEffect(function()
 		local elapsed = 0
-		local nextShake = 0
-		local swing = 1
-
 		local connection = Motion.heartbeat:Connect(function(deltaTime)
 			elapsed += deltaTime
-			if elapsed < nextShake then
-				return
-			end
-			nextShake = elapsed + SHAKE_PERIOD
-			swing = -swing
-			setRotation(swing * SHAKE_DEGREES)
+			setRotation(math.sin(elapsed * (math.pi / SHAKE_PERIOD)) * SHAKE_DEGREES)
 		end)
 
 		-- One cue per swing would be a machine gun; every third reads as a rattle.
@@ -74,49 +104,69 @@ local function ShakingEgg(props)
 		end
 	end, {})
 
-	local batch = props.count or 1
+	if batch <= 1 then
+		return e(P.Group, {
+			key = props.key or "ShakingEgg",
+			size = UDim2.fromOffset(280, 340),
+			position = UDim2.fromScale(0.5, 0.46),
+			anchorPoint = Vector2.new(0.5, 0.5),
+			zIndex = 6,
+			children = {
+				e(ShakingEggSlot, {
+					key = "Egg",
+					eggId = props.eggId,
+					size = 280,
+					rotation = rotation,
+					position = UDim2.fromScale(0.5, 0),
+					anchorPoint = Vector2.new(0.5, 0),
+				}),
+			},
+		})
+	end
+
+	local eggs = {}
+	for index = 1, batch do
+		eggs[index] = e(ShakingEggSlot, {
+			key = `Egg{index}`,
+			eggId = props.eggId,
+			size = extent,
+			rotation = rotation,
+			layoutOrder = index,
+		})
+	end
 
 	return e(P.Group, {
 		key = props.key or "ShakingEgg",
-		size = UDim2.fromOffset(280, 340),
+		size = UDim2.fromOffset(batch * (extent + gap) + 24, extent + 90),
 		position = UDim2.fromScale(0.5, 0.46),
 		anchorPoint = Vector2.new(0.5, 0.5),
 		zIndex = 6,
-		children = P.compact(
-			e("Frame", {
-				key = "Pivot",
-				BackgroundTransparency = 1,
-				Size = UDim2.fromOffset(280, 280),
-				Position = UDim2.fromScale(0.5, 0),
-				AnchorPoint = Vector2.new(0.5, 0),
-				Rotation = rotation,
-			}, {
-				e(ModelView.View, {
-					key = "Egg",
-					kind = "egg",
-					model = props.eggId,
-					size = UDim2.fromScale(1, 1),
-					glyph = "crate",
-				}),
+		children = {
+			e(P.Label, {
+				key = "Batch",
+				text = `OPENING {batch} EGGS`,
+				textSize = Theme.TextSize.Heading,
+				color = Theme.Color.White,
+				size = UDim2.new(1, 0, 0, 38),
+				position = UDim2.fromScale(0.5, 0),
+				anchorPoint = Vector2.new(0.5, 0),
+				zIndex = 7,
 			}),
-			--[[
-				Only for a multi-hatch. A single egg needs no caption -- the player pressed SUMMON and an egg
-				is shaking -- but a batch should say so before the reveal, or three pets arriving looks like a
-				bug rather than the thing that was bought.
-			]]
-			if batch > 1
-				then e(P.Label, {
-					key = "Batch",
-					text = `OPENING {batch} EGGS`,
-					textSize = Theme.TextSize.Heading,
-					color = Theme.Color.White,
-					size = UDim2.new(1, 0, 0, 38),
-					position = UDim2.fromScale(0.5, 1),
-					anchorPoint = Vector2.new(0.5, 1),
-					zIndex = 7,
-				})
-				else nil
-		),
+			e(P.Group, {
+				key = "Row",
+				size = UDim2.new(1, 0, 0, extent),
+				position = UDim2.new(0.5, 0, 0, 44),
+				anchorPoint = Vector2.new(0.5, 0),
+				layout = P.list({
+					direction = Enum.FillDirection.Horizontal,
+					padding = gap,
+					hAlign = Enum.HorizontalAlignment.Center,
+					vAlign = Enum.VerticalAlignment.Center,
+				}),
+				children = eggs,
+				zIndex = 6,
+			}),
+		},
 	})
 end
 

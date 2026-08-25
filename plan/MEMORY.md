@@ -1,6 +1,6 @@
 # Project Memory
 
-Last updated: 2026-08-22
+Last updated: 2026-08-25
 
 ## Identity
 
@@ -294,6 +294,46 @@ No Snowman-specific runtime source remains. Historical references exist only in 
 
 ## Exact Next Action
 
+The Pit now uses four Pit-only scraps authored in Workspace (`Drone`, `Submarine`, `LavaCoreScrap`, `Robot Arm`). Robot Arm is strength 50, the hardest pull in the game. They never spawn on plots. Pickups pay slag (banks across weeks). The Pit shop spends slag (client sends offer id). One wreck chips while players stand nearby and spills public chunks. `PIT DIVER` title for discovering all four. Changelog 0.5.0.
+
+Pit shop Secret Ticket is 2,500 slag, God Potion 6,000. Pit scrap keeps authored colours (no rarity wash on those models). Drone / Submarine / Lava Core scale down to fit the hoard; Robot Arm stays the large piece. Changelog 0.5.1.
+
+Pit shop is HUD **PIT SHOP** only — no ProximityPrompt on `PitSpawn`. The wreck stands in front of PitSpawn (not the Event Area pivot), scaled to 22 studs with a WRECK bar. Changelog 0.5.2.
+
+Pit shop opens by walking into **Event Shop** (`CHS_Shop` under that booth, same as Magnet Shop). HUD PIT SHOP button is gone; ENTER THE PIT remains. Wreck placement is a Studio part named **`WreckAnchor`** under Event Area — no spawn-pad fallback (that was why it floated). Changelog 0.5.3.
+
+The wreck art is the Workspace model named **`Wreck`**, cloned onto `WreckAnchor`. Colours stay authored (no orange wash). Longest axis is scaled to 72 studs. `WreckAnchor` inside `PitScrapSpawns` is not a loot pad. Changelog 0.5.4.
+
+Wreck template search tries each name in Workspace before falling through -- Submarine in ScrapModels was winning first. Chipping no longer needs bag space. Range is 40 studs. Changelog 0.5.5.
+
+The wreck is **only** the Workspace instance named `RobotWreck`. Pit scrap models live in `EventScrap` and are never the wreck. Changelog 0.5.7.
+
+Finder looks up `Workspace.RobotWreck` first (confirmed in Studio as a Model). Clones onto `WreckAnchor` without moving the authored asset. Changelog 0.5.8.
+
+`Workspace.RobotWreck.meshes[0]` shipped Unanchored. Physics dropped it through the floor before `WreckService.Open`, so the wreck spawned as Submarine (old fallback) and as nothing once that fallback was removed. Runtime now pins every BasePart and stashes a ServerStorage clone at module load (before `ArenaService.Start`). Changelog 0.5.9.
+
+Pit wreck clone yaws `ArenaConfig.Wreck.YawDegrees` (180) when it stands on `WreckAnchor`. Change that number if the facing is still wrong.
+
+Wreck is collidable (Hull), scaled to 48 studs, HP on HUD above storage plus a chest-height world plate. Changelog 0.5.10. Pit has ~39 loot pads so TargetScrap 90 never fills; refill is 6/tick. Next: duplicate spawn pads in Studio toward 60–90, and a Pit sell pad by Event Shop.
+
+Wreck integrity is 3600 at 4 HP/s (about 15 minutes alone). Chip range is the player's magnet reach (capped at 16 studs inside the Event Area). World HP plate has no MaxDistance. Breaking plays a shard burst. Spawn pads were an 87×101 cluster on a 204-stud floor — spread them across the cylinder in Studio. Changelog 0.5.11.
+
+Admin panel **THE PIT** tab: SET WRECK HP (amount box, 1–100000). Applies to the live wreck, or the next spawn if none is up. Server command, not a save field. Clamped in `AdminService`.
+
+Wreck break: sparks and smoke while it shakes, then the original mesh is destroyed and ten scaled clones fly up and out. Players standing in the spawn volume are shoved out so they are not trapped in the hull.
+
+Wreck shield (changelog 0.5.12): after `ShieldEveryIntegrity` (450) HP chipped, DPS pauses. One neon OVERLOAD pillar on a Pit scrap pad; magnet range drops the shield, spills extra public scrap, then the node moves. Solo can still finish. HUD bar reads SHIELDED (cyan). Tune in `ArenaConfig.Wreck`.
+
+Egg sites are the three folders under `NewMap.FeaturedPodium.EggSummonPodium`: `FrontYardEggGroup` (JunkyardEgg), `WorkshopYardEggGroup` (WorkshopEgg), `VehicleGraveyardEggGroup` (QuantumEgg). Each has an `EggId` attribute. The hatch overlay clones those meshes into `ReplicatedStorage.EggModels`. Changelog 0.5.13.
+
+Pack coin `rbxassetid://121498047668196` (`Coins_2`) is `Assets.Icons.coin` — HUD, daily, playtime, spin. Pack bills `rbxassetid://76672014495401` (`Money_1`) is `Assets.Icons.cash` — Pit shop Scrap Stash and Scrap Haul only. Changelog 0.5.14.
+
+**Studio:** Save the place -- folder renames (`WorkshopGraveyardEggGroup` -> `WorkshopYardEggGroup`, inner Workshop egg/stand, Vehicle Graveyard mesh name) live in the Studio file. Then Play-verify: three hold-E prompts open three different eggs, and SUMMON shakes the authored mesh not a white ball.
+
+**Studio (wreck):** Select `Workspace.RobotWreck` / `meshes[0]`, set **Anchored**, save the place. Runtime pin is a safety net; an unanchored mesh can still void before scripts if Studio physics runs first. Play-verify: Output `template is ...RobotWreck` and a wreck on `WreckAnchor` with a WRECK bar. Chip until the bar says SHIELDED, then magnet the glowing OVERLOAD.
+
+No event pet yet — wait for a model weaker than Sinister Lord.
+
 JunkyardEgg display name is Front Yard Egg; QuantumEgg is Vehicle Graveyard Egg. Egg hold-E sits on a padded invisible hitbox with 18-stud reach. Authored podium signs that still said Junkyard/Quantum are rewritten on bind. Changelog 0.4.12.
 
 Load sanitiser `BASE_PET_SLOTS` is 3, matching `PetConfig.BaseEquipSlots`. It was still 1, so a rejoin trimmed EquippedPets to one. Changelog 0.4.11.
@@ -334,7 +374,7 @@ AUTO SELL sells the current load on purchase, on join if the bag is already full
 
 Movement Speed is +3 per level from 16 (level 1 = 19, level 10 = 46, cap 64). The 2x Walk Speed pass multiplies after the upgrade and is applied on purchase, on every state push, and on CharacterAdded (it previously never wrote WalkSpeed).
 
-Singularity MoneyMultiplier is 8. Hatchable pet cash is still capped at +100%; premium cash adds after that cap.
+Singularity MoneyMultiplier is 8. Hatchable pet cash is capped at +100% for the whole egg-pet team; no single hatchable fills it. Ladder (C/U/R/E/L/S): Junkyard +8/12/16/22/30/40, Workshop +10/14/18/26/34/44, Quantum +12/16/20/28/38/50. Three best Front Yard pets reach +92%; Workshop and Graveyard teams hit the cap. Premium cash adds after. Inspect shows each pet's own share plus a combine note. Knight is unchanged (`+40%` cash plus luck/respawn/storage). Changelog 0.5.16.
 
 Pet inspect uses a two-column compact stat grid in a scrolling viewport (168px) so every bonus is visible.
 
@@ -343,6 +383,8 @@ WalkSpeed is re-applied whenever the Humanoid's WalkSpeed changes, because Human
 Hub leaderboards (`LeaderboardService`) find `Leaderboard_TopPlaytime` / `TopRebirths` / `TopRobux` anywhere under Workspace, fill or build the SurfaceGui rows, resolve usernames from the live player then `GetNameFromUserIdAsync`, and fall back to whoever is connected when the OrderedDataStore is empty.
 
 Egg sites are each `<Area>EggGroup` under NewMap. Equipped followers pose from `AnimatedFace` (`PetModelPose`); Pup's `FollowerScale` is 0.7.
+
+Triple and penta hatch shake that many eggs on the takeover (same rattle as a single summon), then the existing batch reveal. `roll.Count` sizes the shake row. The rotating layer is an inner pivot -- UIListLayout was swallowing Rotation on the row children, so a batch sat still. Changelog 0.5.18.
 
 The Pit uses authored `Workspace.Event Area`. Players land on the authored `Event Area Spawn Point.PitSpawn` — loot nodes in `PitScrapSpawns` are scrap only. The area is never destroyed; only the `PitScrap` folder comes and goes with the event.
 

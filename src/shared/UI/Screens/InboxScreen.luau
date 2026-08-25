@@ -50,6 +50,9 @@ local function rewardSummary(rewards): string
 	if typeof(rewards.Gears) == "number" and rewards.Gears > 0 then
 		table.insert(parts, `{rewards.Gears} gears`)
 	end
+	if typeof(rewards.Slag) == "number" and rewards.Slag > 0 then
+		table.insert(parts, `{rewards.Slag} slag`)
+	end
 	if typeof(rewards.Spins) == "number" and rewards.Spins > 0 then
 		table.insert(parts, `{rewards.Spins} spins`)
 	end

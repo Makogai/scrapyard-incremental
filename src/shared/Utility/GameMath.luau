@@ -49,13 +49,21 @@ local PET_EFFECT_KEYS = {
 
 	Capped on CASH from hatchable pets only. Premium pets add their cash AFTER that
 	ceiling, so a paid pet advertised as ×8 actually pays ×8 instead of being crushed
-	down to the same +100% as a hatchable secret. The other effects -- range, collection,
+	down to the same +100% as the egg-pet team. Hatchable Secrets contribute toward
+	that team cap; they must not fill it alone. The other effects -- range, collection,
 	storage, luck -- have their own ceilings further along the chain.
 
 	Long term the answer to pet power creep is a duplicate sink (5 identical -> Shiny at 1.4x, and so on)
 	rather than raising this. Do not "fix" a hatchable pet that feels weak by moving this number.
 ]]
 local MAXIMUM_PET_CASH_BONUS = 1.0
+GameMath.MAXIMUM_PET_CASH_BONUS = MAXIMUM_PET_CASH_BONUS
+
+--- What one hatchable pet actually pays in cash when equipped alone, after the team cap.
+function GameMath.hatchableCashMultiplier(moneyMultiplier: number): number
+	local bonus = math.max(0, moneyMultiplier - 1)
+	return 1 + math.min(bonus, MAXIMUM_PET_CASH_BONUS)
+end
 
 function GameMath.petEffectMultipliers(
 	equippedPetIds: { string },

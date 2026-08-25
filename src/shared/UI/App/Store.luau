@@ -78,6 +78,7 @@ Store.GameData = GameData
 local function seedMock()
 	Atoms.money(Mock.player.cash)
 	Atoms.gears(Mock.player.gears)
+	Atoms.slag(Mock.player.eventTokens)
 	Atoms.storedWeight(Mock.player.storage)
 	Atoms.storedValue(Mock.player.storageValue)
 	Atoms.inbox(Mock.inbox)
@@ -295,6 +296,11 @@ local function liveActions()
 	function self.buyMagnet(magnetId: string)
 		Sound.play("purchase")
 		Bridge.buyMagnet(magnetId)
+	end
+
+	function self.buyPitItem(offerId: string)
+		Sound.play("purchase")
+		Bridge.buyPitItem(offerId)
 	end
 
 	--[[
@@ -705,10 +711,20 @@ local function mockActions()
 		Atoms.spinRoll(nil)
 	end
 
+	function self.buyPitItem(offerId: string)
+		for _, offer in ipairs(GameData.pitShop()) do
+			if offer.id == offerId and Atoms.slag() >= offer.slagPrice then
+				Atoms.slag(Atoms.slag() - offer.slagPrice)
+				break
+			end
+		end
+	end
+
 	for _, name in ipairs({
 		"teleport",
 		"teleportHome",
 		"buyMagnet",
+		"buyPitItem",
 		"purchase",
 		"equipPet",
 		"unequipPet",
@@ -821,6 +837,7 @@ function Store.use()
 
 	local money = useAtom(Atoms.money)
 	local gears = useAtom(Atoms.gears)
+	local slag = useAtom(Atoms.slag)
 	local storedWeight = useAtom(Atoms.storedWeight)
 	local storedValue = useAtom(Atoms.storedValue)
 	local inbox = useAtom(Atoms.inbox)
@@ -861,6 +878,9 @@ function Store.use()
 	local eggSummon = useAtom(Atoms.eggSummon)
 	local eggRoll = useAtom(Atoms.eggRoll)
 	local announce = useAtom(Atoms.announce)
+	local wreckIntegrity = useAtom(Atoms.wreckIntegrity)
+	local wreckIntegrityMax = useAtom(Atoms.wreckIntegrityMax)
+	local wreckShielded = useAtom(Atoms.wreckShielded)
 
 	--[[
 		The player list for the admin panel, refreshed on a ticker.
@@ -1133,10 +1153,13 @@ function Store.use()
 
 		cash = money,
 		gears = gears,
-		eventTokens = nil,
+		eventTokens = slag,
 		prestige = prestigeCount,
 		storage = storedWeight,
 		storageValue = storageProjected,
+		wreckIntegrity = wreckIntegrity,
+		wreckIntegrityMax = wreckIntegrityMax,
+		wreckShielded = wreckShielded,
 		inbox = inbox,
 		socialClaims = socialClaims,
 		broadcast = broadcast,

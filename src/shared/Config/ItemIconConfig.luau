@@ -19,6 +19,10 @@ return table.freeze({
 		Glyph = "+",
 		Color = Color3.fromRGB(139, 84, 246),
 	}),
-	Money = table.freeze({ AssetId = "", Glyph = "$", Color = Color3.fromRGB(255, 154, 47) }),
+	Money = table.freeze({
+		AssetId = "rbxassetid://121498047668196",
+		Glyph = "$",
+		Color = Color3.fromRGB(255, 154, 47),
+	}),
 	Gears = table.freeze({ AssetId = "", Glyph = "⚙", Color = Color3.fromRGB(139, 84, 246) }),
 })

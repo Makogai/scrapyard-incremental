@@ -202,6 +202,14 @@ function AdminCatalogue.build(): { AdminSection }
 				Glyph = "gear",
 				Accent = "Gold",
 			},
+			{
+				Id = "AddSlag",
+				Label = "SLAG",
+				Command = "AddSlag",
+				Amount = true,
+				Glyph = "crate",
+				Accent = "Gold",
+			},
 			--[[
 				The three that were missing, and the reason this section is RESOURCES rather than
 				CURRENCIES: anything a player holds a COUNT of belongs here, so testing a spin, a streak
@@ -524,6 +532,29 @@ function AdminCatalogue.build(): { AdminSection }
 		Accent = "Cyan",
 		Entries = eventEntries,
 		AmountLabel = "MINUTES",
+	})
+
+	--[[
+		THE PIT. Server-level, like events: the wreck is not a per-player save field.
+
+		Its own tab so the amount box can say HP instead of inheriting EVENTS' MINUTES.
+	]]
+	table.insert(sections, {
+		Id = "pit",
+		Label = "THE PIT",
+		Glyph = "crate",
+		Accent = "Orange",
+		AmountLabel = "HP",
+		Entries = {
+			{
+				Id = "SetWreckHp",
+				Label = "SET WRECK HP",
+				Command = "SetWreckHp",
+				Amount = true,
+				Glyph = "crate",
+				Accent = "Orange",
+			},
+		},
 	})
 
 	--[[

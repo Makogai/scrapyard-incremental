@@ -74,12 +74,12 @@ Assets.Icons = {
 
 	-- currencies and progression
 	--[[
-		Painted gold coin. The old id (`104065626751462`, `Images/34_264__gold`) was a gold
-		swatch, not a coin -- cash days on the daily calendar, playtime rungs, and the
-		wheel rendered as empty wells next to real potion art.
+		Pack coin (Coins_2): three gold coins. Used for HUD cash, daily / playtime /
+		spin money prizes, and every other "this is money" mark.
+		Pack bills (Money_1): one banded stack. Reserved for the Pit shop cash crates.
 	]]
-	coin = "rbxassetid://130780043686108",
-	cash = "rbxassetid://130780043686108",
+	coin = "rbxassetid://121498047668196",
+	cash = "rbxassetid://76672014495401",
 	gear = "rbxassetid://18209577633",
 	robux = "rbxassetid://140667728219031",
 	upgrade = "rbxassetid://132836771612353",

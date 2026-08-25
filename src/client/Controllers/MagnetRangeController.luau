@@ -38,6 +38,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
+local ArenaConfig = require(ReplicatedStorage.Shared.Config.ArenaConfig)
 local Theme = require(ReplicatedStorage.Shared.UI.Theme)
 local ClientPreferences = require(script.Parent.Parent.ClientPreferences)
 
@@ -238,6 +239,13 @@ function MagnetRangeController.Start()
 		local colour = Theme.Color[ring.Accent] or Theme.Color.Cyan
 		local centre = root.Position + Vector3.new(0, GROUND_OFFSET, 0)
 		local radius = currentRange
+		local area = workspace:FindFirstChild(ArenaConfig.AreaName)
+		if area ~= nil and area:IsA("Model") then
+			local cf, size = area:GetBoundingBox()
+			if ArenaConfig.containsPoint(root.Position, cf, size) then
+				radius = math.min(radius, ArenaConfig.MagnetRangeCap)
+			end
+		end
 		local time = os.clock() - startedAt
 		--[[
 			A very small breath, and only on the fill.

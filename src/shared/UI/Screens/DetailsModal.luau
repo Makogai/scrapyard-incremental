@@ -82,6 +82,11 @@ local function DetailsFrame(props)
 		else 0
 	local statsViewport = if statsHeight > 0 then math.min(statsHeight, STATS_VIEWPORT) else 0
 	local descriptionHeight = if props.description then (if compact then 40 else 48) else 0
+	local noteText = props.note
+	local noteHeight = 0
+	if type(noteText) == "string" and noteText ~= "" then
+		noteHeight = if #noteText > 42 then 64 else 46
+	end
 
 	return e(Overlays.Modal, {
 		key = props.key or "DetailsModal",
@@ -94,13 +99,9 @@ local function DetailsFrame(props)
 			here and it grew, so the window has to grow with it or the stat rows get
 			pushed out of the bottom.
 		]]
-		contentHeight = 30
-			+ artHeight
-			+ descriptionHeight
-			+ statsViewport
-			+ (if props.note then 56 else 0)
-			+ (if props.badges then 40 else 0)
-			+ 24,
+		contentHeight = 30 + artHeight + descriptionHeight + statsViewport + (if noteHeight > 0
+			then noteHeight + 10
+			else 0) + (if props.badges then 40 else 0) + 24,
 		onClose = props.onClose,
 		footerHeight = 66,
 		footer = e(P.Group, {
@@ -210,10 +211,10 @@ local function DetailsFrame(props)
 							children = statRows,
 						})
 						else nil,
-					if props.note
+					if noteHeight > 0
 						then e(P.Panel, {
 							key = "Note",
-							size = UDim2.new(1, 0, 0, 46),
+							size = UDim2.new(1, 0, 0, noteHeight),
 							layoutOrder = 5,
 							radius = Theme.Radius.Small,
 							color = Theme.Color.PanelDark,
@@ -224,7 +225,7 @@ local function DetailsFrame(props)
 							children = {
 								e(Icon, {
 									key = "Icon",
-									glyph = "lock",
+									glyph = props.noteGlyph or "lock",
 									plain = true,
 									size = UDim2.fromOffset(26, 26),
 									position = UDim2.new(0, 12, 0.5, 0),
@@ -233,10 +234,11 @@ local function DetailsFrame(props)
 								}),
 								e(P.Label, {
 									key = "Text",
-									text = props.note,
+									text = noteText,
 									textSize = Theme.TextSize.Body,
 									color = Theme.Color.Gold,
 									align = Enum.TextXAlignment.Left,
+									wrapped = true,
 									size = UDim2.new(1, -52, 1, 0),
 									position = UDim2.fromOffset(48, 0),
 									zIndex = 3,
@@ -577,7 +579,12 @@ local function PetDetails(props)
 				else nil
 		),
 		stats = pet.effects or {},
-		note = if pet.owned then nil else "Hatch this pet from an egg",
+		note = if pet.cashCapNote and not pet.owned
+			then "Hatch this pet from an egg. " .. pet.cashCapNote
+			elseif pet.cashCapNote then pet.cashCapNote
+			elseif pet.owned then nil
+			else "Hatch this pet from an egg",
+		noteGlyph = if pet.cashCapNote then "note" else "lock",
 		actions = buttons,
 		onClose = actions.closeDetail,
 	})

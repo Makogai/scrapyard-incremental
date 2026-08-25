@@ -753,6 +753,7 @@ Glyphs.byName = {
 	paw = Glyphs.Paw,
 	pet = Glyphs.Paw,
 	scrap = Glyphs.Scrap,
+	slag = Glyphs.Crate,
 	pin = Glyphs.Pin,
 	area = Glyphs.Pin,
 	home = Glyphs.Home,

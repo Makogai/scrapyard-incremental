@@ -504,7 +504,9 @@ local function refreshAll()
 				elseif definition.name == "Leaderboard_TopRebirths" then
 					entries = withOnlineFallback(entries, function(player)
 						local state = PlayerStateService.GetPlotState(player)
-						return if state then math.max(0, math.floor(state.PrestigeCount or 0)) else 0
+						return if state
+							then math.max(0, math.floor(state.PrestigeCount or 0))
+							else 0
 					end)
 				else
 					entries = withOnlineFallback(entries, function()

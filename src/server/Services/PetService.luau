@@ -77,14 +77,64 @@ local function findEggFolder(sourceFolder: Instance, eggId: string): Instance?
 	return nil
 end
 
+local function asEggModel(source: Instance, eggId: string): Model
+	local model: Model
+	if source:IsA("Model") then
+		model = source:Clone()
+		model.Name = eggId
+	else
+		model = Instance.new("Model")
+		model.Name = eggId
+		local part = source:Clone()
+		part.Parent = model
+		if part:IsA("BasePart") then
+			model.PrimaryPart = part
+		end
+	end
+	local junk = {}
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BaseScript") or descendant:IsA("ProximityPrompt") then
+			table.insert(junk, descendant)
+		end
+	end
+	for _, descendant in junk do
+		descendant:Destroy()
+	end
+	return model
+end
+
 --[[
 	Publishes one model per egg into `ReplicatedStorage.EggModels`, keyed by egg id
 	so the client can render it in a ViewportFrame without reaching into Workspace.
+
+	Podium meshes on FeaturedPodium win: those are the eggs the player is standing
+	in front of. `Workspace.Pets/<egg>/Egg` is the old path. A placeholder is last.
 ]]
 local function publishEggModels(sourceFolder: Instance?)
 	local repository = ReplicatedStorage:FindFirstChild("EggModels") or Instance.new("Folder")
 	repository.Name = "EggModels"
 	repository.Parent = ReplicatedStorage
+
+	local map = workspace:FindFirstChild("NewMap")
+	if map then
+		for _, site in EggPodiums.collect(map) do
+			local tagged = site:GetAttribute("EggId")
+			local eggId = if typeof(tagged) == "string"
+				then tagged
+				else EggPodiums.SiteEggIds[site.Name]
+			if typeof(eggId) ~= "string" or PetConfig.Eggs[eggId] == nil then
+				continue
+			end
+			if repository:FindFirstChild(eggId) then
+				continue
+			end
+			local visual = EggPodiums.findVisualEgg(site)
+			if visual == nil then
+				continue
+			end
+			asEggModel(visual, eggId).Parent = repository
+		end
+	end
 
 	for _, eggId in PetConfig.EggOrder do
 		if repository:FindFirstChild(eggId) then
@@ -93,12 +143,12 @@ local function publishEggModels(sourceFolder: Instance?)
 		local definition = PetConfig.Eggs[eggId]
 		local folder = if sourceFolder then findEggFolder(sourceFolder, eggId) else nil
 		local authored = folder and folder:FindFirstChild("Egg")
-		if authored and authored:IsA("Model") then
-			local clone = authored:Clone()
-			clone.Name = eggId
-			clone.Parent = repository
+		if authored and (authored:IsA("Model") or authored:IsA("BasePart")) then
+			asEggModel(authored, eggId).Parent = repository
 		else
-			warn(`[Pets] No Egg model in Workspace.Pets/{definition.DisplayName} - using a placeholder`)
+			warn(
+				`[Pets] No Egg model on the podium or in Workspace.Pets/{definition.DisplayName} - using a placeholder`
+			)
 			placeholderEgg(eggId).Parent = repository
 		end
 	end
@@ -190,7 +240,9 @@ local function publishPetModels()
 			claimed[source] = true
 			publishClone(repository, source, petId)
 		else
-			warn(`[Pets] No model for premium pet {petId} (tried {definition.ModelName} / {definition.DisplayName})`)
+			warn(
+				`[Pets] No model for premium pet {petId} (tried {definition.ModelName} / {definition.DisplayName})`
+			)
 		end
 	end
 
@@ -232,19 +284,24 @@ end
 --[[
 	Which egg a site sells.
 
-	An explicit `EggId` attribute or StringValue wins. Otherwise the instance name
-	is matched against the egg id, its required area, or its display name -- so
-	`FrontYardEggGroup` is the Junkyard egg and `VehicleGraveyardEggGroup` is the
-	Quantum egg without anyone having to set an attribute. Unlabelled leftover
-	podiums still fall back to the starter egg.
+	An explicit `EggId` attribute or StringValue wins. Folder names on
+	`FeaturedPodium.EggSummonPodium` map through `EggPodiums.SiteEggIds`. Otherwise
+	the instance name is matched against the egg id, its required area, or its
+	display name. Unlabelled leftover podiums still fall back to the starter egg.
 ]]
 local function resolveEggId(site: Instance): string
 	local node: Instance? = site
 	while node ~= nil and node ~= workspace do
 		local value = node:FindFirstChild("EggId")
-		local eggId = if value and value:IsA("StringValue") then value.Value else node:GetAttribute("EggId")
+		local eggId = if value and value:IsA("StringValue")
+			then value.Value
+			else node:GetAttribute("EggId")
 		if typeof(eggId) == "string" and PetConfig.Eggs[eggId] ~= nil then
 			return eggId
+		end
+		local mapped = EggPodiums.SiteEggIds[node.Name]
+		if mapped ~= nil then
+			return mapped
 		end
 		local lowered = string.lower(node.Name)
 		for _, candidate in PetConfig.EggOrder do
@@ -252,7 +309,12 @@ local function resolveEggId(site: Instance): string
 			if
 				string.find(lowered, string.lower(egg.Id), 1, true)
 				or string.find(lowered, string.lower(egg.RequiredArea), 1, true)
-				or string.find(lowered, string.lower((string.gsub(egg.DisplayName, " ", ""))), 1, true)
+				or string.find(
+					lowered,
+					string.lower((string.gsub(egg.DisplayName, " ", ""))),
+					1,
+					true
+				)
 			then
 				return candidate
 			end
@@ -280,7 +342,9 @@ local function worldAabb(parts: { BasePart }): (Vector3?, Vector3?)
 		for x = -1, 1, 2 do
 			for y = -1, 1, 2 do
 				for z = -1, 1, 2 do
-					local corner = part.CFrame:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
+					local corner = part.CFrame:PointToWorldSpace(
+						Vector3.new(half.X * x, half.Y * y, half.Z * z)
+					)
 					min = min:Min(corner)
 					max = max:Max(corner)
 				end
@@ -415,7 +479,7 @@ local function bindSummonPodiums()
 
 	if bound == 0 then
 		warn(
-			"[Pets] No egg sites found in Workspace.NewMap. Name a folder FrontYardEggGroup / WorkshopYardEggGroup / VehicleGraveyardEggGroup, or a model EggSummonPodium."
+			"[Pets] No egg sites found in Workspace.NewMap. Put FrontYardEggGroup / WorkshopYardEggGroup / VehicleGraveyardEggGroup under FeaturedPodium.EggSummonPodium."
 		)
 	end
 end

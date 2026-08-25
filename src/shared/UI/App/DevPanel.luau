@@ -41,6 +41,8 @@ local SCREEN_BUTTONS = {
 	{ id = "daily", text = "DAILY" },
 	{ id = "playtime", text = "PLAYTIME" },
 	{ id = "collection", text = "COLLECTION" },
+	{ id = "magnetshop", text = "MAGNET SHOP" },
+	{ id = "pitshop", text = "PIT SHOP" },
 	{ id = "plot", text = "PLOT" },
 	{ id = "leaderboards", text = "BOARDS" },
 }

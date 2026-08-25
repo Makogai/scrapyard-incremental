@@ -173,6 +173,7 @@ local function HudDesktop(props)
 				cash = state.cash,
 				gears = state.gears,
 				prestige = state.prestige,
+				slag = state.eventTokens,
 				position = UDim2.new(0, MARGIN, 1, -(MARGIN + bottomLift)),
 				anchorPoint = Vector2.new(0, 1),
 			}),
@@ -268,6 +269,26 @@ local function HudDesktop(props)
 				anchorPoint = Vector2.new(0.5, 1),
 			}),
 			--[[
+				Same lane as storage: the player is already watching that bar fill. The world
+				plate sits at chest height on the wreck; this is the copy you can read without
+				tilting the camera.
+			]]
+			if (state.wreckIntegrityMax or 0) > 0
+				then e(Parts.WreckMeter, {
+					key = "Wreck",
+					integrity = state.wreckIntegrity,
+					max = state.wreckIntegrityMax,
+					shielded = state.wreckShielded == true,
+					position = UDim2.new(
+						0.5,
+						0,
+						1,
+						-(math.floor(MARGIN / 2) + bottomLift + 30 + 8)
+					),
+					anchorPoint = Vector2.new(0.5, 1),
+				})
+				else nil,
+			--[[
 				Only when there is an event to name. Rendered unconditionally, this component fell back to
 				its own hardcoded "SCRAP RUSH EVENT -- 3x scrap value" and lied to every player forever
 				(audit 3.3). `state.event` is nil when the schedule has nothing, and nil is safe here
@@ -297,6 +318,8 @@ local function HudDesktop(props)
 				`arena` is false for the events that are just multipliers. The server refuses the teleport
 				when the Pit is shut anyway (see `TeleportService`), so this is the honest half of a check
 				that is enforced on both sides.
+
+				The shop is not on the HUD. Walk into Event Shop inside the Pit, same as Magnet Shop.
 			]]
 			if state.event and state.event.arena
 				then e(Buttons.Button, {

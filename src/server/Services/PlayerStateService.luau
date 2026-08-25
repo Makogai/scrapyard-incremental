@@ -10,6 +10,7 @@ local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationC
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
 local InboxConfig = require(ReplicatedStorage.Shared.Config.InboxConfig)
+local PitShopConfig = require(ReplicatedStorage.Shared.Config.PitShopConfig)
 local SocialConfig = require(ReplicatedStorage.Shared.Config.SocialConfig)
 local AreaRules = require(ReplicatedStorage.Shared.Utility.AreaRules)
 local CollectionRules = require(ReplicatedStorage.Shared.Utility.CollectionRules)
@@ -18,6 +19,7 @@ local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local RewardsConfig = require(ReplicatedStorage.Shared.Config.RewardsConfig)
 local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
+local ArenaConfig = require(ReplicatedStorage.Shared.Config.ArenaConfig)
 local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
 local AdminConfig = require(ReplicatedStorage.Shared.Config.AdminConfig)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
@@ -340,6 +342,7 @@ local function publicSnapshot(data: { [string]: any })
 	return {
 		Money = data.Money,
 		Gears = data.Gears,
+		Slag = data.Slag or 0,
 		StoredWeight = data.StoredWeight,
 		StoredValue = data.StoredValue,
 		--[[
@@ -682,6 +685,15 @@ function PlayerStateService.GrantRewards(player: Player, rewards: { [string]: an
 		data.Gears = math.min(
 			Environment.MaximumGears,
 			data.Gears + math.clamp(math.floor(rewards.Gears), 0, Environment.MaximumGears)
+		)
+	end
+	if typeof(rewards.Slag) == "number" then
+		data.Slag = math.min(1e9, (data.Slag or 0) + math.clamp(math.floor(rewards.Slag), 0, 1e9))
+	end
+	if typeof(rewards.SecretTickets) == "number" then
+		data.SecretTickets = math.min(
+			100,
+			(data.SecretTickets or 0) + math.clamp(math.floor(rewards.SecretTickets), 0, 100)
 		)
 	end
 	if typeof(rewards.Spins) == "number" then
@@ -1386,6 +1398,34 @@ function PlayerStateService.GetPublicState(player: Player): { [string]: any }?
 	return if session then publicSnapshot(session.Data) else nil
 end
 
+function PlayerStateService.GrantSlag(player: Player, amount: number, notify: string?): number
+	local session = sessions[player]
+	if session == nil then
+		return 0
+	end
+	local grant = math.clamp(math.floor(amount), 0, 1e9)
+	if grant <= 0 then
+		return 0
+	end
+	local data = session.Data
+	local before = data.Slag or 0
+	data.Slag = math.min(1e9, before + grant)
+	local paid = data.Slag - before
+	pushState(player, data)
+	if notify ~= nil and notify ~= "" and notifyRemote then
+		notifyRemote:FireClient(player, notify)
+	end
+	return paid
+end
+
+--[[
+	A wreck chips for anyone whose magnet reaches it. Bag space is not required --
+	the wreck is not going into the bag. Range is the same MagnetRange scrap uses.
+]]
+function PlayerStateService.CanChipWreck(player: Player): boolean
+	return sessions[player] ~= nil
+end
+
 --- `ignoreAreaLock`: see `CanCollect`. The two must agree or a piece passes the check and fails the take.
 function PlayerStateService.TryCollect(
 	player: Player,
@@ -1397,8 +1437,14 @@ function PlayerStateService.TryCollect(
 	local session = sessions[player]
 	local scrap = ScrapConfig.ById[scrapId]
 	local variant = ScrapConfig.Variants[variantId]
-	local area = AreaConfig.ById[areaId]
-	if session == nil or scrap == nil or variant == nil or area == nil then
+	if session == nil or scrap == nil or variant == nil then
+		return false, "Invalid"
+	end
+	--[[
+		Pit scrap uses `ArenaConfig.PublicAreaId` rather than a plot area. The area lock is
+		skipped when `ignoreAreaLock` is set; without that flag an unknown area is still a refuse.
+	]]
+	if ignoreAreaLock ~= true and AreaConfig.ById[areaId] == nil then
 		return false, "Invalid"
 	end
 
@@ -1434,12 +1480,27 @@ function PlayerStateService.TryCollect(
 	)
 	data.TotalScrapCollected += 1
 	local discovery = data.DiscoveredScrap[scrapId]
+	if discovery == nil then
+		discovery = { Discovered = false, HighestVariant = "Normal", TotalCollected = 0 }
+		data.DiscoveredScrap[scrapId] = discovery
+	end
 	local wasDiscovered = discovery.Discovered
 	local previousVariant = discovery.HighestVariant
 	discovery.Discovered = true
 	discovery.TotalCollected += 1
 	if VARIANT_RANK[variantId] > VARIANT_RANK[discovery.HighestVariant] then
 		discovery.HighestVariant = variantId
+	end
+	--[[
+		Slag is Pit participation currency. Paid only on public (arena) pickups of Pit-only
+		scrap, never multiplied by rarity -- rarity already pays cash. No toast: the HUD
+		counter moving is the feedback, and a toast per piece would fill the stack.
+	]]
+	if ignoreAreaLock == true then
+		local slag = scrap.SlagValue or 0
+		if slag > 0 then
+			data.Slag = math.min(1e9, (data.Slag or 0) + slag)
+		end
 	end
 	--[[
 		AUTO SELL: the pass earns its keep here.
@@ -1484,7 +1545,10 @@ function PlayerStateService.CanCollect(
 ): (boolean, string)
 	local session = sessions[player]
 	local scrap = ScrapConfig.ById[scrapId]
-	if session == nil or scrap == nil or AreaConfig.ById[areaId] == nil then
+	if session == nil or scrap == nil then
+		return false, "Invalid"
+	end
+	if ignoreAreaLock ~= true and AreaConfig.ById[areaId] == nil then
 		return false, "Invalid"
 	end
 	local data = session.Data
@@ -1643,6 +1707,9 @@ function PlayerStateService.AdminMutate(
 	elseif command == "AddGears" then
 		local grant = math.floor(math.clamp(amount or 0, 0, Environment.MaximumGears))
 		data.Gears = math.min(Environment.MaximumGears, data.Gears + grant)
+	elseif command == "AddSlag" then
+		local grant = math.floor(math.clamp(amount or 0, 0, 1e9))
+		data.Slag = math.min(1e9, (data.Slag or 0) + grant)
 	elseif command == "AddSpins" then
 		--[[
 			Clamped to the same `MaximumStored` the schema sanitiser enforces. Granting past it would be
@@ -2167,6 +2234,27 @@ function PlayerStateService.TryBuyMagnet(player: Player, magnetId: string): (boo
 	return true, `{definition.DisplayName} purchased!`
 end
 
+--[[
+	Pit shop: client sends an offer id, never a price. Location / "is the Pit open"
+	are checked by `ShopService` so this function only charges and grants.
+]]
+function PlayerStateService.TryBuyPitOffer(player: Player, offerId: string): (boolean, string)
+	local session = sessions[player]
+	local offer = PitShopConfig.ById[offerId]
+	if session == nil or offer == nil then
+		return false, "Unknown offer"
+	end
+	local data = session.Data
+	local price = offer.SlagPrice
+	if (data.Slag or 0) < price then
+		return false, "Not enough slag"
+	end
+	PlayerStateService.MarkActive(player)
+	data.Slag -= price
+	PlayerStateService.GrantRewards(player, offer.Rewards)
+	return true, `{offer.DisplayName} purchased!`
+end
+
 function PlayerStateService.TryPrestige(player: Player): (boolean, string)
 	local session = sessions[player]
 	if session == nil then
@@ -2217,7 +2305,22 @@ end
 
 function PlayerStateService.GetDerivedStats(player: Player): { [string]: number }?
 	local session = sessions[player]
-	return if session then derivedStats(session.Data) else nil
+	if session == nil then
+		return nil
+	end
+	local stats = derivedStats(session.Data)
+	local character = player.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if root ~= nil and root:IsA("BasePart") then
+		local area = workspace:FindFirstChild(ArenaConfig.AreaName)
+		if area ~= nil and area:IsA("Model") then
+			local cf, size = area:GetBoundingBox()
+			if ArenaConfig.containsPoint(root.Position, cf, size) then
+				stats.MagnetRange = math.min(stats.MagnetRange, ArenaConfig.MagnetRangeCap)
+			end
+		end
+	end
+	return stats
 end
 
 function PlayerStateService.IsAreaUnlocked(player: Player, areaId: string): boolean

@@ -18,6 +18,7 @@ local SocialConfig = require("../src/shared/Config/SocialConfig")
 local InboxConfig = require("../src/shared/Config/InboxConfig")
 local PlotSkinConfig = require("../src/shared/Config/PlotSkinConfig")
 local Format = require("../src/shared/UI/Format")
+local EggPodiums = require("../src/shared/Utility/EggPodiums")
 
 local passed = 0
 
@@ -65,9 +66,17 @@ expectNear(
 	0.01,
 	"respawn reduction curve"
 )
-expectEqual(GameMath.incrementalUpgradeEffect(16, 3, 0, "Power", 1, 64), 16, "speed level 0 is default walk")
+expectEqual(
+	GameMath.incrementalUpgradeEffect(16, 3, 0, "Power", 1, 64),
+	16,
+	"speed level 0 is default walk"
+)
 expectEqual(GameMath.incrementalUpgradeEffect(16, 3, 1, "Power", 1, 64), 19, "speed level 1")
-expectEqual(GameMath.incrementalUpgradeEffect(16, 3, 10, "Power", 1, 64), 46, "speed level 10 is almost 3x")
+expectEqual(
+	GameMath.incrementalUpgradeEffect(16, 3, 10, "Power", 1, 64),
+	46,
+	"speed level 10 is almost 3x"
+)
 expectEqual(
 	GameMath.incrementalUpgradeEffect(25, 5, 5, "Power", 1, 1e9),
 	50,
@@ -132,17 +141,30 @@ expectNear(
 	"workshop common plus ghost cash adds"
 )
 expectNear(
-	GameMath.petEffectMultipliers({ "Singularity" }, { Singularity = 1 }, { Singularity = singularity }).MagnetStrength,
+	GameMath.petEffectMultipliers(
+		{ "Singularity" },
+		{ Singularity = 1 },
+		{ Singularity = singularity }
+	).MagnetStrength,
 	6,
 	1e-6,
 	"singularity strength is +500 percent"
 )
 expectNear(
-	GameMath.petEffectMultipliers({ "Singularity" }, { Singularity = 1 }, { Singularity = singularity }).Cash,
+	GameMath.petEffectMultipliers(
+		{ "Singularity" },
+		{ Singularity = 1 },
+		{ Singularity = singularity }
+	).Cash,
 	20,
 	1e-6,
 	"singularity cash is times 20, not crushed by the hatchable cap"
 )
+expectNear(GameMath.hatchableCashMultiplier(3.5), 2, 1e-6, "overfill hatchable cash still caps at +100 percent")
+expectNear(GameMath.hatchableCashMultiplier(1.08), 1.08, 1e-6, "common hatchable cash is the raw bonus when under the ceiling")
+expectNear(GameMath.hatchableCashMultiplier(1.44), 1.44, 1e-6, "workshop secret cash stays under the team cap")
+expectNear(GameMath.hatchableCashMultiplier(1.50), 1.50, 1e-6, "quantum secret cash stays under the team cap")
+expectEqual(GameMath.MAXIMUM_PET_CASH_BONUS, 1, "hatchable cash cap is +100 percent")
 expectNear(
 	GameMath.petEffectMultipliers(
 		{ "Singularity", "Wrench" },
@@ -227,6 +249,12 @@ expectEqual(limiter:Allow("player", 5), true, "rate limit window reset")
 
 local defaultData = PlayerDataSchema.createDefault(1000)
 expectEqual(defaultData.SchemaVersion, 18, "default schema version")
+expectEqual(defaultData.Slag, 0, "new profiles start with no slag")
+expectEqual(
+	defaultData.DiscoveredScrap.RobotArm.Discovered,
+	false,
+	"pit scrap is listed undiscovered"
+)
 
 --[[
 	PLOT SKINS. `PlayerDataSchema` requires nothing -- the Lune runner cannot load a config built out of
@@ -388,7 +416,11 @@ expectEqual(migratedOk, true, "version one migration")
 expectEqual(migrated.SchemaVersion, 18, "migrated schema version")
 --- An ancient save arrives with an empty mailbox rather than a nil one, so the screen never sees nil.
 expectEqual(#migrated.Inbox, 0, "a migrated save has an empty mailbox")
-expectEqual(migrated.ActivePlotTheme, "WorkshopYard", "plot theme follows the highest unlocked area")
+expectEqual(
+	migrated.ActivePlotTheme,
+	"WorkshopYard",
+	"plot theme follows the highest unlocked area"
+)
 expectEqual(migrated.Money, 125, "migrated money")
 expectEqual(migrated.UpgradeLevels.MagnetStrength, 3, "migrated upgrade")
 expectEqual(migrated.UpgradeLevels.MagnetRange, 0, "repaired missing upgrade")
@@ -709,6 +741,133 @@ for eventId in EventSoundConfig.ById do
 	end
 end
 
+local ArenaConfig = require("../src/shared/Config/ArenaConfig")
+local PitShopConfig = require("../src/shared/Config/PitShopConfig")
+
+expectEqual(ArenaConfig.ScrapWeights.RobotArm ~= nil, true, "the pit roster includes the robot arm")
+expectEqual(ArenaConfig.ScrapWeights.Drone ~= nil, true, "the pit roster includes the drone")
+expectEqual(ArenaConfig.PublicAreaId, "Pit", "public scrap uses the pit sentinel area")
+expectEqual(
+	PitShopConfig.ById.LuckPotion.SlagPrice > 0,
+	true,
+	"pit shop luck potion has a slag price"
+)
+expectEqual(
+	PitShopConfig.ById.SecretTicket.SlagPrice >= 2500,
+	true,
+	"secret ticket is a slag jackpot"
+)
+expectEqual(
+	PitShopConfig.ById.GodPotion.SlagPrice >= 6000,
+	true,
+	"god potion is the dearest pit shop row"
+)
+expectEqual(
+	PitShopConfig.ById.GodPotion.SlagPrice > PitShopConfig.ById.SecretTicket.SlagPrice,
+	true,
+	"god potion costs more slag than a secret ticket"
+)
+expectEqual(
+	table.find(PitShopConfig.ZoneNames, "PitSpawn"),
+	nil,
+	"the spawn pad is not a pit shop zone"
+)
+expectEqual(
+	table.find(PitShopConfig.ZoneNames, "Event Shop") ~= nil,
+	true,
+	"event shop is the pit shop walk-in"
+)
+expectEqual(
+	ArenaConfig.Wreck.FitLongestStuds > ArenaConfig.FitLongestStuds.RobotArm,
+	true,
+	"the wreck is larger than pit scrap"
+)
+expectEqual(#ArenaConfig.Wreck.ModelNames > 0, true, "the wreck has a template name list")
+expectEqual(ArenaConfig.Wreck.ModelNames[1], "RobotWreck", "RobotWreck is the wreck")
+expectEqual(#ArenaConfig.Wreck.ModelNames, 1, "no pit scrap is a wreck fallback")
+expectEqual(ArenaConfig.EventScrapFolderName, "EventScrap", "pit scrap models live in EventScrap")
+expectEqual(
+	table.find(ArenaConfig.Wreck.ModelNames, "Submarine"),
+	nil,
+	"submarine is never the wreck"
+)
+expectEqual(
+	ArenaConfig.Wreck.FitLongestStuds >= 40,
+	true,
+	"the wreck is a landmark without filling the camera"
+)
+expectEqual(
+	ArenaConfig.Wreck.Integrity >= 1000,
+	true,
+	"wreck integrity takes minutes for one player"
+)
+expectEqual(
+	ArenaConfig.Wreck.BreakdownSeconds > 0,
+	true,
+	"wreck plays a breakdown beat before it shatters"
+)
+expectEqual(
+	ArenaConfig.Wreck.ShieldEveryIntegrity > 0,
+	true,
+	"wreck shield is a slice of integrity"
+)
+expectEqual(
+	ArenaConfig.Wreck.ShieldEveryIntegrity < ArenaConfig.Wreck.Integrity,
+	true,
+	"wreck shield cannot be the whole HP bar"
+)
+expectEqual(
+	ArenaConfig.Wreck.NodeMinStuds < ArenaConfig.Wreck.NodeMaxStuds,
+	true,
+	"overload node sits in a ring around the wreck"
+)
+expectEqual(
+	ArenaConfig.Wreck.NodeBurstCount > 0,
+	true,
+	"dropping the shield spills scrap at the node"
+)
+expectEqual(
+	ArenaConfig.MagnetRangeCap >= 8,
+	true,
+	"pit magnet cap still exceeds the starter magnet"
+)
+expectEqual(
+	ArenaConfig.MagnetRangeCap <= 24,
+	true,
+	"pit magnet cap cannot cover the whole floor from one stand"
+)
+expectEqual(
+	AdminConfig.MaximumWreckHp >= ArenaConfig.Wreck.Integrity,
+	true,
+	"admin can set wreck HP at least as high as the live wreck"
+)
+expectEqual(
+	EggPodiums.SiteEggIds.FrontYardEggGroup,
+	"JunkyardEgg",
+	"front yard podium folder is the starter egg"
+)
+expectEqual(
+	EggPodiums.SiteEggIds.WorkshopYardEggGroup,
+	"WorkshopEgg",
+	"workshop podium folder is the workshop egg"
+)
+expectEqual(
+	EggPodiums.SiteEggIds.VehicleGraveyardEggGroup,
+	"QuantumEgg",
+	"vehicle graveyard podium folder is the quantum egg"
+)
+expectEqual(
+	EggPodiums.SiteEggIds.WorkshopGraveyardEggGroup,
+	"WorkshopEgg",
+	"workshop graveyard typo still maps to the workshop egg"
+)
+expectEqual(
+	AchievementConfig.ById.PitDiver.Metric,
+	"PitScrapDiscovered",
+	"pit diver reads pit discoveries"
+)
+expectEqual(AchievementConfig.ById.PitDiver.Threshold, 4, "pit diver wants all four pit types")
+
 --[[
 	NO TWO WINDOWS MAY OVERLAP, swept at hourly resolution across a whole week.
 
@@ -965,6 +1124,11 @@ expectEqual(
 	0,
 	"a brand new profile has discovered no scrap"
 )
+expectEqual(
+	AchievementRules.metric(blankProfile, "PitScrapDiscovered"),
+	0,
+	"a brand new profile has discovered no pit scrap"
+)
 
 --- Tag formatting, which two different surfaces render and must not disagree about.
 expectEqual(TitleConfig.tag("Baron"), "[SCRAP BARON]", "title tag formatting")
@@ -1085,7 +1249,10 @@ end
 local storeSource = fs.readFile("src/shared/UI/App/Store.luau")
 local tableStarts = {}
 for name in string.gmatch(storeSource, "local function (%a+Actions)%(%)") do
-	table.insert(tableStarts, { Name = name, At = string.find(storeSource, `local function {name}()`, 1, true) })
+	table.insert(
+		tableStarts,
+		{ Name = name, At = string.find(storeSource, `local function {name}()`, 1, true) }
+	)
 end
 expectEqual(#tableStarts >= 2, true, "Store defines several action tables")
 

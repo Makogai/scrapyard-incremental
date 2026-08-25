@@ -228,9 +228,10 @@ function ModelView.View(props)
 			the field of view -- nothing important gets cropped.
 		]]
 		local origin, extent = visibleBounds(model)
-		local centre = origin.Position
-		local radius = math.max(extent.Magnitude * 0.5, 0.5)
-		local distance = (radius / math.tan(math.rad(FIELD_OF_VIEW * 0.5))) * (props.zoom or 0.94)
+		local frame = {
+			centre = origin.Position,
+			radius = math.max(extent.Magnitude * 0.5, 0.5),
+		}
 
 		local camera = Instance.new("Camera")
 		camera.FieldOfView = FIELD_OF_VIEW
@@ -244,16 +245,42 @@ function ModelView.View(props)
 			the previews are consistent.
 		]]
 		local baseYaw = props.yaw or 28
-		local lift = radius * (props.lift or 0.32)
-		local function look(degrees: number)
-			local direction = CFrame.fromAxisAngle(Vector3.yAxis, math.rad(degrees)) * front
-			local eye = centre + direction * distance + Vector3.new(0, lift, 0)
-			camera.CFrame = CFrame.lookAt(eye, centre)
+		local degrees = baseYaw
+		local function look(yaw: number)
+			local distance = (frame.radius / math.tan(math.rad(FIELD_OF_VIEW * 0.5)))
+				* (props.zoom or 0.94)
+			local lift = frame.radius * (props.lift or 0.32)
+			local direction = CFrame.fromAxisAngle(Vector3.yAxis, math.rad(yaw)) * front
+			local eye = frame.centre + direction * distance + Vector3.new(0, lift, 0)
+			camera.CFrame = CFrame.lookAt(eye, frame.centre)
 		end
-		look(baseYaw)
+		look(degrees)
+
+		--[[
+			A MeshPart's Size can rewrite itself when the mesh finishes loading, which
+			makes the first bounds tiny and the model a speck. Five hatch eggs hit that
+			at once. Reframe after the current frame, and once more after a short wait.
+		]]
+		local function reframe()
+			if camera.Parent == nil or model.Parent == nil then
+				return
+			end
+			local nextOrigin, nextExtent = visibleBounds(model)
+			frame.centre = nextOrigin.Position
+			frame.radius = math.max(nextExtent.Magnitude * 0.5, 0.5)
+			look(degrees)
+		end
+		task.defer(reframe)
+		local alive = true
+		task.delay(0.2, function()
+			if alive then
+				reframe()
+			end
+		end)
 
 		if not props.spin then
 			return function()
+				alive = false
 				setHasModel(false)
 				model:Destroy()
 				camera:Destroy()
@@ -261,13 +288,13 @@ function ModelView.View(props)
 		end
 
 		local speed = if type(props.spin) == "number" then props.spin else 45
-		local degrees = baseYaw
 		local connection = Motion.heartbeat:Connect(function(deltaTime)
 			degrees += speed * deltaTime
 			look(degrees)
 		end)
 
 		return function()
+			alive = false
 			connection:Disconnect()
 			setHasModel(false)
 			model:Destroy()

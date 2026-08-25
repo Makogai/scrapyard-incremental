@@ -139,43 +139,39 @@ local function DailyRewardsScreen(props)
 		onClose = actions.closeScreen,
 		footerHeight = 64,
 		footer = e(P.Group, {
-				key = "Claim",
-				size = UDim2.fromScale(1, 1),
-				children = {
-					--[[
+			key = "Claim",
+			size = UDim2.fromScale(1, 1),
+			children = {
+				--[[
 						The streak as a chip, and no prose. The old footer had a sentence on the left and a
 						RESETS IN badge on the right, both saying what the cards already show -- two redundant
 						strings flanking the button is what made this read as filler.
 					]]
-					e(Indicators.Badge, {
-						key = "Streak",
-						text = if bonusPercent > 0
-							then `STREAK {streak}  ·  +{bonusPercent}% CASH`
-							else `STREAK {streak}`,
-						gradient = if streak > 0
-							then Theme.Gradient.Gold
-							else Theme.Gradient.PanelDeep,
-						textSize = Theme.TextSize.Small,
-						position = UDim2.fromScale(0, 0.5),
-						anchorPoint = Vector2.new(0, 0.5),
-					}),
-					e(Buttons.Button, {
-						key = "ClaimButton",
-						text = if claimable then "CLAIM" else "COME BACK TOMORROW",
-						glyph = if claimable then "check" else nil,
-						variant = if claimable then "Primary" else "Neutral",
-						disabled = not claimable,
-						textSize = if claimable
-							then Theme.TextSize.Heading
-							else Theme.TextSize.Body,
-						size = UDim2.fromOffset(300, 56),
-						position = UDim2.fromScale(0.5, 0.5),
-						anchorPoint = Vector2.new(0.5, 0.5),
-						-- No argument: the server decides what is claimable.
-						onClick = actions.claimDaily,
-					}),
-				},
-			}),
+				e(Indicators.Badge, {
+					key = "Streak",
+					text = if bonusPercent > 0
+						then `STREAK {streak}  ·  +{bonusPercent}% CASH`
+						else `STREAK {streak}`,
+					gradient = if streak > 0 then Theme.Gradient.Gold else Theme.Gradient.PanelDeep,
+					textSize = Theme.TextSize.Small,
+					position = UDim2.fromScale(0, 0.5),
+					anchorPoint = Vector2.new(0, 0.5),
+				}),
+				e(Buttons.Button, {
+					key = "ClaimButton",
+					text = if claimable then "CLAIM" else "COME BACK TOMORROW",
+					glyph = if claimable then "check" else nil,
+					variant = if claimable then "Primary" else "Neutral",
+					disabled = not claimable,
+					textSize = if claimable then Theme.TextSize.Heading else Theme.TextSize.Body,
+					size = UDim2.fromOffset(300, 56),
+					position = UDim2.fromScale(0.5, 0.5),
+					anchorPoint = Vector2.new(0.5, 0.5),
+					-- No argument: the server decides what is claimable.
+					onClick = actions.claimDaily,
+				}),
+			},
+		}),
 		children = {
 			e(P.Group, {
 				key = "Calendar",

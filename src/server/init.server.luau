@@ -28,6 +28,7 @@ local LeaderboardService = require(script.Services.LeaderboardService)
 local LeaderstatsService = require(script.Services.LeaderstatsService)
 local GlobalChatService = require(script.Services.GlobalChatService)
 local ArenaService = require(script.Services.ArenaService)
+local WreckService = require(script.Services.WreckService)
 local TeleportService = require(script.Services.TeleportService)
 local RichestPlayerService = require(script.Services.RichestPlayerService)
 local PlotThemeService = require(script.Services.PlotThemeService)
@@ -64,11 +65,13 @@ LeaderboardService.Start()
 LeaderstatsService.Start()
 --- Owns the `Global` TextChannel and the MessagingService topic behind it.
 GlobalChatService.Start()
+WreckService.PinTemplate()
 --[[
 	After `ScrapService`, which owns the public-scrap folder this registers, and after `EventService`, whose
 	schedule it reads. It polls rather than being driven, so a late start only delays the first build.
 ]]
 ArenaService.Start()
+WreckService.Start()
 TeleportService.Start()
 RichestPlayerService.Start()
 --[[

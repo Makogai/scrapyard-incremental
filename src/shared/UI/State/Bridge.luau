@@ -196,6 +196,10 @@ function Bridge.buyMagnet(magnetId: string)
 	fire("ShopAction", "BuyMagnet", magnetId)
 end
 
+function Bridge.buyPitItem(offerId: string)
+	fire("ShopAction", "BuyPitItem", offerId)
+end
+
 --[[
 	BUYING SOMETHING. Three outcomes, in order.
 
@@ -609,6 +613,7 @@ function Bridge.start(): boolean
 		OpenAreaShop = "areas",
 		OpenExclusiveShop = "shop",
 		OpenPetShop = "pets",
+		OpenPitShop = "pitshop",
 	}) do
 		local remote = folder:FindFirstChild(remoteName)
 		if remote and remote:IsA("RemoteEvent") then

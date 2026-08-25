@@ -4,16 +4,14 @@
 	Makes the egg on every summon podium read as a hologram: translucent, rim-lit, a shaft of light rising
 	through it, and floating gently up and down.
 
-	AUTHORED SHAPE IT LOOKS FOR (all of it optional -- a podium that does not match is skipped, never
-	errored, because the map is edited in Studio and this must not break a playtest):
+	Authored shape (all of it optional -- a podium that does not match is skipped):
 
-		Workspace.NewMap
-		  FrontYardEggGroup               a Folder or Model, anywhere under NewMap
-		    Egg                           Model or BasePart, the thing that floats
-		    Stand                         left alone
+		Workspace.NewMap.FeaturedPodium.EggSummonPodium
+		  FrontYardEggGroup
+		    FrontYardEgg                  the mesh that floats
+		    FrontYardEggStand             left alone
 		  WorkshopYardEggGroup
 		  VehicleGraveyardEggGroup
-		  -- or the older shape: an EggSummonPodium model wrapping those groups
 
 	The egg is found by name: something containing "egg" that is not the group, the stand or the podium
 	base. If nothing matches, the largest child Model is used, because "the big thing on the podium" is the
@@ -63,9 +61,6 @@ local BEAM_RISE_STUDS = 7
 local BEAM_BASE_SCALE = 0.85
 local BEAM_TIP_SCALE = 0.2
 
---- Names that are never the egg, however they are cased.
-local NOT_THE_EGG = { "stand", "group", "base", "podium", "plinth", "pedestal", "hitbox", "prompt" }
-
 --------------------------------------------------------------------------------
 -- Geometry
 --------------------------------------------------------------------------------
@@ -112,76 +107,16 @@ end
 -- Finding the egg
 --------------------------------------------------------------------------------
 
-local function looksLikeTheEgg(name: string): boolean
-	local lowered = string.lower(name)
-	if not string.find(lowered, "egg", 1, true) then
-		return false
-	end
-	for _, banned in NOT_THE_EGG do
-		if string.find(lowered, banned, 1, true) then
-			return false
-		end
-	end
-	return true
-end
-
---[[
-	The egg inside a podium or a group.
-
-	Two passes, cheapest signal first: a child that is named like an egg, then the largest child model.
-	`GetChildren` rather than `GetDescendants`, because a mesh part INSIDE the egg model is a piece of the
-	egg, not a candidate -- picking one would float the shell and leave the yolk behind.
-]]
-local function findEgg(root: Instance): Instance?
-	for _, child in root:GetChildren() do
-		if (child:IsA("Model") or child:IsA("BasePart")) and looksLikeTheEgg(child.Name) then
-			return child
-		end
-	end
-
-	local best: Instance? = nil
-	local bestVolume = 0
-	for _, child in root:GetChildren() do
-		if not (child:IsA("Model") or child:IsA("BasePart")) then
-			continue
-		end
-		local lowered = string.lower(child.Name)
-		local banned = false
-		for _, name in NOT_THE_EGG do
-			if string.find(lowered, name, 1, true) then
-				banned = true
-				break
-			end
-		end
-		if banned then
-			continue
-		end
-		local parts = partsOf(child)
-		if #parts == 0 then
-			continue
-		end
-		local min, max = worldBounds(parts)
-		local size = max - min
-		local volume = size.X * size.Y * size.Z
-		if volume > bestVolume then
-			best = child
-			bestVolume = volume
-		end
-	end
-	return best
-end
-
 --[[
 	Every egg to dress, across every podium.
 
-	Each site from `EggPodiums` (an `<Area>EggGroup`, or a lone `EggSummonPodium`) is
-	searched for its egg. The group is returned alongside so its attribute overrides
-	can be read.
+	Each site from `EggPodiums` is searched for its visual egg. The group is
+	returned alongside so its attribute overrides can be read.
 ]]
 local function collectEggs(map: Instance): { { Egg: Instance, Holder: Instance } }
 	local found = {}
 	for _, site in EggPodiums.collect(map) do
-		local egg = findEgg(site)
+		local egg = EggPodiums.findVisualEgg(site)
 		if egg ~= nil then
 			table.insert(found, { Egg = egg, Holder = site })
 		end

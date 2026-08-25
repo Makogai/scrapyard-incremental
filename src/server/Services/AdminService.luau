@@ -18,6 +18,7 @@ local InboxService = require(script.Parent.InboxService)
 local ServerRestartService = require(script.Parent.ServerRestartService)
 local RemoteService = require(script.Parent.RemoteService)
 local ScrapService = require(script.Parent.ScrapService)
+local WreckService = require(script.Parent.WreckService)
 
 local AdminService = {}
 
@@ -49,6 +50,9 @@ local GIFT_REWARDS: { [string]: (number, string?) -> { [string]: any } } = {
 	AddGears = function(amount)
 		return { Gears = amount }
 	end,
+	AddSlag = function(amount)
+		return { Slag = amount }
+	end,
 	AddSpins = function(amount)
 		return { Spins = amount }
 	end,
@@ -60,6 +64,7 @@ local GIFT_REWARDS: { [string]: (number, string?) -> { [string]: any } } = {
 local GIFT_TITLES: { [string]: string } = {
 	AddMoney = "A gift of scrap cash",
 	AddGears = "A gift of gears",
+	AddSlag = "A gift of slag",
 	AddSpins = "Free spins",
 	GrantConsumable = "A gift from the team",
 }
@@ -182,6 +187,7 @@ local function boundedAmount(command: string, value: any): number?
 	if
 		command ~= "AddMoney"
 		and command ~= "AddGears"
+		and command ~= "AddSlag"
 		and command ~= "GrantPet"
 		and command ~= "GrantConsumable"
 		and command ~= "AddUpgradeLevels"
@@ -191,6 +197,7 @@ local function boundedAmount(command: string, value: any): number?
 		and command ~= "GrantSecretTicket"
 		and command ~= "ActivateBoost"
 		and command ~= "StartEvent"
+		and command ~= "SetWreckHp"
 	then
 		return nil
 	end
@@ -199,16 +206,18 @@ local function boundedAmount(command: string, value: any): number?
 	end
 	--[[
 		`ActivateBoost` and `StartEvent` take MINUTES, and their ceilings are far lower than a grant's.
-		Everything else here hands something to one player; these two change the rules for everybody, so
-		the clamp is the difference between a half-hour boost and a day of it.
+		`SetWreckHp` takes hit points. Everything else here hands something to one player; these change
+		the rules for everybody, so the clamp is the difference between a test and a stuck server.
 	]]
 	local maximum = if command == "AddMoney"
 		then AdminConfig.MaximumGrantMoney
 		elseif command == "AddGears" then AdminConfig.MaximumGrantGears
 		elseif command == "ActivateBoost" then AdminConfig.MaximumServerBoostMinutes
 		elseif command == "StartEvent" then AdminConfig.MaximumEventMinutes
+		elseif command == "SetWreckHp" then AdminConfig.MaximumWreckHp
 		else 9999
-	return math.floor(math.clamp(value, 0, maximum))
+	local minimum = if command == "SetWreckHp" then 1 else 0
+	return math.floor(math.clamp(value, minimum, maximum))
 end
 
 --[[
@@ -221,6 +230,7 @@ end
 local SERVER_COMMANDS = {
 	StartEvent = true,
 	StopEvent = true,
+	SetWreckHp = true,
 }
 
 --[[
@@ -253,6 +263,12 @@ local function applyServerCommand(command: string, minutes: number?, itemId: str
 		EventService.Republish()
 		local definition = EventConfig.ById[itemId]
 		return `{if definition then definition.Title else itemId} started for {length} min`
+	end
+	if command == "SetWreckHp" then
+		if minutes == nil then
+			return nil
+		end
+		return WreckService.SetIntegrity(minutes)
 	end
 	return nil
 end
@@ -431,12 +447,14 @@ function AdminService.Start()
 				(
 					command == "AddMoney"
 					or command == "AddGears"
+					or command == "AddSlag"
 					or command == "AddSpins"
 					or command == "SetDailyStreak"
 					or command == "AddRebirths"
 					or command == "GrantPet"
 					or command == "GrantConsumable"
 					or command == "AddUpgradeLevels"
+					or command == "SetWreckHp"
 				) and safeAmount == nil
 			then
 				return

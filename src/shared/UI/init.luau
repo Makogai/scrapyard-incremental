@@ -86,6 +86,7 @@ return {
 		EggSummon = require(Screens.EggSummonScreen),
 		EggRoll = require(Screens.EggRollOverlay),
 		MagnetShop = require(Screens.MagnetShopScreen),
+		PitShop = require(Screens.PitShopScreen),
 		Notifications = require(Screens.NotificationStack),
 
 		DetailsModal = Details.DetailsModal,

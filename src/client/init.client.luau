@@ -21,6 +21,7 @@ local EggHologramController = require(script.Controllers.EggHologramController)
 local ServerNoticeController = require(script.Controllers.ServerNoticeController)
 local SecretPetVfxController = require(script.Controllers.SecretPetVfxController)
 local PassPadController = require(script.Controllers.PassPadController)
+local WreckHudController = require(script.Controllers.WreckHudController)
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 assert(remotes:FindFirstChild("RequestInitialState"), "Initial-state remote is unavailable")
@@ -95,5 +96,10 @@ ServerNoticeController.Start()
 SecretPetVfxController.Start()
 --- Stepping on a plot pad opens the purchase dialog; the prompt has to be client-side.
 PassPadController.Start()
+--[[
+	Pit wreck HP on the HUD. Reads CollectionService tags / attributes, writes
+	client-owned atoms. Screens never touch this module.
+]]
+WreckHudController.Start()
 
 print(string.format("[%s] Client bootstrap ready", Environment.GameName))

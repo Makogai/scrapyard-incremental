@@ -530,7 +530,9 @@ end
 function Indicators.StatRow(props)
 	local compact = props.compact == true
 	local iconSize = if compact then 18 else 26
-	local textSize = if compact then Theme.TextSize.Tiny else (props.textSize or Theme.TextSize.Body)
+	local textSize = if compact
+		then Theme.TextSize.Tiny
+		else (props.textSize or Theme.TextSize.Body)
 	return e(P.Panel, {
 		key = props.key or "Stat",
 		size = props.size or UDim2.new(1, 0, 0, if compact then 38 else 44),

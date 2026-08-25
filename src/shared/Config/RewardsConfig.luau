@@ -25,7 +25,7 @@
 	worth protecting without making day 1 of a new streak feel worthless.
 ]]
 local dailyDays = {
-	table.freeze({ Day = 1, Money = 500, Glyph = "cash", Accent = "Green", Label = "$500" }),
+	table.freeze({ Day = 1, Money = 500, Glyph = "coin", Accent = "Green", Label = "$500" }),
 	table.freeze({
 		Day = 2,
 		Items = table.freeze({ CashPotion = 1 }),
@@ -33,7 +33,7 @@ local dailyDays = {
 		Accent = "Gold",
 		Label = "Cash Potion",
 	}),
-	table.freeze({ Day = 3, Money = 2500, Glyph = "cash", Accent = "Green", Label = "$2,500" }),
+	table.freeze({ Day = 3, Money = 2500, Glyph = "coin", Accent = "Green", Label = "$2,500" }),
 	table.freeze({
 		Day = 4,
 		Items = table.freeze({ LuckPotion = 1 }),
@@ -41,7 +41,7 @@ local dailyDays = {
 		Accent = "Purple",
 		Label = "Luck Potion",
 	}),
-	table.freeze({ Day = 5, Money = 12000, Glyph = "cash", Accent = "Green", Label = "$12,000" }),
+	table.freeze({ Day = 5, Money = 12000, Glyph = "coin", Accent = "Green", Label = "$12,000" }),
 	--- `wheel`, not `star`: spins ARE the wheel, and the star glyph has no art behind it.
 	table.freeze({ Day = 6, Spins = 3, Glyph = "wheel", Accent = "Cyan", Label = "3 Spins" }),
 	--[[
@@ -180,7 +180,7 @@ local spinSegments = {
 		Money = 1500,
 		Label = "$1.5K",
 		Accent = "Green",
-		Glyph = "cash",
+		Glyph = "coin",
 	}),
 	table.freeze({
 		Id = "MediumCash",
@@ -188,7 +188,7 @@ local spinSegments = {
 		Money = 6000,
 		Label = "$6K",
 		Accent = "Green",
-		Glyph = "cash",
+		Glyph = "coin",
 	}),
 	table.freeze({
 		Id = "LargeCash",
@@ -196,7 +196,7 @@ local spinSegments = {
 		Money = 25000,
 		Label = "$25K",
 		Accent = "Gold",
-		Glyph = "cash",
+		Glyph = "coin",
 	}),
 	table.freeze({
 		Id = "CashPotion",

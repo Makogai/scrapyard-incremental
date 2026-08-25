@@ -32,6 +32,7 @@ local ShopScreen = require(UI.Screens.ShopScreen)
 local SettingsScreen = require(UI.Screens.SettingsScreen)
 local CollectionScreen = require(UI.Screens.CollectionScreen)
 local MagnetShopScreen = require(UI.Screens.MagnetShopScreen)
+local PitShopScreen = require(UI.Screens.PitShopScreen)
 local ChangelogScreen = require(UI.Screens.ChangelogScreen)
 local InboxScreen = require(UI.Screens.InboxScreen)
 local DailyRewardsScreen = require(UI.Screens.DailyRewardsScreen)
@@ -68,6 +69,7 @@ local SCREENS = {
 	collection = CollectionScreen,
 	-- Opened by the world booth's proximity prompt via OpenMagnetShop.
 	magnetshop = MagnetShopScreen,
+	pitshop = PitShopScreen,
 	-- Opened by the far-left TopbarPlus icon.
 	changelog = ChangelogScreen,
 	--- Opened by the top-right INBOX icon; everything an admin gifts arrives here.

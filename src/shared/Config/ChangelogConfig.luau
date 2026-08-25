@@ -32,6 +32,231 @@ return table.freeze({
 			that the build changed. There is no second list to keep in step.
 		]]
 		table.freeze({
+			Version = "0.5.18",
+			Date = "2026-08-25",
+			Title = "Multi-hatch eggs rattle",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Summoning 3 or 5 eggs now rattles each egg the way a single summon does, instead of leaving a row of tiny still models.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.17",
+			Date = "2026-08-25",
+			Title = "Triple and penta hatch shake",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Summoning 3 or 5 eggs now shakes that many eggs on screen, then reveals the pets in a row. Single summons are unchanged.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.16",
+			Date = "2026-08-25",
+			Title = "Egg pets combine for scrap value",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Egg-pet scrap value now adds toward a shared +100% cap instead of one Secret filling it alone. Equip a few hatchables to reach the ceiling; premium pets still add on top.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.15",
+			Date = "2026-08-25",
+			Title = "Pet scrap-value labels",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Pet cards now show the scrap-value you actually get. Egg pets share a +100% team cap, so a Secret reads +100% rather than a raw x3.5 that never paid out. Premium pets still add on top of that cap.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.14",
+			Date = "2026-08-25",
+			Title = "Coin and cash icons",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Money in the HUD, daily calendar, playtime ladder and spin wheel now uses the pack coin. The Pit shop's two cash crates use the banded bill stack.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.13",
+			Date = "2026-08-25",
+			Title = "Real egg meshes",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Hold-E at the island podium now opens the egg whose folder you are facing, and the hatch shake uses that egg's real mesh instead of a blank white placeholder.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.12",
+			Date = "2026-08-25",
+			Title = "Pit wreck shield",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The Pit wreck now raises a shield after a chunk of damage. Magnet the glowing OVERLOAD on the floor to drop it -- it then moves, and dropping it bursts extra scrap. Same walk-near-the-glow as collecting scrap; one player can still finish the wreck alone.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.11",
+			Date = "2026-08-25",
+			Title = "Tougher Pit wreck",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "The Pit wreck takes much longer to break, only chips when your magnet can reach it, and bursts apart when it falls. Magnet range is shorter inside the Pit so one player cannot vacuum the whole floor.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.10",
+			Date = "2026-08-25",
+			Title = "Wreck you can stand on",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit wreck is solid, a bit smaller, and shows its HP on the HUD above your bag so you do not have to zoom out to find the bar.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.9",
+			Date = "2026-08-25",
+			Title = "Wreck stays put",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit wreck now appears when the event starts. The imported RobotWreck mesh was unanchored, so it fell through the world before it could be cloned onto WreckAnchor.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.8",
+			Date = "2026-08-25",
+			Title = "Find RobotWreck",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit wreck finds RobotWreck even with a space in the name, and still appears if WreckAnchor is missing by standing where that model already is.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.7",
+			Date = "2026-08-25",
+			Title = "Robot wreck",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit wreck is the Workspace RobotWreck model. Pit scrap models live in EventScrap and are not used as the wreck.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.6",
+			Date = "2026-08-25",
+			Title = "Wreck is Wreck",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit wreck is only the Workspace Wreck model. It no longer falls back to Submarine or any other Pit scrap.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.5",
+			Date = "2026-08-25",
+			Title = "Wreck art and chipping",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit wreck now uses the Workspace Wreck model. It was spawning as a Submarine because that template was found first.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Standing next to the wreck chips it. A full bag no longer blocks chipping.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.4",
+			Date = "2026-08-25",
+			Title = "Authored wreck",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The Pit wreck is the Workspace Wreck model, spawned on WreckAnchor. It keeps its authored colours and stands as a large landmark.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.3",
+			Date = "2026-08-25",
+			Title = "Pit shop walk-in",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit shop opens by walking into Event Shop, the same way as Magnet Shop. There is no HUD shop button -- go to the Pit first.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Place a part named WreckAnchor under Event Area where the wreck should stand. It no longer floats off the spawn pad.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.2",
+			Date = "2026-08-25",
+			Title = "Pit shop and wreck",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The Pit shop is the HUD PIT SHOP button. There is no interaction prompt on the spawn pad.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "The wreck now stands in front of where you land, larger than the hoard, with a WRECK bar. Stand next to it to chip it.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.1",
+			Date = "2026-08-25",
+			Title = "Pit shop and scrap",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Pit shop Secret Ticket is 2,500 slag and God Potion is 6,000 slag.",
+				}),
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Pit scrap keeps the colours authored on the model. Drone, Submarine and Lava Core sit smaller on the floor; Robot Arm stays the big piece.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.0",
+			Date = "2026-08-25",
+			Title = "The Pit",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The Pit now drops unique scrap: Drone, Submarine, Lava Core, and Robot Arm. Robot Arm needs the strongest magnet. Pickups pay slag, spent at the Pit shop. Stand next to the wreck to chip it into more scrap.",
+				}),
+			}),
+		}),
+		table.freeze({
 			Version = "0.4.12",
 			Date = "2026-08-24",
 			Title = "Egg prompts",

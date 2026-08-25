@@ -55,7 +55,12 @@ end
 	World CFrame to `PivotTo` so the pet stands at `position`, faces along `look`
 	(flattened to the ground), and its face Up matches world Up.
 ]]
-function PetModelPose.worldPivot(model: Model, position: Vector3, look: Vector3, faceRotation: CFrame?): CFrame
+function PetModelPose.worldPivot(
+	model: Model,
+	position: Vector3,
+	look: Vector3,
+	faceRotation: CFrame?
+): CFrame
 	local flat = Vector3.new(look.X, 0, look.Z)
 	local lookFlat = if flat.Magnitude > 0.01 then flat.Unit else Vector3.new(0, 0, -1)
 	local desired = CFrame.lookAt(Vector3.zero, lookFlat)
@@ -69,7 +74,8 @@ end
 	a box that has nothing to do with how it looks behind the player.
 ]]
 function PetModelPose.standingBounds(model: Model, faceRotation: CFrame?): (Vector3, Vector3)
-	local standing = PetModelPose.worldPivot(model, Vector3.zero, Vector3.new(0, 0, -1), faceRotation)
+	local standing =
+		PetModelPose.worldPivot(model, Vector3.zero, Vector3.new(0, 0, -1), faceRotation)
 	local pivot = model:GetPivot()
 	local min = Vector3.new(math.huge, math.huge, math.huge)
 	local max = Vector3.new(-math.huge, -math.huge, -math.huge)
@@ -110,7 +116,8 @@ end
 function PetModelPose.hoverLocalOffset(model: Model, faceRotation: CFrame?): Vector3
 	local min, max = PetModelPose.standingBounds(model, faceRotation)
 	local bottomCentre = Vector3.new((min.X + max.X) * 0.5, min.Y, (min.Z + max.Z) * 0.5)
-	local standing = PetModelPose.worldPivot(model, Vector3.zero, Vector3.new(0, 0, -1), faceRotation)
+	local standing =
+		PetModelPose.worldPivot(model, Vector3.zero, Vector3.new(0, 0, -1), faceRotation)
 	return standing:PointToObjectSpace(bottomCentre)
 end
 

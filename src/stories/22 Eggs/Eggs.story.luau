@@ -2,7 +2,8 @@
 	Egg summoning, end to end: the podium window, the hatch takeover, and the
 	server-wide announcement.
 
-	In game the sequence is: hold E at `Workspace.NewMap.EggSummonPodium` ->
+	In game the sequence is: hold E at a `*EggGroup` under
+	`Workspace.NewMap.FeaturedPodium.EggSummonPodium` ->
 	`OpenEggSummon` -> this window -> SUMMON sends an `OpenEgg` intent -> the egg
 	shakes while the server rolls -> `PetResult` names the pet -> reveal. A Secret
 	also goes out on `Announce` to every client.
@@ -22,7 +23,9 @@
 		Phase       what to show. `summon` is the window; `shaking` and `revealed`
 		            jump straight into the takeover without waiting on a roll.
 		Egg         which egg's contents to show
-		RevealPet   which pet the reveal shows, 1 = Common .. 6 = Secret
+		Batch       1, 3 or 5 eggs. Shaking puts that many meshes on screen; revealed
+		            shows that many pets.
+		RevealPet   which pet the single reveal shows, 1 = Common .. 6 = Secret
 		Announce    show the full-width banner as well
 		OwnAll      pretend every pet is already hatched, to compare the rendered
 		            slots against the silhouettes
@@ -42,6 +45,7 @@ local e = React.createElement
 
 local EGG_IDS = { "JunkyardEgg", "WorkshopEgg", "QuantumEgg" }
 local PHASES = { "summon", "shaking", "revealed" }
+local BATCHES = { "1", "3", "5" }
 
 --[[
 	Drives the atoms directly, which is what the Bridge does in game. A story cannot
@@ -54,6 +58,10 @@ local function Scene(props)
 	React.useEffect(function()
 		local Atoms = UI.Atoms
 		local eggId = controls.Egg
+		local ownedPasses = table.clone(Atoms.entitlements())
+		ownedPasses.TripleHatch = true
+		ownedPasses.PentaHatch = true
+		Atoms.entitlements(ownedPasses)
 
 		if controls.OwnAll then
 			local egg = UI.GameData.eggRoll(eggId)
@@ -70,11 +78,19 @@ local function Scene(props)
 		else
 			Atoms.eggSummon(nil)
 			local egg = UI.GameData.eggRoll(eggId)
+			local batch = math.clamp(tonumber(controls.Batch) or 1, 1, 5)
+			local ids = {}
+			for index = 1, batch do
+				local pet = egg.pets[((controls.RevealPet - 1 + index - 1) % #egg.pets) + 1]
+				ids[index] = pet.id
+			end
 			local pet = egg.pets[math.clamp(controls.RevealPet, 1, #egg.pets)]
 			Atoms.eggRoll({
 				EggId = eggId,
 				Phase = controls.Phase,
+				Count = batch,
 				PetId = if controls.Phase == "revealed" then pet.id else nil,
+				PetIds = if controls.Phase == "revealed" then ids else nil,
 			})
 		end
 
@@ -95,6 +111,7 @@ local function Scene(props)
 		controls.Phase,
 		controls.Egg,
 		controls.RevealPet,
+		controls.Batch,
 		controls.Announce,
 		controls.OwnAll,
 	})
@@ -113,10 +130,11 @@ return UILabs.CreateReactStory({
 	react = React,
 	reactRoblox = ReactRoblox,
 	name = "Eggs",
-	summary = "Egg summon window, hatch takeover and the server-wide announcement.",
+	summary = "Egg summon window, hatch takeover (1 / 3 / 5 eggs) and the server-wide announcement.",
 	controls = {
 		Phase = UILabs.Choose(PHASES, 1),
 		Egg = UILabs.Choose(EGG_IDS, 1),
+		Batch = UILabs.Choose(BATCHES, 1),
 		RevealPet = UILabs.Slider(6, 1, 6, 1),
 		Announce = UILabs.Boolean(false),
 		OwnAll = UILabs.Boolean(false),

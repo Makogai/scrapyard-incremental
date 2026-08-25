@@ -23,12 +23,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
 local AreaRules = require(ReplicatedStorage.Shared.Utility.AreaRules)
 local GameMath = require(ReplicatedStorage.Shared.Utility.GameMath)
+local Format = require(script.Parent.Format)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
+local PitShopConfig = require(ReplicatedStorage.Shared.Config.PitShopConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local Assets = require(ReplicatedStorage.Shared.UI.Assets)
 
@@ -353,19 +355,58 @@ local PET_EFFECT_GLYPHS = {
 	MovementSpeed = "bolt",
 }
 
+local function formatBonusPercent(bonus: number): string
+	return string.format("+%d%%", math.floor(bonus * 100 + 0.5))
+end
+
+local function formatPremiumCash(cash: number): string
+	if cash >= 2 then
+		if cash % 1 < 0.001 then
+			return string.format("×%d", cash)
+		end
+		return string.format("×%.2f", cash)
+	end
+	return formatBonusPercent(cash - 1)
+end
+
+--[[
+	Hatchable cash is a contribution toward GameMath.MAXIMUM_PET_CASH_BONUS.
+	Show this pet's own bonus so three egg pets can be compared as they add up;
+	the inspect note explains the shared cap. If a config value ever overfills
+	the cap, clamp the printed number so the card still matches payout.
+]]
+local function petCashStat(definition, cash: number)
+	local premium = definition.Premium == true
+	if premium then
+		return {
+			label = PET_EFFECT_LABELS.Cash,
+			value = formatPremiumCash(cash),
+			glyph = PET_EFFECT_GLYPHS.Cash,
+			magnitude = cash,
+		}
+	end
+	local effective = GameMath.hatchableCashMultiplier(cash)
+	return {
+		label = PET_EFFECT_LABELS.Cash,
+		value = formatBonusPercent(effective - 1),
+		glyph = PET_EFFECT_GLYPHS.Cash,
+		magnitude = effective,
+	}
+end
+
+local function petCashCapNote(definition): string?
+	if definition.Premium == true then
+		return nil
+	end
+	return `Combines with other egg pets up to {Format.percent(GameMath.MAXIMUM_PET_CASH_BONUS)} scrap value. Premium pets add on top.`
+end
+
 local function petEffectStats(definition): { any }
 	local stats = {}
 	local effects = definition.Effects or {}
 	local cash = definition.MoneyMultiplier or effects.Cash or 1
 	if cash > 1.001 then
-		table.insert(stats, {
-			label = PET_EFFECT_LABELS.Cash,
-			value = if cash % 1 < 0.001
-				then string.format("×%d", cash)
-				else string.format("×%.2f", cash),
-			glyph = PET_EFFECT_GLYPHS.Cash,
-			magnitude = cash,
-		})
+		table.insert(stats, petCashStat(definition, cash))
 	end
 	for _, key in ipairs(PET_EFFECT_ORDER) do
 		if key ~= "Cash" then
@@ -416,6 +457,7 @@ function GameData.pets(owned: { [string]: number }): { any }
 			rarity = definition.Rarity,
 			bonus = petHeadlineBonus(definition),
 			effects = petEffectStats(definition),
+			cashCapNote = petCashCapNote(definition),
 			description = definition.Description,
 			eggId = definition.EggId,
 			premium = definition.Premium == true,
@@ -853,17 +895,22 @@ function GameData.scrapOrder(): { string }
 			end
 		end
 	end
+	for _, scrapId in ipairs(ScrapConfig.PitOrder) do
+		if not seen[scrapId] then
+			seen[scrapId] = true
+			table.insert(order, scrapId)
+		end
+	end
 	return order
 end
 
 --[[
 	WHERE EACH SCRAP COMES FROM: the first area in progression order that spawns it.
 
-	The index lists all eighteen scrap types from the moment a player joins, so eleven of them are
-	things the Front Yard will never produce -- which reads as "the index shows scrap that is not in
-	the game". They ARE in the game; they are behind an area. First-area-wins because a few types
-	appear in two (a tyre turns up in the Front Yard and the Workshop), and the earliest one is the
-	answer to "where do I get this".
+	The index lists every scrap type from the moment a player joins, including Pit-only
+	pieces that never spawn on a plot -- those cards name The Pit rather than a yard.
+	Plot scrap that appears in two yards uses the earliest area, which is the answer
+	to "where do I get this".
 ]]
 function GameData.scrapSourceArea(): { [string]: string }
 	local source = {}
@@ -903,13 +950,14 @@ function GameData.scrapIndex(
 				else "Normal"
 			local areaId = sourceArea[scrapId]
 			local area = if areaId then AreaConfig.ById[areaId] else nil
+			local pitOnly = definition.PitOnly == true
 			table.insert(list, {
 				id = scrapId,
 				name = definition.DisplayName,
 				--- Where it comes from, and whether the player can get there yet.
-				areaId = areaId,
-				areaName = if area then area.DisplayName else nil,
-				available = areaId == nil or unlocked[areaId] == true,
+				areaId = if pitOnly then nil else areaId,
+				areaName = if pitOnly then "The Pit" elseif area then area.DisplayName else nil,
+				available = pitOnly or areaId == nil or unlocked[areaId] == true,
 				rarity = if found and record.HighestVariant
 					then (GameData.variantRarity[record.HighestVariant] or "Normal")
 					else "Normal",
@@ -953,10 +1001,32 @@ function GameData.prestige(money: number, _gears: number, prestigeCount: number)
 		gearsReward = reward,
 		ready = money >= requirement,
 		shortfall = math.max(0, requirement - money),
-		permanentBonus = string.format("%.2fx Cash  +%d%% Luck", nextValue, math.floor(nextLuck * 100 + 0.5)),
+		permanentBonus = string.format(
+			"%.2fx Cash  +%d%% Luck",
+			nextValue,
+			math.floor(nextLuck * 100 + 0.5)
+		),
 		lose = { "Cash", "Normal upgrades", "Area progress" },
 		keep = { "Magnets", "Pets", "Potions", "Gears", "Cosmetics" },
 	}
+end
+
+function GameData.pitShop(): { any }
+	local list = {}
+	for index, offerId in ipairs(PitShopConfig.Order) do
+		local offer = PitShopConfig.ById[offerId]
+		if offer then
+			table.insert(list, {
+				id = offer.Id,
+				name = offer.DisplayName,
+				description = offer.Description,
+				glyph = offer.Glyph,
+				slagPrice = offer.SlagPrice,
+				layoutOrder = index,
+			})
+		end
+	end
+	return list
 end
 
 return GameData

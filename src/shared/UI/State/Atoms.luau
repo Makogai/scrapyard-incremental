@@ -74,6 +74,7 @@ end
 
 Atoms.money = Charm.atom(0)
 Atoms.gears = Charm.atom(0)
+Atoms.slag = Charm.atom(0)
 Atoms.storedWeight = Charm.atom(0)
 Atoms.storedValue = Charm.atom(0)
 --[[
@@ -203,6 +204,16 @@ Atoms.toasts = Charm.atom({} :: { Toast })
 Atoms.buyAmount = Charm.atom("x1")
 
 --[[
+	Pit wreck HP, mirrored from the tagged model's attributes by `WreckHudController`.
+	Zero max means no wreck is live. Not a snapshot field -- the HUD reads it the
+	same way it reads other client-owned world facts. `wreckShielded` is the
+	overload pause: chip DPS is frozen until someone magnets the glowing node.
+]]
+Atoms.wreckIntegrity = Charm.atom(0)
+Atoms.wreckIntegrityMax = Charm.atom(0)
+Atoms.wreckShielded = Charm.atom(false)
+
+--[[
 	Egg summoning, all client-owned. The server decides *what* hatched; these three
 	only describe what the player is looking at while it happens.
 
@@ -256,6 +267,9 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.Gears) == "number" then
 		Atoms.gears(snapshot.Gears)
+	end
+	if type(snapshot.Slag) == "number" then
+		Atoms.slag(snapshot.Slag)
 	end
 	if type(snapshot.StoredWeight) == "number" then
 		Atoms.storedWeight(snapshot.StoredWeight)

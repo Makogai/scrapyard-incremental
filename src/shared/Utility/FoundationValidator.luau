@@ -6,6 +6,10 @@ local PrestigeConfig = require(script.Parent.Parent.Config.PrestigeConfig)
 local MonetizationConfig = require(script.Parent.Parent.Config.MonetizationConfig)
 local PlotConfig = require(script.Parent.Parent.Config.PlotConfig)
 local ScrapConfig = require(script.Parent.Parent.Config.ScrapConfig)
+local ArenaConfig = require(script.Parent.Parent.Config.ArenaConfig)
+local PitShopConfig = require(script.Parent.Parent.Config.PitShopConfig)
+local AdminConfig = require(script.Parent.Parent.Config.AdminConfig)
+local InventoryConfig = require(script.Parent.Parent.Config.InventoryConfig)
 local UpgradeConfig = require(script.Parent.Parent.Config.UpgradeConfig)
 local PetConfig = require(script.Parent.Parent.Config.PetConfig)
 local GameMath = require(script.Parent.GameMath)
@@ -40,15 +44,19 @@ function FoundationValidator.validate()
 		positive(scrap.RequiredMagnetStrength, `{scrapId}.RequiredMagnetStrength`)
 		positive(scrap.SpawnWeight, `{scrapId}.SpawnWeight`)
 		positive(scrap.RespawnSeconds, `{scrapId}.RespawnSeconds`)
-		assert(#scrap.AreaIds > 0, `{scrapId} must belong to an area`)
-		--[[
-			There is no size or rotation to validate here: both come from the model in Studio now. What
-			is still worth asserting is that a model is named at all, because a blank name spawns
-			nothing and the failure shows up as an empty yard rather than as an error.
-		]]
 		assert(#scrap.ModelName > 0, `{scrapId}.ModelName must not be empty`)
-		for _, areaId in scrap.AreaIds do
-			assert(AreaConfig.ById[areaId] ~= nil, `{scrapId} references unknown area {areaId}`)
+		if scrap.PitOnly == true then
+			assert(#scrap.AreaIds == 0, `{scrapId} is Pit-only and must not belong to a plot area`)
+			positive(scrap.SlagValue or 0, `{scrapId}.SlagValue`)
+		else
+			assert(#scrap.AreaIds > 0, `{scrapId} must belong to an area`)
+			assert(
+				scrap.SlagValue == nil or scrap.SlagValue == 0,
+				`{scrapId} is plot scrap and pays no slag`
+			)
+			for _, areaId in scrap.AreaIds do
+				assert(AreaConfig.ById[areaId] ~= nil, `{scrapId} references unknown area {areaId}`)
+			end
 		end
 	end
 
@@ -100,6 +108,16 @@ function FoundationValidator.validate()
 			totalWeight += pet.RollWeight
 		end
 		assert(totalWeight == PetConfig.RollTotal, `{eggId} roll weights must match RollTotal`)
+	end
+	for petId, pet in PetConfig.Pets do
+		positive(pet.MoneyMultiplier, `{petId}.MoneyMultiplier`)
+		if pet.Premium ~= true then
+			local bonus = math.max(0, pet.MoneyMultiplier - 1)
+			assert(
+				bonus < GameMath.MAXIMUM_PET_CASH_BONUS,
+				`{petId} hatchable cash must leave room for teammates under the team cap`
+			)
+		end
 	end
 
 	positive(PrestigeConfig.BaseMoneyRequirement, "Prestige.BaseMoneyRequirement")
@@ -167,6 +185,107 @@ function FoundationValidator.validate()
 		"Crusher must leave back expansion clearance"
 	)
 	assert(PlotConfig.EntranceLocalZ < 0, "Plot entrance must remain on the front side")
+
+	local pitWeightTotal = 0
+	local strongestPit = 0
+	local strongestPitId = ""
+	for scrapId, weight in ArenaConfig.ScrapWeights do
+		local definition = ScrapConfig.ById[scrapId]
+		assert(definition ~= nil, `ArenaConfig.ScrapWeights names unknown scrap {scrapId}`)
+		assert(definition.PitOnly == true, `{scrapId} in the Pit roster must be Pit-only`)
+		positive(weight, `ArenaConfig.ScrapWeights.{scrapId}`)
+		pitWeightTotal += weight
+		if definition.RequiredMagnetStrength >= strongestPit then
+			strongestPit = definition.RequiredMagnetStrength
+			strongestPitId = scrapId
+		end
+	end
+	assert(pitWeightTotal > 0, "ArenaConfig.ScrapWeights must not be empty")
+	assert(strongestPitId == "RobotArm", "Robot Arm must be the strongest Pit scrap")
+	local armFit = ArenaConfig.FitLongestStuds.RobotArm
+	positive(armFit, "ArenaConfig.FitLongestStuds.RobotArm")
+	for scrapId, longest in ArenaConfig.FitLongestStuds do
+		positive(longest, `ArenaConfig.FitLongestStuds.{scrapId}`)
+		assert(ScrapConfig.ById[scrapId] ~= nil, `FitLongestStuds names unknown scrap {scrapId}`)
+		assert(longest <= armFit, `{scrapId} must not out-size the Robot Arm in the Pit`)
+	end
+
+	for _, scrapId in ScrapConfig.PitOrder do
+		local definition = ScrapConfig.ById[scrapId]
+		assert(
+			definition ~= nil and definition.PitOnly == true,
+			`{scrapId} in PitOrder must be Pit-only`
+		)
+	end
+
+	local wreck = ArenaConfig.Wreck
+	positive(wreck.Integrity, "ArenaConfig.Wreck.Integrity")
+	assert(wreck.Integrity >= 1000, "the wreck must take minutes, not seconds")
+	positive(wreck.ChipPerSecond, "ArenaConfig.Wreck.ChipPerSecond")
+	positive(ArenaConfig.MagnetRangeCap, "ArenaConfig.MagnetRangeCap")
+	positive(wreck.ChunkCount, "ArenaConfig.Wreck.ChunkCount")
+	positive(wreck.FitLongestStuds, "ArenaConfig.Wreck.FitLongestStuds")
+	assert(
+		wreck.FitLongestStuds > armFit,
+		"the wreck must out-size Pit scrap so it reads as the landmark"
+	)
+	positive(wreck.BarHeightStuds, "ArenaConfig.Wreck.BarHeightStuds")
+	positive(wreck.BarWidthStuds, "ArenaConfig.Wreck.BarWidthStuds")
+	positive(wreck.BreakdownSeconds, "ArenaConfig.Wreck.BreakdownSeconds")
+	positive(wreck.ShieldEveryIntegrity, "ArenaConfig.Wreck.ShieldEveryIntegrity")
+	assert(
+		wreck.ShieldEveryIntegrity < wreck.Integrity,
+		"wreck shield must be a slice of integrity, not the whole fight"
+	)
+	assert(wreck.ShieldCooldownSeconds >= 0, "ArenaConfig.Wreck.ShieldCooldownSeconds")
+	assert(wreck.ShieldSkipBelow >= 0, "ArenaConfig.Wreck.ShieldSkipBelow")
+	positive(wreck.NodeMinStuds, "ArenaConfig.Wreck.NodeMinStuds")
+	positive(wreck.NodeMaxStuds, "ArenaConfig.Wreck.NodeMaxStuds")
+	assert(
+		wreck.NodeMinStuds < wreck.NodeMaxStuds,
+		"overload node min distance must be inside the max"
+	)
+	positive(wreck.NodeRelocateSeconds, "ArenaConfig.Wreck.NodeRelocateSeconds")
+	positive(wreck.ShieldBurstCount, "ArenaConfig.Wreck.ShieldBurstCount")
+	positive(wreck.NodeBurstCount, "ArenaConfig.Wreck.NodeBurstCount")
+	assert(#wreck.ModelNames == 1, "the wreck uses only the RobotWreck model")
+	assert(wreck.ModelNames[1] == "RobotWreck", "RobotWreck is the wreck template")
+	positive(AdminConfig.MaximumWreckHp, "AdminConfig.MaximumWreckHp")
+	assert(
+		AdminConfig.MaximumWreckHp >= wreck.Integrity,
+		"admin wreck HP ceiling must reach the live wreck"
+	)
+	for _, name in wreck.ModelNames do
+		assert(ScrapConfig.ById[name] == nil, `{name} is Pit scrap and must not be the wreck`)
+	end
+
+	for _, offerId in PitShopConfig.Order do
+		local offer = PitShopConfig.ById[offerId]
+		assert(offer ~= nil, `PitShopConfig.Order names unknown offer {offerId}`)
+		assert(offer.Id == offerId, `Pit shop key mismatch for {offerId}`)
+		positive(offer.SlagPrice, `{offerId}.SlagPrice`)
+		local rewards = offer.Rewards
+		local hasReward = false
+		if rewards.Items then
+			for itemId, amount in rewards.Items do
+				assert(
+					InventoryConfig.Consumables[itemId] ~= nil,
+					`{offerId} grants unknown item {itemId}`
+				)
+				positive(amount, `{offerId}.Items.{itemId}`)
+				hasReward = true
+			end
+		end
+		if rewards.Money then
+			positive(rewards.Money, `{offerId}.Money`)
+			hasReward = true
+		end
+		if rewards.SecretTickets then
+			positive(rewards.SecretTickets, `{offerId}.SecretTickets`)
+			hasReward = true
+		end
+		assert(hasReward, `{offerId} must grant something`)
+	end
 end
 
 return table.freeze(FoundationValidator)

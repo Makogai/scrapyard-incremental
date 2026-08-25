@@ -105,6 +105,12 @@ local titles: { TitleDefinition } = {
 		Rarity = "Epic",
 		Source = "IndexComplete",
 	}),
+	table.freeze({
+		Id = "PitDiver",
+		Text = "PIT DIVER",
+		Rarity = "Epic",
+		Source = "PitDiver",
+	}),
 	table.freeze({ Id = "Tycoon", Text = "TYCOON", Rarity = "Epic", Source = "MoneyMillion" }),
 	table.freeze({ Id = "Ascended", Text = "ASCENDED", Rarity = "Epic", Source = "RebirthTen" }),
 	table.freeze({

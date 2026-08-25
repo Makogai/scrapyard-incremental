@@ -79,11 +79,16 @@ local SCRAP_IDS = {
 	"ExhaustPipe",
 	"Axle",
 	"FuelTank",
+	"Drone",
+	"Submarine",
+	"LavaCoreScrap",
+	"RobotArm",
 }
 local VARIANT_IDS = { Normal = true, Rare = true, Epic = true, Legendary = true, Nebula = true }
 
 local MAXIMUM_MONEY = 1e15
 local MAXIMUM_GEARS = 1000000
+local MAXIMUM_SLAG = 1e9
 local MAXIMUM_STORED_WEIGHT = 1e9
 local MAXIMUM_STORED_VALUE = 1e12
 local MAXIMUM_COLLECTED = 1e15
@@ -217,6 +222,7 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		SchemaVersion = PlayerDataSchema.CurrentVersion,
 		Money = 0,
 		Gears = 0,
+		Slag = 0,
 		TotalScrapCollected = 0,
 		StoredWeight = 0,
 		StoredValue = 0,
@@ -579,6 +585,7 @@ function PlayerDataSchema.validate(
 	local clean = PlayerDataSchema.createDefault(nowTimestamp)
 	clean.Money = boundedInteger(raw.Money, defaults.Money, 0, MAXIMUM_MONEY)
 	clean.Gears = boundedInteger(raw.Gears, defaults.Gears, 0, MAXIMUM_GEARS)
+	clean.Slag = boundedInteger(raw.Slag, 0, 0, MAXIMUM_SLAG)
 	clean.TotalScrapCollected = boundedInteger(raw.TotalScrapCollected, 0, 0, MAXIMUM_COLLECTED)
 	clean.StoredWeight = boundedNumber(raw.StoredWeight, 0, 0, MAXIMUM_STORED_WEIGHT)
 	clean.StoredValue = boundedInteger(raw.StoredValue, 0, 0, MAXIMUM_STORED_VALUE)
@@ -761,6 +768,7 @@ function PlayerDataSchema.validate(
 					rewards = {}
 					rewards.Money = boundedInteger(entry.Rewards.Money, 0, 0, MAXIMUM_MONEY)
 					rewards.Gears = boundedInteger(entry.Rewards.Gears, 0, 0, MAXIMUM_GEARS)
+					rewards.Slag = boundedInteger(entry.Rewards.Slag, 0, 0, MAXIMUM_SLAG)
 					rewards.Spins = boundedInteger(entry.Rewards.Spins, 0, 0, 1000)
 					if typeof(entry.Rewards.Items) == "table" then
 						rewards.Items = {}

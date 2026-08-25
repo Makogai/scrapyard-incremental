@@ -29,6 +29,11 @@ AdminConfig.MaximumRestartSeconds = 600
 ]]
 AdminConfig.MaximumServerBoostMinutes = 120
 AdminConfig.MaximumEventMinutes = 240
+--[[
+	Admin wreck HP. Live config is 3600; this ceiling stops a fat-finger from making
+	a wreck that never dies. Floor of 1 is applied in `AdminService`.
+]]
+AdminConfig.MaximumWreckHp = 100000
 
 --[[
 	TWO TIERS, ONE PANEL.

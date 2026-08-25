@@ -60,7 +60,7 @@ local function HudMobile(props)
 	-- first band under the strip and the rest of the HUD stacks below it.
 	local topRow = safe.top + 44
 
-	local pitOffset = if state.event and state.event.arena then 52 else 0
+	local pitOffset = if state.event and state.event.arena then 48 else 0
 	--- 32-tall tiles plus their 8 gap, so the skin card lands under whatever boosts are actually drawn.
 	local boostLane = #(state.boosts or {}) * 40
 
@@ -82,6 +82,7 @@ local function HudMobile(props)
 			cash = state.cash,
 			gears = state.gears,
 			prestige = state.prestige,
+			slag = state.eventTokens,
 			direction = Enum.FillDirection.Horizontal,
 			width = 116,
 			height = 36,

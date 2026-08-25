@@ -27,6 +27,7 @@ local ArenaConfig = require(ReplicatedStorage.Shared.Config.ArenaConfig)
 local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local PlotService = require(script.Parent.PlotService)
 local ScrapService = require(script.Parent.ScrapService)
+local WreckService = require(script.Parent.WreckService)
 
 local ArenaService = {}
 
@@ -70,11 +71,15 @@ local function spawnMarkers(area: Model): { BasePart }
 	local markers = {}
 	for _, child in folder:GetChildren() do
 		if child:IsA("BasePart") then
-			table.insert(markers, child)
+			if child.Name ~= ArenaConfig.Wreck.AnchorName and child.Name ~= "Wreck" then
+				table.insert(markers, child)
+			end
 		elseif child:IsA("Model") then
-			local part = child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart", true)
-			if part then
-				table.insert(markers, part)
+			if child.Name ~= ArenaConfig.Wreck.AnchorName and child.Name ~= "Wreck" then
+				local part = child.PrimaryPart or child:FindFirstChildWhichIsA("BasePart", true)
+				if part then
+					table.insert(markers, part)
+				end
 			end
 		end
 	end
@@ -152,6 +157,20 @@ function ArenaService.IsOpen(): boolean
 	return arenaEvent() ~= nil and findArea() ~= nil
 end
 
+function ArenaService.PlayerIsInside(player: Player): boolean
+	local model = findArea()
+	if model == nil then
+		return false
+	end
+	local character = player.Character
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	local cf, size = model:GetBoundingBox()
+	return ArenaConfig.containsPoint(root.Position, cf, size)
+end
+
 function ArenaService.SpawnPart(): BasePart?
 	if arenaEvent() == nil then
 		return nil
@@ -200,7 +219,7 @@ local function rollScrapId(): string
 			return scrapId
 		end
 	end
-	return "MetalCan"
+	return "Drone"
 end
 
 --[[
@@ -273,7 +292,11 @@ local function evacuate(area: Model)
 		local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
 		if root ~= nil and root:IsA("BasePart") then
 			local delta = cf:PointToObjectSpace(root.Position)
-			if math.abs(delta.X) <= half.X and math.abs(delta.Y) <= half.Y and math.abs(delta.Z) <= half.Z then
+			if
+				math.abs(delta.X) <= half.X
+				and math.abs(delta.Y) <= half.Y
+				and math.abs(delta.Z) <= half.Z
+			then
 				local plot = PlotService.GetPlot(player)
 				local home = if plot then plot:FindFirstChild("PlayerSpawn") else nil
 				if home ~= nil and home:IsA("BasePart") and character ~= nil then
@@ -317,6 +340,7 @@ openArena = function()
 	if not filled then
 		warn(`[ArenaService] Pit loot failed to spawn: {fillError}`)
 	end
+	WreckService.Open(model)
 end
 
 closeArena = function()
@@ -325,6 +349,7 @@ closeArena = function()
 		return
 	end
 	evacuate(model)
+	WreckService.Close()
 	ScrapService.ClearPublic()
 	ScrapService.SetPublicFolder(nil)
 	local folder = scrapFolder

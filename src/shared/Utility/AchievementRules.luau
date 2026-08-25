@@ -113,10 +113,38 @@ local METRICS: { [string]: (data: { [string]: any }) -> number } = {
 		undiscovered scrap without special-casing nil; this metric is the one that has to be specific about
 		what "discovered" means.
 	]]
+	--[[
+		Distinct plot scrap types seen. Pit-only pieces have their own achievement
+		(`PitDiver`) so finding a Drone cannot complete Archivist.
+	]]
 	ScrapDiscovered = function(data)
 		local total = 0
 		if type(data.DiscoveredScrap) == "table" then
-			for _, record in pairs(data.DiscoveredScrap) do
+			for scrapId, record in pairs(data.DiscoveredScrap) do
+				if
+					type(record) == "table"
+					and record.Discovered == true
+					and scrapId ~= "Drone"
+					and scrapId ~= "Submarine"
+					and scrapId ~= "LavaCoreScrap"
+					and scrapId ~= "RobotArm"
+				then
+					total += 1
+				end
+			end
+		end
+		return total
+	end,
+
+	--[[
+		The four Pit-only types. Listed here rather than read from `ScrapConfig` because
+		this module runs under Lune, and ScrapConfig uses Color3.
+	]]
+	PitScrapDiscovered = function(data)
+		local total = 0
+		if type(data.DiscoveredScrap) == "table" then
+			for _, scrapId in { "Drone", "Submarine", "LavaCoreScrap", "RobotArm" } do
+				local record = data.DiscoveredScrap[scrapId]
 				if type(record) == "table" and record.Discovered == true then
 					total += 1
 				end

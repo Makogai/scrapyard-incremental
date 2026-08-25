@@ -19,6 +19,10 @@ export type ScrapId =
 	| "ExhaustPipe"
 	| "Axle"
 	| "FuelTank"
+	| "Drone"
+	| "Submarine"
+	| "LavaCoreScrap"
+	| "RobotArm"
 
 export type VariantId = "Normal" | "Rare" | "Epic" | "Legendary" | "Nebula"
 export type AreaId = "FrontYard" | "WorkshopYard" | "VehicleGraveyard"
@@ -50,6 +54,14 @@ export type ScrapDefinition = {
 		with the art.
 	]]
 	ModelName: string,
+	--[[
+		Pit-only scrap never belongs to a plot area. Empty `AreaIds` plus this flag is what keeps
+		`ScrapService` from rolling it onto a yard, and what lets `TryCollect` skip the area lock
+		without pretending the piece came from the Front Yard.
+	]]
+	PitOnly: boolean?,
+	--- Slag paid on a Pit pickup. Absent or 0 for plot scrap.
+	SlagValue: number?,
 }
 
 export type VariantDefinition = {

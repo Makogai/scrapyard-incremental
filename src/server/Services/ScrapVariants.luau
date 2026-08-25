@@ -43,6 +43,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
+local ArenaConfig = require(ReplicatedStorage.Shared.Config.ArenaConfig)
 
 local ScrapVariants = {}
 
@@ -276,6 +277,93 @@ function ScrapVariants.Coverage(): { [string]: { string } }
 		coverage[scrapId] = list
 	end
 	return coverage
+end
+
+--[[
+	Lift authored Pit / generic models out of Workspace into `ServerStorage.ScrapModels`.
+
+	Pit pieces live in `Workspace.EventScrap` (`Drone`, `Submarine`, `LavaCoreScrap` /
+	`Lava Core`, `Robot Arm`). A model already parented under that folder or the Event
+	Area is cloned, not moved, so the authored copies stay in the place.
+]]
+function ScrapVariants.AdoptWorkspaceModels(templates: Folder): string
+	local adopted = 0
+	local eventScrap = workspace:FindFirstChild(ArenaConfig.EventScrapFolderName)
+		or workspace:FindFirstChild(ArenaConfig.EventScrapFolderName, true)
+
+	local function isModel(instance: Instance): boolean
+		return instance:IsA("Model") or instance:IsA("BasePart")
+	end
+
+	local function childNamed(parent: Instance, name: string): Instance?
+		local exact = parent:FindFirstChild(name)
+		if exact and isModel(exact) then
+			return exact
+		end
+		local lower = string.lower(name)
+		for _, child in parent:GetChildren() do
+			if string.lower(child.Name) == lower and isModel(child) then
+				return child
+			end
+		end
+		local deep = parent:FindFirstChild(name, true)
+		if deep and isModel(deep) then
+			return deep
+		end
+		return nil
+	end
+
+	local function aliases(definition): { string }
+		if definition.Id == "LavaCoreScrap" then
+			return { definition.ModelName, "Lava Core", "LavaCore" }
+		end
+		if definition.Id == "RobotArm" then
+			return { definition.ModelName, "RobotArm" }
+		end
+		return { definition.ModelName }
+	end
+
+	for _, definition in ScrapConfig.ById do
+		if templates:FindFirstChild(definition.ModelName) then
+			continue
+		end
+		local source: Instance? = nil
+		if eventScrap then
+			for _, name in aliases(definition) do
+				source = childNamed(eventScrap, name)
+				if source then
+					break
+				end
+			end
+		end
+		if source == nil then
+			source = workspace:FindFirstChild(definition.ModelName)
+			if source == nil then
+				source = workspace:FindFirstChild(definition.ModelName, true)
+			end
+		end
+		if source == nil or not isModel(source) then
+			continue
+		end
+		local clone = source:Clone()
+		clone.Name = definition.ModelName
+		for _, descendant in clone:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				descendant.Anchored = true
+			end
+		end
+		if clone:IsA("BasePart") then
+			clone.Anchored = true
+		end
+		clone.Parent = templates
+		adopted += 1
+		if source.Parent == workspace then
+			source:Destroy()
+		end
+	end
+	return if adopted > 0
+		then `adopted {adopted} Workspace scrap models into ServerStorage.ScrapModels`
+		else "no Workspace scrap models to adopt"
 end
 
 function ScrapVariants.SourceFolder(): Folder?

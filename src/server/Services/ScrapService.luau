@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
+local ArenaConfig = require(ReplicatedStorage.Shared.Config.ArenaConfig)
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local PlotConfig = require(ReplicatedStorage.Shared.Config.PlotConfig)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
@@ -609,6 +610,34 @@ local function clampIfRunaway(instance: Instance, definition: GameTypes.ScrapDef
 end
 
 --[[
+	Pit hoard presentation. SCALE DOWN ONLY, to `ArenaConfig.FitLongestStuds`.
+
+	These four models were authored as display pieces and overfill the 3.5-stud spawn
+	grid. Plot scrap is untouched. Robot Arm's cap is the highest so it stays the
+	large jackpot on the floor.
+]]
+local function fitPitScrap(instance: Instance, definition: GameTypes.ScrapDefinition)
+	if definition.PitOnly ~= true then
+		return
+	end
+	local target = ArenaConfig.FitLongestStuds[definition.Id]
+	if typeof(target) ~= "number" or target <= 0 then
+		return
+	end
+	local _, box = boundsOf(instance)
+	local longest = math.max(box.X, box.Y, box.Z)
+	if longest < MINIMUM_MEASURABLE_STUDS or longest <= target then
+		return
+	end
+	local correction = target / longest
+	if instance:IsA("Model") then
+		instance:ScaleTo(instance:GetScale() * correction)
+	elseif instance:IsA("BasePart") then
+		instance.Size *= correction
+	end
+end
+
+--[[
 	Put a piece of scrap on its marker EXACTLY as it was authored: same size, same rotation.
 
 	THIS IS THE WHOLE CONTRACT. Whatever a model looks like in Studio is what appears in the yard, so
@@ -641,6 +670,7 @@ local function placeScrap(
 	end
 
 	clampIfRunaway(instance, definition)
+	fitPitScrap(instance, definition)
 	standAt(instance, placement)
 end
 
@@ -667,6 +697,7 @@ local function restandAfterLoad(
 		return
 	end
 	clampIfRunaway(instance, definition)
+	fitPitScrap(instance, definition)
 	standAt(instance, placement)
 end
 
@@ -799,15 +830,23 @@ function ScrapService.SpawnPublic(
 	instance:SetAttribute("ScrapId", scrapId)
 	instance:SetAttribute("VariantId", variantId)
 	--[[
-		The area is recorded as the one this scrap actually comes from, not as the arena. Collection
-		bypasses the area LOCK (see `TryCollect`), but the discovery it files should still say a scrap car
-		is Vehicle Graveyard scrap -- that is what the index reads.
+		Pit-only scrap has no plot area. Recording "FrontYard" would file a Robot Arm as a
+		Front Yard discovery; recording nothing would fail `TryCollect`'s area lookup. `Pit`
+		is a sentinel `CanCollect` accepts only with `ignoreAreaLock`.
 	]]
-	instance:SetAttribute("AreaId", definition.AreaIds[1])
+	local areaId = if definition.PitOnly == true or #definition.AreaIds == 0
+		then ArenaConfig.PublicAreaId
+		else definition.AreaIds[1]
+	instance:SetAttribute("AreaId", areaId)
 	instance:SetAttribute("OwnerUserId", 0)
 	instance:SetAttribute("ReservedUserId", 0)
 
-	local flattenColour = baseArt == nil
+	--[[
+		Pit models are authored art sitting in ScrapModels, not the generic tinted box.
+		Washing them to the rarity swatch is what threw away the colours set in Studio.
+		Rare+ still gets the highlight overlay when there is no per-rarity mesh.
+	]]
+	local flattenColour = baseArt == nil and definition.PitOnly ~= true
 	for _, descendant in instance:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant.Anchored = true
@@ -846,7 +885,7 @@ function ScrapService.SpawnPublic(
 		Plot = nil,
 		OwnerUserId = 0,
 		ScrapId = scrapId,
-		AreaId = definition.AreaIds[1],
+		AreaId = areaId,
 		VariantId = variantId,
 		ReservedUserId = nil,
 		FootprintRadius = math.max(ownBox.X, ownBox.Z) / 2,
@@ -1410,6 +1449,7 @@ function ScrapService.Start()
 		ServerStorage:FindFirstChild("ScrapModels"),
 		"ServerStorage.ScrapModels required"
 	) :: Folder
+	print(`[ScrapService] {ScrapVariants.AdoptWorkspaceModels(templates)}`)
 	print(`[ScrapService] ScrapVariants: {ScrapVariants.Load()}`)
 	print(`[ScrapService] {ScrapVariants.PublishPreviews(templates)}`)
 	gameplayEffect = RemoteService.GetEvent("GameplayEffect")

@@ -19,6 +19,7 @@ local React = require(ReplicatedStorage.Packages.React)
 local ReactRoblox = require(ReplicatedStorage.Packages.ReactRoblox)
 local UILabs = require(game:GetService("ServerStorage").DevPackages.UILabs)
 local UI = require(ReplicatedStorage.Shared.UI)
+local Atoms = require(ReplicatedStorage.Shared.UI.State.Atoms)
 
 local Harness = require(script.Parent.Parent.Harness)
 
@@ -32,8 +33,15 @@ return UILabs.CreateReactStory({
 	controls = {
 		Device = UILabs.Choose({ "desktop", "tablet", "mobile" }, 1),
 		GameView = UILabs.Boolean(true),
+		WreckHp = UILabs.Slider(2400, 0, 3600, 50),
+		Shielded = UILabs.Boolean(false),
 	},
 }, function(props)
+	local hp = props.controls.WreckHp
+	Atoms.wreckIntegrity(hp)
+	Atoms.wreckIntegrityMax(if hp > 0 then 3600 else 0)
+	Atoms.wreckShielded(props.controls.Shielded == true)
+
 	return e(Harness.Screen, {
 		component = UI.Screens.HudDesktop,
 		device = props.controls.Device,
