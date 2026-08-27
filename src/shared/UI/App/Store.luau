@@ -84,6 +84,7 @@ local function seedMock()
 	Atoms.inbox(Mock.inbox)
 	Atoms.socialClaims(Mock.socialClaims)
 	Atoms.prestigeCount(Mock.player.prestige)
+	Atoms.gearUpgrades(table.clone(Mock.gearUpgrades))
 	Atoms.totalScrapCollected(Mock.player.totalScrap)
 	Atoms.equippedMagnet(Mock.player.equippedMagnet)
 	Atoms.equippedPets(table.clone(Mock.player.equippedPets))
@@ -288,6 +289,11 @@ local function liveActions()
 		Bridge.setPlotSkin(skinId or "")
 	end
 
+	function self.equipMagnetSkin(skinId: string?)
+		Sound.play("equip")
+		Bridge.setMagnetSkin(skinId or "")
+	end
+
 	function self.usePotion(itemId: string)
 		Sound.play("equip")
 		Bridge.useConsumable(itemId)
@@ -301,6 +307,11 @@ local function liveActions()
 	function self.buyPitItem(offerId: string)
 		Sound.play("purchase")
 		Bridge.buyPitItem(offerId)
+	end
+
+	function self.buyGearItem(offerId: string)
+		Sound.play("purchase")
+		Bridge.buyGearItem(offerId)
 	end
 
 	--[[
@@ -585,6 +596,16 @@ local function mockActions()
 		Atoms.plotSkin(skinId or "")
 	end
 
+	function self.equipMagnetSkin(skinId: string?)
+		local id = skinId or ""
+		Atoms.activeMagnetSkin(id)
+		if id ~= "" then
+			local owned = table.clone(Atoms.ownedMagnetSkins())
+			owned[id] = true
+			Atoms.ownedMagnetSkins(owned)
+		end
+	end
+
 	--[[
 		The social reward buttons, claimed locally.
 
@@ -720,11 +741,32 @@ local function mockActions()
 		end
 	end
 
+	function self.buyGearItem(offerId: string)
+		local levels = table.clone(Atoms.gearUpgrades())
+		for _, offer in ipairs(GameData.gearShop(Atoms.prestigeCount(), levels)) do
+			if
+				offer.id == offerId
+				and not offer.locked
+				and not offer.maxed
+				and typeof(offer.price) == "number"
+				and Atoms.gears() >= offer.price
+			then
+				Atoms.gears(Atoms.gears() - offer.price)
+				if offer.maxLevel > 0 then
+					levels[offer.id] = (levels[offer.id] or 0) + 1
+					Atoms.gearUpgrades(levels)
+				end
+				break
+			end
+		end
+	end
+
 	for _, name in ipairs({
 		"teleport",
 		"teleportHome",
 		"buyMagnet",
 		"buyPitItem",
+		"buyGearItem",
 		"purchase",
 		"equipPet",
 		"unequipPet",
@@ -846,10 +888,13 @@ function Store.use()
 	local restart = useAtom(Atoms.restart)
 	local derived = useAtom(Atoms.derived)
 	local upgradeLevels = useAtom(Atoms.upgradeLevels)
+	local gearUpgrades = useAtom(Atoms.gearUpgrades)
 	local unlockedAreas = useAtom(Atoms.unlockedAreas)
 	local prestigeCount = useAtom(Atoms.prestigeCount)
 	local ownedMagnets = useAtom(Atoms.ownedMagnets)
 	local equippedMagnet = useAtom(Atoms.equippedMagnet)
+	local ownedMagnetSkins = useAtom(Atoms.ownedMagnetSkins)
+	local activeMagnetSkin = useAtom(Atoms.activeMagnetSkin)
 	local inventory = useAtom(Atoms.inventory)
 	local activeBoosts = useAtom(Atoms.activeBoosts)
 	local activeEvent = useAtom(Atoms.activeEvent)
@@ -1168,9 +1213,12 @@ function Store.use()
 		derived = derived,
 
 		upgradeLevels = upgradeLevels,
+		gearUpgrades = gearUpgrades,
 		unlockedAreas = unlockedAreas,
 		ownedMagnets = ownedMagnets,
 		equippedMagnet = equippedMagnet,
+		ownedMagnetSkins = ownedMagnetSkins,
+		activeMagnetSkin = activeMagnetSkin,
 		equippedSkin = nil,
 		--- The plot skin actually worn, "" for the standard build. See `PlotSkinConfig.Catalogue`.
 		plotSkin = plotSkin,

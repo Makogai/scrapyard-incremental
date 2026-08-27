@@ -38,18 +38,18 @@ local byId: { [GameTypes.UpgradeId]: GameTypes.UpgradeDefinition } = {
 		BaseMaximumLevel = 10,
 		LevelsPerPrestige = 2,
 		--[[
-			Starter magnet is 5 studs (was 9). First buy is $500 so a tight start is a
-			goal, not a wall. +1 stud a level: you pass the old 9-stud start at level 4,
-			and the base cap is 15. EffectCap stays 42 -- that is still the prestige
-			ceiling, because range is BaseRange + (effect - BaseEffect).
+			Starter magnet is 5 studs. +0.4 studs a level, so the first prestige cap
+			(level 10) is +4 and rebirth 6 (level 22) is +8.8. The hard ceiling on
+			derived reach is Environment.MaximumMagnetRange -- this EffectCap is only
+			the upgrade's own contribution (BaseEffect + 8).
 		]]
 		BaseCost = 500,
 		GrowthRate = 1.35,
 		BaseEffect = 5,
-		EffectPerLevel = 1,
+		EffectPerLevel = 0.4,
 		EffectCurve = "Power",
 		CurvePower = 1,
-		EffectCap = 42,
+		EffectCap = 13,
 		EffectUnit = " studs",
 	}),
 	StorageCapacity = upgrade({

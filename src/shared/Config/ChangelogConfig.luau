@@ -32,6 +32,176 @@ return table.freeze({
 			that the build changed. There is no second list to keep in step.
 		]]
 		table.freeze({
+			Version = "0.5.32",
+			Date = "2026-08-27",
+			Title = "Event Horizon spins on the ground",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Event Horizon's swirl and glow now spin flat on the magnet reach circle, not as vertical discs stuck to the character.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.31",
+			Date = "2026-08-27",
+			Title = "Magnet range stays on your plot",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Balance" :: ChangeKind,
+					Text = "Magnet reach is capped at 16 studs. Quantum, Salvage and Advanced start closer in, and range upgrades add less per level, so a maxed rebirth-6 Quantum no longer pulls from the next plot.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.30",
+			Date = "2026-08-27",
+			Title = "Ember Core whirlpool",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Ember Core's inner fill is a spinning magma whirl now, not the same swirl discs as Event Horizon.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.29",
+			Date = "2026-08-27",
+			Title = "Ember Core molten rings",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Ember Core rings are solid molten lines now, and the inner circle is filled with swirling lava.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.28",
+			Date = "2026-08-27",
+			Title = "Ember Core is a smooth ring",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Ember Core's circles are a continuous waving line now, not a chain of boxes.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.27",
+			Date = "2026-08-27",
+			Title = "Ember Core is a waving ring",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Ember Core no longer paints a lava plate on the floor. It is a transparent waving ring, with the bubbles and fire still coming out of the circle.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.26",
+			Date = "2026-08-27",
+			Title = "Ember Core looks like fire",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Ember Core uses molten reds, ember orange and charcoal smoke now, instead of neon gold glow.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.25",
+			Date = "2026-08-27",
+			Title = "Ember Core is lava",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Ember Core is a lava pool now -- bubbling magma, hopping fireballs, sparks, and a flowing hot rim -- instead of a few embers drifting up.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.24",
+			Date = "2026-08-27",
+			Title = "Horizon quiet, Orbital moving",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Event Horizon no longer strobes on the ground -- the void swirl, beams, and rings stay.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Orbital rings now roll and ride up and down, instead of sitting at a fixed height.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.23",
+			Date = "2026-08-27",
+			Title = "Orbital rings and Event Horizon",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Orbital reach rings are now solid spinning hoops, lifted so the tilted circle no longer clips the ground.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Event Horizon is a real void now -- a dark core, accretion beams, and spinning swirl discs -- instead of a quieter version of the planet rings.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.22",
+			Date = "2026-08-26",
+			Title = "Magnet skins actually look different",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Each magnet skin now has its own silhouette in your hand -- a real U-magnet, a wrapped chrome coil, a glowing barrel, planet rings, or a black hole -- instead of five similar sticks.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Skin reach effects no longer share one animation. Paint is stacked hoops, Chrome is current around the rim, Ember is fire rising, Orbital is tilted planet rings, and Event Horizon is still the one that swallows motes.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.21",
+			Date = "2026-08-26",
+			Title = "Magnet skins sit in the hand",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Magnet skins now sit in the palm the way the real magnets do, instead of floating beside the hand.",
+				}),
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Skin reach rings lift off the floor a little and pull motes inward, so the circle reads as a volume rather than a sticker.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.20",
+			Date = "2026-08-26",
+			Title = "Magnet skins",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "Five magnet skins restyle the magnet in your hand and the reach ring around you. They are cosmetics only -- strength and range stay on the magnet you equipped. Grant them from the admin panel while we look at the models; a Robux crate comes later.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.19",
+			Date = "2026-08-25",
+			Title = "Gear Shop",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The Gear Shop is open. Spend Gears on a rebirth head start, a nest-egg cash kit, a bag floor, an extra pet slot, scrap luck, egg fortune, and Secret tickets. Some rows unlock at later rebirths. Gears still do not raise income, and Skip Rebirth stays a Robux product.",
+				}),
+			}),
+		}),
+		table.freeze({
 			Version = "0.5.18",
 			Date = "2026-08-25",
 			Title = "Multi-hatch eggs rattle",

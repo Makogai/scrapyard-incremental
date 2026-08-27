@@ -27,6 +27,7 @@ local definitions: { Definition } = {
 	definition("OpenAreaShop", "RemoteEvent"),
 	definition("OpenExclusiveShop", "RemoteEvent"),
 	definition("OpenPitShop", "RemoteEvent"),
+	definition("OpenGearShop", "RemoteEvent"),
 	definition("RequestTeleport", "RemoteEvent"),
 	definition("ShopAction", "RemoteEvent"),
 	definition("MonetizationPrompt", "RemoteEvent"),

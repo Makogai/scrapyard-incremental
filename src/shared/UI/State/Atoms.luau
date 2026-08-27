@@ -105,6 +105,12 @@ Atoms.prestigeCount = Charm.atom(0)
 Atoms.totalScrapCollected = Charm.atom(0)
 Atoms.ownedMagnets = Charm.atom({} :: { [string]: boolean })
 Atoms.equippedMagnet = Charm.atom("MagnetBasic")
+--[[
+	Cosmetic magnet skins. `activeMagnetSkin` is "" for the equipped magnet's own look.
+	Pure cosmetic -- strength and range stay on EquippedMagnet.
+]]
+Atoms.ownedMagnetSkins = Charm.atom({} :: { [string]: boolean })
+Atoms.activeMagnetSkin = Charm.atom("")
 Atoms.inventory = Charm.atom({} :: { [string]: number })
 Atoms.activeBoosts = Charm.atom({} :: { [string]: number })
 
@@ -152,6 +158,7 @@ Atoms.plotSkin = Charm.atom("")
 Atoms.ownedPets = Charm.atom({} :: { [string]: number })
 Atoms.equippedPets = Charm.atom({} :: { string })
 Atoms.petSlotUpgradeLevel = Charm.atom(0)
+Atoms.gearUpgrades = Charm.atom({} :: { [string]: number })
 --[[
 	The server's own equip-slot count, straight out of the snapshot. The UI used to
 	derive this, which is how the header came to read "EQUIPPED 2 / 1": two pets were
@@ -308,6 +315,12 @@ function Atoms.applySnapshot(snapshot: any)
 	if type(snapshot.EquippedMagnet) == "string" then
 		Atoms.equippedMagnet(snapshot.EquippedMagnet)
 	end
+	if type(snapshot.OwnedMagnetSkins) == "table" then
+		Atoms.ownedMagnetSkins(snapshot.OwnedMagnetSkins)
+	end
+	if type(snapshot.ActiveMagnetSkin) == "string" then
+		Atoms.activeMagnetSkin(snapshot.ActiveMagnetSkin)
+	end
 	if type(snapshot.Inventory) == "table" then
 		Atoms.inventory(snapshot.Inventory)
 	end
@@ -355,6 +368,9 @@ function Atoms.applySnapshot(snapshot: any)
 	end
 	if type(snapshot.PetSlotUpgradeLevel) == "number" then
 		Atoms.petSlotUpgradeLevel(snapshot.PetSlotUpgradeLevel)
+	end
+	if type(snapshot.GearUpgrades) == "table" then
+		Atoms.gearUpgrades(snapshot.GearUpgrades)
 	end
 	if type(snapshot.DiscoveredScrap) == "table" then
 		Atoms.discoveredScrap(snapshot.DiscoveredScrap)

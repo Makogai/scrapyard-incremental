@@ -8,6 +8,8 @@ local PlotConfig = require(script.Parent.Parent.Config.PlotConfig)
 local ScrapConfig = require(script.Parent.Parent.Config.ScrapConfig)
 local ArenaConfig = require(script.Parent.Parent.Config.ArenaConfig)
 local PitShopConfig = require(script.Parent.Parent.Config.PitShopConfig)
+local GearShopConfig = require(script.Parent.Parent.Config.GearShopConfig)
+local MagnetSkinConfig = require(script.Parent.Parent.Config.MagnetSkinConfig)
 local AdminConfig = require(script.Parent.Parent.Config.AdminConfig)
 local InventoryConfig = require(script.Parent.Parent.Config.InventoryConfig)
 local UpgradeConfig = require(script.Parent.Parent.Config.UpgradeConfig)
@@ -168,6 +170,18 @@ function FoundationValidator.validate()
 	positive(PrestigeConfig.MaximumGearsPerPrestige, "Prestige.MaximumGearsPerPrestige")
 	positive(PrestigeConfig.ValuePerPrestige, "Prestige.ValuePerPrestige")
 	assert(PlotConfig.PlotCount == Environment.MaximumPlayers, "Plot count must match server size")
+	positive(Environment.MaximumMagnetRange, "Environment.MaximumMagnetRange")
+	assert(
+		Environment.MaximumMagnetRange >= InventoryConfig.Magnets.QuantumMagnet.BaseRange,
+		"MaximumMagnetRange must cover the Quantum's own range"
+	)
+	assert(Environment.MaximumMagnetRange <= 20, "MaximumMagnetRange must stay inside a plot")
+	for magnetId, magnet in InventoryConfig.Magnets do
+		assert(
+			magnet.BaseRange <= Environment.MaximumMagnetRange,
+			`{magnetId}.BaseRange cannot exceed MaximumMagnetRange`
+		)
+	end
 	assert(
 		PlotConfig.StreetCount * PlotConfig.PlotsPerStreet == PlotConfig.PlotCount,
 		"Street layout must account for every plot"
@@ -286,6 +300,128 @@ function FoundationValidator.validate()
 		end
 		assert(hasReward, `{offerId} must grant something`)
 	end
+
+	for _, offerId in GearShopConfig.Order do
+		local offer = GearShopConfig.ById[offerId]
+		assert(offer ~= nil, `GearShopConfig.Order names unknown offer {offerId}`)
+		assert(offer.Id == offerId, `Gear shop key mismatch for {offerId}`)
+		assert(offer.Id ~= "SkipRebirth", "Gear shop must not sell skip rebirth")
+		nonnegative(offer.RequiredPrestige, `{offerId}.RequiredPrestige`)
+		if offer.Kind == "Upgrade" then
+			assert(offer.MaxLevel ~= nil and offer.MaxLevel >= 1, `{offerId} needs a max rank`)
+			assert(offer.Costs ~= nil, `{offerId} needs Costs`)
+			assert(#offer.Costs == offer.MaxLevel, `{offerId} Costs must match MaxLevel`)
+			local previous = 0
+			for index, cost in offer.Costs do
+				positive(cost, `{offerId}.Costs[{index}]`)
+				assert(cost > previous, `{offerId} Costs must rise each rank`)
+				previous = cost
+			end
+		else
+			positive(offer.GearPrice or 0, `{offerId}.GearPrice`)
+			assert(offer.Rewards ~= nil, `{offerId} must grant something`)
+		end
+	end
+	assert(GearShopConfig.ById.HeadStart.RequiredPrestige >= 1, "Head Start unlocks after a rebirth")
+	assert(GearShopConfig.ById.HatchLuck.RequiredPrestige >= 5, "Egg Fortune is the late unlock")
+	assert(GearShopConfig.ById.PetSlot.MaxLevel == 1, "Companion Bay is a single extra slot")
+	local hatchLuckLast = GearShopConfig.ById.HatchLuck.Costs
+	assert(hatchLuckLast ~= nil, "Egg Fortune needs Costs")
+	assert(
+		(GearShopConfig.ById.SecretTicket.GearPrice or 0) > hatchLuckLast[#hatchLuckLast],
+		"a Secret ticket must cost more than maxing Egg Fortune"
+	)
+	positive(GearShopConfig.StorageSlotsPerLevel, "GearShopConfig.StorageSlotsPerLevel")
+	positive(GearShopConfig.HatchLuckSkipPerLevel, "GearShopConfig.HatchLuckSkipPerLevel")
+
+	local forms = { Horseshoe = true, Coil = true, Planet = true, Void = true }
+	local rarities = {
+		Common = true,
+		Uncommon = true,
+		Rare = true,
+		Epic = true,
+		Legendary = true,
+	}
+	assert(#MagnetSkinConfig.Order == 5, "MagnetSkinConfig must list five skins")
+	local legendaryCount = 0
+	local seen: { [string]: boolean } = {}
+	for _, skinId in MagnetSkinConfig.Order do
+		local skin = MagnetSkinConfig.ById[skinId]
+		assert(skin ~= nil, `MagnetSkinConfig.Order names unknown skin {skinId}`)
+		assert(skin.Id == skinId, `magnet skin key mismatch for {skinId}`)
+		assert(seen[skinId] ~= true, `duplicate magnet skin {skinId}`)
+		seen[skinId] = true
+		assert(#skin.DisplayName > 0, `{skinId}.DisplayName must not be empty`)
+		assert(forms[skin.Form] == true, `{skinId} has unknown Form {skin.Form}`)
+		assert(rarities[skin.Rarity] == true, `{skinId} has unknown Rarity {skin.Rarity}`)
+		if skin.Rarity == "Legendary" then
+			legendaryCount += 1
+			assert(skinId == "EventHorizon", "Event Horizon is the legendary magnet skin")
+		end
+		local ring = skin.RangeRing
+		nonnegative(ring.Fill, `{skinId}.RangeRing.Fill`)
+		assert(ring.Fill <= 1, `{skinId}.RangeRing.Fill must be at most 1`)
+		positive(ring.Rim, `{skinId}.RangeRing.Rim`)
+		nonnegative(ring.SecondRim, `{skinId}.RangeRing.SecondRim`)
+		positive(ring.PulseSeconds, `{skinId}.RangeRing.PulseSeconds`)
+		nonnegative(ring.PulseRings, `{skinId}.RangeRing.PulseRings`)
+		if ring.Motes ~= nil then
+			nonnegative(ring.Motes, `{skinId}.RangeRing.Motes`)
+			assert(ring.Motes <= 16, `{skinId}.RangeRing.Motes is capped at 16`)
+		end
+		if ring.MoteSpeed ~= nil then
+			positive(ring.MoteSpeed, `{skinId}.RangeRing.MoteSpeed`)
+		end
+		if ring.RimLift ~= nil then
+			nonnegative(ring.RimLift, `{skinId}.RangeRing.RimLift`)
+		end
+		if ring.InnerLift ~= nil then
+			nonnegative(ring.InnerLift, `{skinId}.RangeRing.InnerLift`)
+		end
+		if ring.MoteMode ~= nil then
+			assert(
+				ring.MoteMode == "spiral" or ring.MoteMode == "rise",
+				`{skinId}.RangeRing.MoteMode must be spiral or rise`
+			)
+		end
+		if ring.FlowSpeed ~= nil then
+			positive(ring.FlowSpeed, `{skinId}.RangeRing.FlowSpeed`)
+		end
+		if ring.Fx ~= nil then
+			assert(ring.Fx == "Void" or ring.Fx == "Ember", `{skinId}.RangeRing.Fx must be Void or Ember`)
+		end
+		if ring.Dash ~= nil then
+			assert(ring.Dash >= 2, `{skinId}.RangeRing.Dash needs a gap`)
+		end
+		if ring.Spin ~= nil then
+			nonnegative(ring.Spin, `{skinId}.RangeRing.Spin`)
+		end
+		if ring.Tilt ~= nil then
+			nonnegative(ring.Tilt, `{skinId}.RangeRing.Tilt`)
+		end
+		if ring.Bob ~= nil then
+			nonnegative(ring.Bob, `{skinId}.RangeRing.Bob`)
+		end
+	end
+	for skinId in MagnetSkinConfig.ById do
+		assert(seen[skinId] == true, `{skinId} is in ById but missing from Order`)
+	end
+	assert(legendaryCount == 1, "exactly one legendary magnet skin")
+	assert(
+		(MagnetSkinConfig.ById.YardPaint.RangeRing.Motes or 0) == 0,
+		"Yard Paint is stacked hoops, not motes"
+	)
+	assert(MagnetSkinConfig.ById.ChromeCoil.RangeRing.FlowSpeed ~= nil, "Chrome Coil is current around the rim")
+	assert(MagnetSkinConfig.ById.EmberCore.RangeRing.MoteMode == "rise", "Ember Core is rising fire")
+	assert(MagnetSkinConfig.ById.EmberCore.RangeRing.Fx == "Ember", "Ember Core uses the lava FX kit")
+	assert(MagnetSkinConfig.ById.Orbital.RangeRing.Dash == nil, "Orbital is solid spinning hoops")
+	assert(MagnetSkinConfig.ById.Orbital.RangeRing.Tilt ~= nil, "Orbital is tilted 3D hoops")
+	assert(MagnetSkinConfig.ById.Orbital.RangeRing.Bob ~= nil, "Orbital hoops travel up and down")
+	assert(
+		MagnetSkinConfig.ById.EventHorizon.RangeRing.MoteMode == "spiral",
+		"Event Horizon is the inward spiral"
+	)
+	assert(MagnetSkinConfig.ById.EventHorizon.RangeRing.Fx == "Void", "Event Horizon uses the void FX kit")
 end
 
 return table.freeze(FoundationValidator)

@@ -50,14 +50,19 @@ local PET_EFFECT_KEYS = {
 	Capped on CASH from hatchable pets only. Premium pets add their cash AFTER that
 	ceiling, so a paid pet advertised as ×8 actually pays ×8 instead of being crushed
 	down to the same +100% as the egg-pet team. Hatchable Secrets contribute toward
-	that team cap; they must not fill it alone. The other effects -- range, collection,
-	storage, luck -- have their own ceilings further along the chain.
+	that team cap; they must not fill it alone.
+
+	RANGE is capped for everyone, including premium pets. Uncapped range walked out
+	of the plot.
 
 	Long term the answer to pet power creep is a duplicate sink (5 identical -> Shiny at 1.4x, and so on)
 	rather than raising this. Do not "fix" a hatchable pet that feels weak by moving this number.
 ]]
 local MAXIMUM_PET_CASH_BONUS = 1.0
 GameMath.MAXIMUM_PET_CASH_BONUS = MAXIMUM_PET_CASH_BONUS
+--- Combined pet Magnet Range bonus. +20% is the ceiling, paid pets included.
+local MAXIMUM_PET_RANGE_BONUS = 0.2
+GameMath.MAXIMUM_PET_RANGE_BONUS = MAXIMUM_PET_RANGE_BONUS
 
 --- What one hatchable pet actually pays in cash when equipped alone, after the team cap.
 function GameMath.hatchableCashMultiplier(moneyMultiplier: number): number
@@ -114,6 +119,8 @@ function GameMath.petEffectMultipliers(
 		local total = bonuses[key] * bonusAmplifier
 		if key == "Cash" then
 			total = math.min(total, MAXIMUM_PET_CASH_BONUS) + premiumCash
+		elseif key == "MagnetRange" then
+			total = math.min(total, MAXIMUM_PET_RANGE_BONUS)
 		end
 		result[key] = 1 + total
 	end
@@ -343,6 +350,34 @@ function GameMath.prestigeLuckBonus(prestigeCount: number, luckPerPrestige: numb
 	end
 	local count = math.max(0, math.floor(prestigeCount))
 	return GameMath.clampFinite(count * math.max(0, luckPerPrestige), 0, 1e15, 0)
+end
+
+--[[
+	Egg-shop luck: shift a 1..rollTotal hatch roll toward later (rarer) pets.
+
+	Pet ids are listed common-first, so adding a skip after the roll is drawn is a
+	weight tilt, not a second roll and not a client-supplied weight table. Pity and
+	Secret tickets bypass this entirely -- they never call it.
+]]
+function GameMath.hatchLuckAdjustedRoll(
+	roll: number,
+	rollTotal: number,
+	luckLevel: number,
+	skipPerLevel: number
+): number
+	if
+		not GameMath.isFinite(roll)
+		or not GameMath.isFinite(rollTotal)
+		or not GameMath.isFinite(luckLevel)
+		or not GameMath.isFinite(skipPerLevel)
+		or rollTotal <= 0
+	then
+		return 1
+	end
+	local total = math.floor(rollTotal)
+	local drawn = math.clamp(math.floor(roll), 1, total)
+	local skip = math.max(0, math.floor(luckLevel)) * math.max(0, skipPerLevel)
+	return math.min(total, drawn + skip)
 end
 
 return table.freeze(GameMath)

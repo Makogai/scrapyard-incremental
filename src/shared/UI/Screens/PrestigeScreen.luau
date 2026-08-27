@@ -25,11 +25,13 @@ local e = React.createElement
 
 --- One of the LOSE / KEEP columns.
 local function OutcomeColumn(props)
+	local columns = props.columns or 1
+	local twoCol = columns >= 2
 	local rows = {}
 	for index, item in ipairs(props.items) do
 		rows[#rows + 1] = e(P.Group, {
 			key = item,
-			size = UDim2.new(1, 0, 0, 30),
+			size = if twoCol then UDim2.new(0.5, -2, 0, 30) else UDim2.new(1, 0, 0, 30),
 			layoutOrder = index,
 			children = {
 				e(Icon, {
@@ -64,6 +66,7 @@ local function OutcomeColumn(props)
 		strokeColor = props.color,
 		strokeThickness = Theme.Stroke.Card,
 		studs = false,
+		clip = true,
 		children = {
 			P.padding({ x = 14, y = 12 }, "Inset"),
 			e(P.Label, {
@@ -78,7 +81,14 @@ local function OutcomeColumn(props)
 				key = "Items",
 				size = UDim2.new(1, 0, 1, -40),
 				position = UDim2.fromOffset(0, 38),
-				layout = P.list({ padding = 2 }),
+				clip = true,
+				layout = if twoCol
+					then P.list({
+						direction = Enum.FillDirection.Horizontal,
+						padding = 2,
+						wraps = true,
+					})
+					else P.list({ padding = 2 }),
 				children = rows,
 			}),
 		},
@@ -98,13 +108,13 @@ local function PrestigeScreen(props)
 
 	return e(Overlays.Modal, {
 		key = props.key or "PrestigeScreen",
-		title = "Prestige",
+		title = "Rebirth",
 		glyph = "recycle",
 		headerColor = Theme.Gradient.Purple,
 		width = 900,
 		-- Summary 98 + progress 34 + outcome 224 + actions 70, three 10px gaps.
 		contentHeight = 456,
-		subtitle = "PRESTIGE " .. state.prestige,
+		subtitle = "REBIRTH " .. state.prestige,
 		onClose = actions.closeScreen,
 		children = {
 			e(P.Group, {
@@ -203,6 +213,7 @@ local function PrestigeScreen(props)
 								items = view.keep,
 								glyph = "check",
 								color = Theme.Color.Positive,
+								columns = 2,
 								size = UDim2.new(0.5, -6, 1, 0),
 								layoutOrder = 2,
 							}),
@@ -223,7 +234,7 @@ local function PrestigeScreen(props)
 							e(Buttons.Button, {
 								key = "Prestige",
 								text = if ready
-									then "PRESTIGE"
+									then "REBIRTH"
 									else ("NEED " .. Format.money(shortfall) .. " MORE"),
 								glyph = if ready then "recycle" else nil,
 								variant = "Premium",
@@ -235,14 +246,14 @@ local function PrestigeScreen(props)
 								layoutOrder = 1,
 								onClick = function()
 									actions.confirm({
-										Title = "Prestige?",
+										Title = "Rebirth?",
 										Glyph = "recycle",
 										HeaderColor = Theme.Gradient.Purple,
 										Lines = {
 											"This cannot be undone.",
-											"You keep magnets, pets, potions, gears and cosmetics.",
+											"You keep magnets, pets, potions, gears, gear ranks and cosmetics.",
 										},
-										ConfirmText = "PRESTIGE",
+										ConfirmText = "REBIRTH",
 										ConfirmVariant = "Premium",
 										OnConfirm = actions.prestige,
 									})

@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
+local MagnetSkinBuilder = require(ReplicatedStorage.Shared.Utility.MagnetSkinBuilder)
 local RateLimiter = require(ReplicatedStorage.Shared.Utility.RateLimiter)
 local PlayerStateService = require(script.Parent.PlayerStateService)
 local PlotThemeService = require(script.Parent.PlotThemeService)
@@ -31,14 +32,36 @@ local function attach(player: Player)
 	end
 	clearHeld(character)
 	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
-	local templates = ServerStorage:FindFirstChild("MagnetModels")
-	local template = templates and templates:FindFirstChild(state.EquippedMagnet)
-	if hand == nil or not hand:IsA("BasePart") or template == nil then
+	if hand == nil or not hand:IsA("BasePart") then
 		return
 	end
-	local magnet = template:Clone()
+	--[[
+		A worn skin replaces the held MODEL only. Strength and range still come from EquippedMagnet.
+		Unknown or empty ActiveMagnetSkin falls through to MagnetModels the same way a missing
+		Studio template used to: the player keeps a magnet in hand rather than nothing.
+	]]
+	local magnet: Instance? = nil
+	local skinId = state.ActiveMagnetSkin
+	if typeof(skinId) == "string" and skinId ~= "" then
+		magnet = MagnetSkinBuilder.build(skinId)
+	end
+	if magnet == nil then
+		local templates = ServerStorage:FindFirstChild("MagnetModels")
+		local template = templates and templates:FindFirstChild(state.EquippedMagnet)
+		if template == nil then
+			return
+		end
+		magnet = template:Clone()
+	end
+	if magnet == nil then
+		return
+	end
 	magnet.Name = "EquippedMagnet"
 	magnet.Parent = character
+	--[[
+		Same pose for skins and real magnets. Skin models are built in AdvancedMagnet
+		space (grip at origin, head in +X) so this rotation puts the grip in the palm.
+	]]
 	local target = hand.CFrame
 		* CFrame.new(0, -0.85, -0.25)
 		* CFrame.Angles(0, math.rad(90), math.rad(90))
@@ -86,6 +109,10 @@ local function attachWhenReady(player: Player)
 	end)
 end
 
+function InventoryService.Refresh(player: Player)
+	attach(player)
+end
+
 function InventoryService.Start()
 	local remote = RemoteService.GetEvent("InventoryAction")
 	remote.OnServerEvent:Connect(function(player, action, itemId)
@@ -106,6 +133,9 @@ function InventoryService.Start()
 		elseif action == "SetPlotSkin" then
 			--- `itemId` is a pass id, or "" to go back to the standard build.
 			success, message = PlotThemeService.WearSkin(player, itemId)
+		elseif action == "SetMagnetSkin" then
+			--- `itemId` is a skin id, or "" for the equipped magnet's own look.
+			success, message = PlayerStateService.TryWearMagnetSkin(player, itemId)
 		else
 			return
 		end

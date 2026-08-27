@@ -3,11 +3,12 @@
 	AdminCatalogue.luau
 	Everything an admin can hand out, derived from the game's own configs.
 
-	DYNAMIC BY CONSTRUCTION. Nothing here lists a magnet, a potion, an upgrade or a pet by name -- it
-	walks `InventoryConfig`, `UpgradeConfig` and `PetConfig`. Add a new magnet and it appears in the
-	admin panel with no edit here and no edit in the UI. That was the requirement, and it is also the
-	only way a panel like this stays true: a hand-maintained list of grantables drifts from the real
-	content within a week.
+	DYNAMIC BY CONSTRUCTION. Nothing here lists a magnet, a potion, an upgrade, a pet or a
+	magnet skin by name -- it walks `InventoryConfig`, `UpgradeConfig`, `PetConfig` and
+	`MagnetSkinConfig`. Add a new magnet skin and it appears in the admin panel with no edit
+	here and no edit in the UI. That was the requirement, and it is also the only way a panel
+	like this stays true: a hand-maintained list of grantables drifts from the real content
+	within a week.
 
 	The panel is a VIEW of this. It renders whatever sections and entries it finds, so a new section
 	added below shows up without touching `AdminScreen`.
@@ -32,6 +33,7 @@ local EventConfig = require(ReplicatedStorage.Shared.Config.EventConfig)
 local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
+local MagnetSkinConfig = require(ReplicatedStorage.Shared.Config.MagnetSkinConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 
@@ -279,6 +281,42 @@ function AdminCatalogue.build(): { AdminSection }
 		Glyph = "magnet",
 		Accent = "Blue",
 		Entries = magnets,
+	})
+
+	--[[
+		Magnet skins. Granting WEARS the skin so the held model and the reach ring change in
+		the same tap -- that is the whole point of the preview. DEFAULT LOOK takes the skin
+		off without deleting ownership, so you can flip back to the real magnet.
+	]]
+	local magnetSkins: { AdminEntry } = {
+		{
+			Id = "DefaultMagnetLook",
+			Label = "DEFAULT LOOK",
+			Command = "WearMagnetSkin",
+			ItemId = "",
+			Glyph = "magnet",
+			Accent = "Gray",
+		},
+	}
+	for _, skinId in MagnetSkinConfig.Order do
+		local definition = MagnetSkinConfig.ById[skinId]
+		if definition then
+			table.insert(magnetSkins, {
+				Id = skinId,
+				Label = definition.DisplayName,
+				Command = "GrantMagnetSkin",
+				ItemId = skinId,
+				Glyph = definition.Glyph,
+				Accent = definition.Accent,
+			})
+		end
+	end
+	table.insert(sections, {
+		Id = "magnetskins",
+		Label = "MAGNET SKINS",
+		Glyph = "magnet",
+		Accent = "Purple",
+		Entries = magnetSkins,
 	})
 
 	--- Potions. These take a count, so they use the amount box.

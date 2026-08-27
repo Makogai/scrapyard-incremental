@@ -192,12 +192,26 @@ function Bridge.setPlotSkin(skinId: string)
 	fire("InventoryAction", "SetPlotSkin", skinId)
 end
 
+--[[
+	WEAR A MAGNET SKIN, or "" for the equipped magnet's own look.
+
+	Id only. The server checks ownership and never takes a colour, a stat, or a model name
+	from the client.
+]]
+function Bridge.setMagnetSkin(skinId: string)
+	fire("InventoryAction", "SetMagnetSkin", skinId)
+end
+
 function Bridge.buyMagnet(magnetId: string)
 	fire("ShopAction", "BuyMagnet", magnetId)
 end
 
 function Bridge.buyPitItem(offerId: string)
 	fire("ShopAction", "BuyPitItem", offerId)
+end
+
+function Bridge.buyGearItem(offerId: string)
+	fire("ShopAction", "BuyGearItem", offerId)
 end
 
 --[[
@@ -614,6 +628,7 @@ function Bridge.start(): boolean
 		OpenExclusiveShop = "shop",
 		OpenPetShop = "pets",
 		OpenPitShop = "pitshop",
+		OpenGearShop = "gearshop",
 	}) do
 		local remote = folder:FindFirstChild(remoteName)
 		if remote and remote:IsA("RemoteEvent") then

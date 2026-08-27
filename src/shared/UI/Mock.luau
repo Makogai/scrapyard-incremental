@@ -43,6 +43,11 @@ Mock.player = {
 	autoCollect = true,
 }
 
+Mock.gearUpgrades = {
+	HeadStart = 1,
+	DeepPockets = 1,
+}
+
 --------------------------------------------------------------------------------
 -- Upgrades
 --------------------------------------------------------------------------------
@@ -516,7 +521,7 @@ Mock.prestige = {
 	nextBonus = "+20% Cash",
 	skipRobux = 199,
 	lose = { "Cash", "Normal upgrades", "Area progress" },
-	keep = { "Magnets", "Pets", "Potions", "Gears", "Cosmetics" },
+	keep = { "Magnets", "Pets", "Potions", "Gears", "Gear ranks", "Cosmetics" },
 }
 
 --------------------------------------------------------------------------------

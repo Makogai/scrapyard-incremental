@@ -31,6 +31,7 @@ local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local Environment = require(ReplicatedStorage.Shared.Config.Environment)
 local ScrapConfig = require(ReplicatedStorage.Shared.Config.ScrapConfig)
 local PitShopConfig = require(ReplicatedStorage.Shared.Config.PitShopConfig)
+local GearShopConfig = require(ReplicatedStorage.Shared.Config.GearShopConfig)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.UpgradeConfig)
 local Assets = require(ReplicatedStorage.Shared.UI.Assets)
 
@@ -546,11 +547,16 @@ end
 	Equip slots available right now: the base slot, plus purchased upgrades, plus
 	the pass bonus. Mirrors PetService's own calculation.
 ]]
-function GameData.petSlots(slotUpgradeLevel: number, entitlements: { [string]: boolean }): number
+function GameData.petSlots(
+	slotUpgradeLevel: number,
+	entitlements: { [string]: boolean },
+	gearPetSlots: number?
+): number
 	local slots = PetConfig.BaseEquipSlots + math.max(0, math.floor(slotUpgradeLevel))
 	if entitlements.ExtraPetSlots then
 		slots += PetConfig.PassBonusSlots
 	end
+	slots += math.max(0, math.floor(gearPetSlots or 0))
 	return slots
 end
 
@@ -646,7 +652,7 @@ local PASS_STYLE = {
 		features = {
 			{
 				glyph = "magnet",
-				title = "25 Strength, 32 Range",
+				title = "25 Strength, 9 Range",
 				note = "Beats every magnet you can craft.",
 			},
 			{
@@ -1007,7 +1013,7 @@ function GameData.prestige(money: number, _gears: number, prestigeCount: number)
 			math.floor(nextLuck * 100 + 0.5)
 		),
 		lose = { "Cash", "Normal upgrades", "Area progress" },
-		keep = { "Magnets", "Pets", "Potions", "Gears", "Cosmetics" },
+		keep = { "Magnets", "Pets", "Potions", "Gears", "Gear ranks", "Cosmetics" },
 	}
 end
 
@@ -1022,6 +1028,35 @@ function GameData.pitShop(): { any }
 				description = offer.Description,
 				glyph = offer.Glyph,
 				slagPrice = offer.SlagPrice,
+				layoutOrder = index,
+			})
+		end
+	end
+	return list
+end
+
+function GameData.gearShop(prestigeCount: number, levels: { [string]: number }?): { any }
+	local ranks = levels or {}
+	local list = {}
+	for index, offerId in ipairs(GearShopConfig.Order) do
+		local offer = GearShopConfig.ById[offerId]
+		if offer then
+			local rank = GearShopConfig.rank(ranks, offerId)
+			local maxLevel = offer.MaxLevel or 0
+			local price = GearShopConfig.nextPrice(offer, rank)
+			local locked = not GearShopConfig.isUnlocked(offer, prestigeCount)
+			local maxed = offer.Kind == "Upgrade" and rank >= maxLevel
+			table.insert(list, {
+				id = offer.Id,
+				name = offer.DisplayName,
+				description = offer.Description,
+				glyph = offer.Glyph,
+				requiredPrestige = offer.RequiredPrestige,
+				level = rank,
+				maxLevel = maxLevel,
+				price = price,
+				locked = locked,
+				maxed = maxed,
 				layoutOrder = index,
 			})
 		end

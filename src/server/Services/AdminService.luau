@@ -19,6 +19,7 @@ local ServerRestartService = require(script.Parent.ServerRestartService)
 local RemoteService = require(script.Parent.RemoteService)
 local ScrapService = require(script.Parent.ScrapService)
 local WreckService = require(script.Parent.WreckService)
+local InventoryService = require(script.Parent.InventoryService)
 
 local AdminService = {}
 
@@ -139,6 +140,13 @@ local function applyToTargets(
 		if PlayerStateService.AdminMutate(target, command, amount, itemId) then
 			applied += 1
 			PlotService.RefreshAppearance(target)
+			if
+				command == "GrantMagnetSkin"
+				or command == "WearMagnetSkin"
+				or command == "ResetProfile"
+			then
+				InventoryService.Refresh(target)
+			end
 			--[[
 				A WIPE OR FULL AREA UNLOCK HAS TO REBUILD THE PLOT, not just refresh it.
 

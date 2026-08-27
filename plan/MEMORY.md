@@ -1,6 +1,6 @@
 # Project Memory
 
-Last updated: 2026-08-25
+Last updated: 2026-08-27
 
 ## Identity
 
@@ -13,7 +13,7 @@ Last updated: 2026-08-25
 
 - Active stage: Phase 6 UI/feedback/mobile polish implemented and validated
 - Completed phases: Phase 0 - Product Reset; Phase 1 - Shared Foundations; Phase 2 - Player Data
-- Next phase: Phase 7 Gears prestige and collection book, with multi-client/12-player soak retained as release QA
+- Next phase: Phase 7 Gears prestige and collection book; Gear Shop is the Gear spend sink
 - New planning system: complete
 - Neutral Scrapyard server/client bootstrap: complete
 - Shared Scrapyard contracts/formulas: complete
@@ -387,6 +387,92 @@ Egg sites are each `<Area>EggGroup` under NewMap. Equipped followers pose from `
 Triple and penta hatch shake that many eggs on the takeover (same rattle as a single summon), then the existing batch reveal. `roll.Count` sizes the shake row. The rotating layer is an inner pivot -- UIListLayout was swallowing Rotation on the row children, so a batch sat still. Changelog 0.5.18.
 
 The Pit uses authored `Workspace.Event Area`. Players land on the authored `Event Area Spawn Point.PitSpawn` — loot nodes in `PitScrapSpawns` are scrap only. The area is never destroyed; only the `PitScrap` folder comes and goes with the event.
+
+## 2026-08-25 — Gear Shop
+
+`Workspace.NewMap.GearShop.CHS_Shop` walk-in opens the Gear Shop the same way Magnet Shop does (`OpenGearShop` → screen `gearshop`). Client sends an offer id only.
+
+Gears still have no income multiplier. Spend is persist-through-wipe or one-shots:
+
+| Offer | Unlock | What it does |
+| Head Start | Rebirth 1 | Cash upgrades start at +N after wipe (and immediately if you are below that floor). Max 5. First rank is 1 Gear. |
+| Nest Egg | Rebirth 1 | Starting cash after wipe: $2.5k / $15k / $75k. |
+| Deep Pockets | Rebirth 2 | +8 scrap slots per rank that survive wipe. Max 3. |
+| Companion Bay | Rebirth 2 | +1 pet equip slot. Stacks with cash slots and the Extra Pet Slots pass. |
+| Scrap Sense | Rebirth 4 | Permanent +8% rare-scrap luck per rank. Max 3. Still under the luck cap. |
+| Egg Fortune | Rebirth 5 | Shifts egg rolls toward rarer pets (`GameMath.hatchLuckAdjustedRoll`). Pity and tickets unchanged. Dear: 12/22/36/55 Gears. |
+| Secret Ticket | Rebirth 5 | 80 Gears, one guaranteed Secret hatch. Repeatable. Dearer than maxing Egg Fortune. |
+
+No skip-rebirth row. Schema v19 adds `GearUpgrades`. Changelog 0.5.19.
+
+**Studio:** walk into GearShop. Studio Play was not run this pass.
+
+Exact next action: Studio Play — walk into `NewMap.GearShop`, buy Head Start at rebirth 1, confirm upgrades jump to the floor, prestige, confirm they come back at that floor. Then Egg Fortune at rebirth 5.
+
+## 2026-08-26 — Magnet skins (admin preview)
+
+Five **pure cosmetic** magnet skins. One skin restyles both the held magnet and the reach ring. Stats stay on EquippedMagnet (Basic / Advanced / Salvage / Quantum). Plot skins remain the place minor boosts might go later. No Robux lootbox yet.
+
+| Id | Name | Rarity | Look |
+| YardPaint | Yard Paint | Common | rusty orange horseshoe |
+| ChromeCoil | Chrome Coil | Uncommon | steel + cyan rim |
+| EmberCore | Ember Core | Rare | hot neon coil |
+| Orbital | Orbital | Epic | planet rings |
+| EventHorizon | Event Horizon | Legendary | black hole; lootbox rare later |
+
+Runtime primitive models from `MagnetSkinBuilder`. Skins are built in **AdvancedMagnet space** (flat in XZ, Grip PrimaryPart at the origin, head in +X) so the existing hand weld sits them in the palm. A standing Y-up build was why they floated.
+
+Reach rings are per-skin, not one loop recoloured:
+
+- Yard Paint: two stacked hoops, slow pulse
+- Chrome Coil: current flowing around the rim
+- Ember Core: solid molten rings plus an inner magma whirl (built-in fire, not the Animation 3 swirl discs)
+- Orbital: solid tilted hoops that yaw and bob (`Bob`); lift is clamped so tilt never clips the floor
+- Event Horizon: tilted void hoops plus Animation 1 beams / Animation 3 swirl particles (`Fx = "Void"`); no floor pulses or strobing overlay discs
+
+Hand models are a U with pole tips (Yard red/blue, Chrome wrapped cyan), a glowing coil barrel, a globe with saturn rings, and a black-hole disc.
+
+Schema **v20**: `OwnedMagnetSkins`, `ActiveMagnetSkin` (`""` = default magnet look). Admin MAGNET SKINS section: GRANT wears the skin; DEFAULT LOOK takes it off.
+
+Verified: Lune tests after the distinct-motion pass. Studio Play was not re-run this pass.
+
+Exact next action: Rojo sync, GRANT each skin, confirm the thing in the hand is readable and the five reach effects do not share the same spinning-balls loop.
+
+## 2026-08-27 — Orbital solid hoops + Event Horizon void kit
+
+Orbital dashed segments became solid 3D hoops (a dashed spin was the only way a flat ring showed motion; tilt + yaw is what actually reads). Tilted hoop height is `max(lift, radius * |sin(tilt)| + 0.65)` so a long magnet range cannot bury a ring in the floor.
+
+Event Horizon keeps the stacked-hoop language but is a void: dark core + neon halo, Animation 1 accretion beams (`5830549480`), Animation 3 four-offset swirl discs (`12323607020`) plus its glow/spark textures, and Animation 2 layered discs. `RangeRing.Fx = "Void"`. Changelog 0.5.23.
+
+Studio Play of this VFX pass was not run from this agent.
+
+Exact next action: Rojo sync, GRANT Orbital (rings roll and bob) then GRANT Event Horizon (void swirl, no ground strobe).
+
+## 2026-08-27 — Magnet range cap
+
+Quantum at rebirth 6 with a maxed Magnet Range upgrade was 22 + 22 = 44 studs before pets, which collected off the plot (130×170). Bases are now Advanced 7 / Salvage 8 / Quantum 9; range upgrades are +0.4 studs; pet range bonus caps at +20%; derived reach clamps at `Environment.MaximumMagnetRange = 16`. Changelog 0.5.31.
+
+## 2026-08-27 — Event Horizon swirl lies on the range disc
+
+Animation 3 swirl/glow used `ParticleEmitter` FacingCamera on a point at inner-hoop height, so they stood up as vertical wheels through the character. They are spinning cylinders with those textures now, yawing around world up at the outer hoop plane (`outer`), same disc the magnet rings draw. Beams `FaceCamera = false` so they stay in that plane. Ember Core's fire whirl is unchanged. Changelog 0.5.32.
+
+Studio Play of this pass was not run from this agent.
+
+Exact next action: Rojo sync, GRANT Event Horizon, confirm swirls spin flat on the reach circle and not on the character.
+
+## 2026-08-27 — Horizon strobe off, Orbital bob
+
+Removed Horizon's floor pulse rings, traveling rim flash, and short-life overlay discs (the strobing "grid"). Swirls, beams, core, hoops, and inward motes stay. Orbital hoops now yaw and bob independently (`Bob = 1.15`) without dropping through the floor. Changelog 0.5.24.
+
+Exact next action: Rojo sync, GRANT Ember Core (lava pool, fireballs, sparks).
+
+## 2026-08-27 — Ember Core lava kit
+
+Ember Core is no longer a few rising specks. `RangeRing.Fx = "Ember"` turns on a circular lava disc with fire/smoke, jumping sparks (built-in fire plus Animation 2 streak textures), a flickering orange light, a flowing crater rim, bubbling blobs that pop, and fireballs on a hop parabola. Colours are molten red/ember/charcoal, not UI neon. Changelog 0.5.26.
+
+Studio Play of this pass was not run from this agent.
+
+Exact next action: Rojo sync, GRANT Ember Core.
 
 ## 2026-08-22 — Pets and Pit teleport
 

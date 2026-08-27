@@ -11,6 +11,8 @@ local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local AreaConfig = require(ReplicatedStorage.Shared.Config.AreaConfig)
 local InboxConfig = require(ReplicatedStorage.Shared.Config.InboxConfig)
 local PitShopConfig = require(ReplicatedStorage.Shared.Config.PitShopConfig)
+local GearShopConfig = require(ReplicatedStorage.Shared.Config.GearShopConfig)
+local MagnetSkinConfig = require(ReplicatedStorage.Shared.Config.MagnetSkinConfig)
 local SocialConfig = require(ReplicatedStorage.Shared.Config.SocialConfig)
 local AreaRules = require(ReplicatedStorage.Shared.Utility.AreaRules)
 local CollectionRules = require(ReplicatedStorage.Shared.Utility.CollectionRules)
@@ -111,6 +113,7 @@ local function derivedStats(data: { [string]: any })
 		strength += InventoryConfig.Consumables.GodPotion.StrengthAmount
 		range += InventoryConfig.Consumables.GodPotion.RangeAmount
 	end
+	range = math.min(range, Environment.MaximumMagnetRange)
 	local scrapValue = effect("ScrapValue")
 	local petMoneyMultiplier = petEffects.Cash
 	scrapValue *= petMoneyMultiplier
@@ -171,6 +174,9 @@ local function derivedStats(data: { [string]: any })
 		carry.
 	]]
 	storageCapacity = math.max(1, math.floor(storageCapacity + 0.5))
+	local gearStorage = GearShopConfig.rank(data.GearUpgrades, "DeepPockets")
+		* GearShopConfig.StorageSlotsPerLevel
+	storageCapacity += gearStorage
 	local collectionSpeed = effect("CollectionSpeed")
 	local respawnMultiplier = effect("ScrapFlow")
 	collectionSpeed *= petEffects.CollectionSpeed
@@ -213,11 +219,42 @@ local function derivedStats(data: { [string]: any })
 		ScrapValue = scrapValue,
 		CollectionSpeed = collectionSpeed,
 		RespawnMultiplier = respawnMultiplier,
-		RarityLuck = effect("Rarity") * petEffects.RarityLuck,
+		RarityLuck = effect("Rarity")
+			* petEffects.RarityLuck
+			* (
+				1
+				+ GearShopConfig.rank(data.GearUpgrades, "ScrapSense")
+					* GearShopConfig.ScrapSenseLuckPerLevel
+			),
 		PetMoneyMultiplier = petMoneyMultiplier,
 		PetEffects = petEffects,
 		FriendBoostMultiplier = friendBoost,
 	}
+end
+
+local function equippedPetSlotCount(data: { [string]: any }): number
+	return PetConfig.BaseEquipSlots
+		+ (data.PetSlotUpgradeLevel or 0)
+		+ (if data.Entitlements.ExtraPetSlots == true then PetConfig.PassBonusSlots else 0)
+		+ GearShopConfig.rank(data.GearUpgrades, "PetSlot")
+end
+
+local function applyHeadStartFloor(data: { [string]: any })
+	local floor = GearShopConfig.rank(data.GearUpgrades, "HeadStart")
+	if floor <= 0 then
+		return
+	end
+	for upgradeId, definition in UpgradeConfig.ById do
+		local maximum = GameMath.upgradeMaximumLevel(
+			definition.BaseMaximumLevel,
+			definition.LevelsPerPrestige,
+			data.PrestigeCount or 0
+		)
+		local target = math.min(floor, maximum)
+		if (data.UpgradeLevels[upgradeId] or 0) < target then
+			data.UpgradeLevels[upgradeId] = target
+		end
+	end
 end
 
 local function applyWalkSpeed(player: Player, data: { [string]: any })
@@ -374,6 +411,8 @@ local function publicSnapshot(data: { [string]: any })
 		DiscoveredScrap = discoveries,
 		OwnedMagnets = table.clone(data.OwnedMagnets),
 		EquippedMagnet = data.EquippedMagnet,
+		OwnedMagnetSkins = table.clone(data.OwnedMagnetSkins or {}),
+		ActiveMagnetSkin = data.ActiveMagnetSkin or "",
 		Inventory = table.clone(data.Inventory),
 		ActiveBoosts = table.clone(data.ActiveBoosts),
 		Entitlements = table.clone(data.Entitlements),
@@ -381,6 +420,7 @@ local function publicSnapshot(data: { [string]: any })
 		OwnedPets = table.clone(data.OwnedPets),
 		EquippedPets = table.clone(data.EquippedPets),
 		PetSlotUpgradeLevel = data.PetSlotUpgradeLevel,
+		GearUpgrades = table.clone(data.GearUpgrades or {}),
 		EggOpenCounts = table.clone(data.EggOpenCounts),
 		--[[
 			THE LIVE EVENT, from the server's clock.
@@ -397,9 +437,7 @@ local function publicSnapshot(data: { [string]: any })
 		UnlockedAchievements = table.clone(data.UnlockedAchievements),
 		UnlockedTitles = table.clone(data.UnlockedTitles),
 		EquippedTitle = data.EquippedTitle,
-		MaximumEquippedPets = PetConfig.BaseEquipSlots
-			+ data.PetSlotUpgradeLevel
-			+ (if data.Entitlements.ExtraPetSlots == true then PetConfig.PassBonusSlots else 0),
+		MaximumEquippedPets = equippedPetSlotCount(data),
 		PetStorageCapacity = PetConfig.BaseStorageCapacity,
 		--- Guaranteed-Secret rolls in hand, so the pets window can say so rather than surprising anyone.
 		SecretTickets = data.SecretTickets,
@@ -467,6 +505,16 @@ local function completePrestige(player: Player, data: { [string]: any }, reward:
 	for upgradeId in data.UpgradeLevels do
 		data.UpgradeLevels[upgradeId] = 0
 	end
+	--[[
+		HEAD START is the Gear Shop's persist-through-wipe for cash upgrades: after the wipe,
+		every upgrade sits at the bought floor instead of zero. Nest Egg then drops the
+		starting cash kit. Both ranks live in `GearUpgrades` and are not reset here.
+	]]
+	applyHeadStartFloor(data)
+	data.Money = math.min(
+		Environment.MaximumMoney,
+		GearShopConfig.startingCash(GearShopConfig.rank(data.GearUpgrades, "NestEgg"))
+	)
 	for _, areaId in AreaConfig.Order do
 		data.UnlockedAreas[areaId] = areaId == "FrontYard"
 	end
@@ -1844,6 +1892,33 @@ function PlayerStateService.AdminMutate(
 			return false, "Unknown magnet ID"
 		end
 		data.OwnedMagnets[itemId] = true
+	elseif command == "GrantMagnetSkin" then
+		--[[
+			Granted AND worn, the same as titles: the point of the button is to LOOK at the skin,
+			not to put it in a bag and then hunt for an equip control that does not exist yet.
+		]]
+		local definition = if itemId then MagnetSkinConfig.ById[itemId] else nil
+		if definition == nil then
+			return false, "Unknown magnet skin ID"
+		end
+		if data.OwnedMagnetSkins == nil then
+			data.OwnedMagnetSkins = {}
+		end
+		data.OwnedMagnetSkins[definition.Id] = true
+		data.ActiveMagnetSkin = definition.Id
+	elseif command == "WearMagnetSkin" then
+		--- `itemId` is a skin id, or "" for the equipped magnet's own look.
+		local id = itemId or ""
+		if id ~= "" and MagnetSkinConfig.ById[id] == nil then
+			return false, "Unknown magnet skin ID"
+		end
+		if id ~= "" then
+			local owned = data.OwnedMagnetSkins
+			if typeof(owned) ~= "table" or owned[id] ~= true then
+				return false, "Skin not owned"
+			end
+		end
+		data.ActiveMagnetSkin = id
 	elseif command == "GrantConsumable" then
 		local definition = if itemId then InventoryConfig.Consumables[itemId] else nil
 		if definition == nil then
@@ -1994,7 +2069,12 @@ function PlayerStateService.TryOpenEgg(
 		elseif nextOpenCount % PetConfig.LegendaryPityRolls == 0 then
 			wonPetId = if math.random(1, 10) == 1 then egg.PetIds[6] else egg.PetIds[5]
 		else
-			local roll = math.random(1, PetConfig.RollTotal)
+			local roll = GameMath.hatchLuckAdjustedRoll(
+				math.random(1, PetConfig.RollTotal),
+				PetConfig.RollTotal,
+				GearShopConfig.rank(data.GearUpgrades, "HatchLuck"),
+				GearShopConfig.HatchLuckSkipPerLevel
+			)
 			local cursor = 0
 			wonPetId = egg.PetIds[1]
 			for _, petId in egg.PetIds do
@@ -2034,9 +2114,7 @@ function PlayerStateService.TryEquipPet(player: Player, petId: string): (boolean
 	if equippedCopies >= data.OwnedPets[petId] then
 		return false, "All owned copies are equipped"
 	end
-	local maximumEquipped = PetConfig.BaseEquipSlots
-		+ data.PetSlotUpgradeLevel
-		+ (if data.Entitlements.ExtraPetSlots == true then PetConfig.PassBonusSlots else 0)
+	local maximumEquipped = equippedPetSlotCount(data)
 	if #data.EquippedPets >= maximumEquipped then
 		return false, "No free pet slots"
 	end
@@ -2174,6 +2252,41 @@ function PlayerStateService.SetActivePlotSkin(player: Player, skinId: string): b
 	return true
 end
 
+--[[
+	WEAR A COSMETIC MAGNET SKIN, or "" for the equipped magnet's own look.
+
+	OWNERSHIP IS CHECKED HERE. Taking a skin OFF never checks, so an unknown or revoked id
+	cannot leave a player stuck wearing a model they cannot remove. Stats stay on EquippedMagnet.
+]]
+function PlayerStateService.TryWearMagnetSkin(player: Player, skinId: string): (boolean, string)
+	local session = sessions[player]
+	if session == nil or typeof(skinId) ~= "string" then
+		return false, "Player data is not loaded"
+	end
+	if skinId == "" then
+		if (session.Data.ActiveMagnetSkin or "") == "" then
+			return true, "Already using the default look"
+		end
+		session.Data.ActiveMagnetSkin = ""
+		pushState(player, session.Data)
+		return true, "Default magnet look"
+	end
+	local definition = MagnetSkinConfig.ById[skinId]
+	if definition == nil then
+		return false, "Unknown magnet skin"
+	end
+	local owned = session.Data.OwnedMagnetSkins
+	if typeof(owned) ~= "table" or owned[skinId] ~= true then
+		return false, "You do not own that skin"
+	end
+	if session.Data.ActiveMagnetSkin == skinId then
+		return true, `{definition.DisplayName} already equipped`
+	end
+	session.Data.ActiveMagnetSkin = skinId
+	pushState(player, session.Data)
+	return true, `{definition.DisplayName} equipped`
+end
+
 function PlayerStateService.TryUpdateSetting(player: Player, settingId: string, value: any): boolean
 	local session = sessions[player]
 	if session == nil or session.Data.Settings[settingId] == nil then
@@ -2255,6 +2368,49 @@ function PlayerStateService.TryBuyPitOffer(player: Player, offerId: string): (bo
 	return true, `{offer.DisplayName} purchased!`
 end
 
+function PlayerStateService.TryBuyGearOffer(player: Player, offerId: string): (boolean, string)
+	local session = sessions[player]
+	local offer = GearShopConfig.ById[offerId]
+	if session == nil or offer == nil then
+		return false, "Unknown offer"
+	end
+	local data = session.Data
+	if not GearShopConfig.isUnlocked(offer, data.PrestigeCount or 0) then
+		return false, `Need Rebirth {offer.RequiredPrestige}`
+	end
+	if offer.Kind == "Consumable" then
+		local price = offer.GearPrice or 0
+		if (data.Gears or 0) < price then
+			return false, "Not enough Gears"
+		end
+		PlayerStateService.MarkActive(player)
+		data.Gears -= price
+		PlayerStateService.GrantRewards(player, offer.Rewards)
+		return true, `{offer.DisplayName} purchased!`
+	end
+
+	if data.GearUpgrades == nil then
+		data.GearUpgrades = {}
+	end
+	local current = GearShopConfig.rank(data.GearUpgrades, offer.Id)
+	local price = GearShopConfig.nextPrice(offer, current)
+	if price == nil then
+		return false, "Already maxed"
+	end
+	if (data.Gears or 0) < price then
+		return false, "Not enough Gears"
+	end
+	PlayerStateService.MarkActive(player)
+	data.Gears -= price
+	data.GearUpgrades[offer.Id] = current + 1
+	if offer.Id == "HeadStart" then
+		applyHeadStartFloor(data)
+		applyWalkSpeed(player, data)
+	end
+	pushState(player, data)
+	return true, `{offer.DisplayName} rank {current + 1} unlocked!`
+end
+
 function PlayerStateService.TryPrestige(player: Player): (boolean, string)
 	local session = sessions[player]
 	if session == nil then
@@ -2279,7 +2435,7 @@ function PlayerStateService.TryPrestige(player: Player): (boolean, string)
 
 	completePrestige(player, data, reward)
 	pushState(player, data)
-	return true, `PRESTIGED FOR {reward} GEARS!`
+	return true, `REBIRTHED FOR {reward} GEARS!`
 end
 
 --[[

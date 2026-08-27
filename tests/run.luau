@@ -17,6 +17,7 @@ local PrestigeConfig = require("../src/shared/Config/PrestigeConfig")
 local SocialConfig = require("../src/shared/Config/SocialConfig")
 local InboxConfig = require("../src/shared/Config/InboxConfig")
 local PlotSkinConfig = require("../src/shared/Config/PlotSkinConfig")
+local MagnetSkinConfig = require("../src/shared/Config/MagnetSkinConfig")
 local Format = require("../src/shared/UI/Format")
 local EggPodiums = require("../src/shared/Utility/EggPodiums")
 
@@ -165,6 +166,21 @@ expectNear(GameMath.hatchableCashMultiplier(1.08), 1.08, 1e-6, "common hatchable
 expectNear(GameMath.hatchableCashMultiplier(1.44), 1.44, 1e-6, "workshop secret cash stays under the team cap")
 expectNear(GameMath.hatchableCashMultiplier(1.50), 1.50, 1e-6, "quantum secret cash stays under the team cap")
 expectEqual(GameMath.MAXIMUM_PET_CASH_BONUS, 1, "hatchable cash cap is +100 percent")
+expectEqual(GameMath.MAXIMUM_PET_RANGE_BONUS, 0.2, "pet range cap is +20 percent")
+expectNear(
+	GameMath.petEffectMultipliers(
+		{ "WideA", "WideB", "WideC" },
+		{ WideA = 1, WideB = 1, WideC = 1 },
+		{
+			WideA = { Effects = { MagnetRange = 1.5 } },
+			WideB = { Effects = { MagnetRange = 1.5 } },
+			WideC = { Effects = { MagnetRange = 1.5 } },
+		}
+	).MagnetRange,
+	1.2,
+	1e-6,
+	"stacked range pets cannot exceed plus 20 percent"
+)
 expectNear(
 	GameMath.petEffectMultipliers(
 		{ "Singularity", "Wrench" },
@@ -209,6 +225,9 @@ expectNear(
 	0.0001,
 	"rebirth luck follows config"
 )
+expectEqual(GameMath.hatchLuckAdjustedRoll(1, 10000, 0, 800), 1, "no egg fortune is no skip")
+expectEqual(GameMath.hatchLuckAdjustedRoll(1, 10000, 1, 800), 801, "first egg fortune skip")
+expectEqual(GameMath.hatchLuckAdjustedRoll(9500, 10000, 4, 800), 10000, "egg fortune clamps to the roll total")
 expectEqual(
 	GameMath.prestigeRequirement(
 		PrestigeConfig.BaseMoneyRequirement,
@@ -248,7 +267,8 @@ expectEqual(limiter:Allow("player", 2), false, "rate limit rejection")
 expectEqual(limiter:Allow("player", 5), true, "rate limit window reset")
 
 local defaultData = PlayerDataSchema.createDefault(1000)
-expectEqual(defaultData.SchemaVersion, 18, "default schema version")
+expectEqual(defaultData.SchemaVersion, 20, "default schema version")
+expectEqual(defaultData.GearUpgrades.HeadStart, 0, "new profiles have no gear shop ranks")
 expectEqual(defaultData.Slag, 0, "new profiles start with no slag")
 expectEqual(
 	defaultData.DiscoveredScrap.RobotArm.Discovered,
@@ -286,6 +306,59 @@ local _, bogusSkin = PlayerDataSchema.validate({ ActivePlotSkin = "NotAPass" }, 
 expectEqual(bogusSkin and bogusSkin.ActivePlotSkin, "", "unknown skin id is cleared")
 local _, numericSkin = PlayerDataSchema.validate({ ActivePlotSkin = 7 }, 1000)
 expectEqual(numericSkin and numericSkin.ActivePlotSkin, "", "non-string skin id is cleared")
+
+--[[
+	MAGNET SKINS. Pure cosmetic. Schema literals must match `MagnetSkinConfig.Order` -- a worn id
+	that is not in MAGNET_SKIN_IDS is cleared, so a config/schema drift would drop every skin
+	on join.
+]]
+expectEqual(defaultData.ActiveMagnetSkin, "", "no magnet skin worn by default")
+expectEqual(next(defaultData.OwnedMagnetSkins), nil, "new profiles own no magnet skins")
+expectEqual(#MagnetSkinConfig.Order, 5, "five magnet skins")
+local magnetLegendary = 0
+for _, skinId in MagnetSkinConfig.Order do
+	local definition = MagnetSkinConfig.ById[skinId]
+	expectEqual(definition ~= nil, true, `{skinId} is in ById`)
+	assert(definition ~= nil)
+	expectEqual(definition.Id, skinId, `{skinId} key matches`)
+	if definition.Rarity == "Legendary" then
+		magnetLegendary += 1
+		expectEqual(skinId, "EventHorizon", "Event Horizon is the legendary magnet skin")
+	end
+	local ownedOk, ownedClean = PlayerDataSchema.validate({
+		OwnedMagnetSkins = { [skinId] = true },
+		ActiveMagnetSkin = skinId,
+	}, 1000)
+	expectEqual(ownedOk, true, `{skinId} profile validates`)
+	expectEqual(ownedClean and ownedClean.ActiveMagnetSkin, skinId, `{skinId} survives schema`)
+	expectEqual(
+		ownedClean and ownedClean.OwnedMagnetSkins[skinId],
+		true,
+		`{skinId} owned flag survives`
+	)
+end
+expectEqual(magnetLegendary, 1, "exactly one legendary magnet skin")
+expectEqual(MagnetSkinConfig.ById.YardPaint.RangeRing.Motes, nil, "yard paint has no motes")
+expectEqual(
+	MagnetSkinConfig.ById.ChromeCoil.RangeRing.FlowSpeed ~= nil,
+	true,
+	"chrome coil has rim current"
+)
+expectEqual(MagnetSkinConfig.ById.EmberCore.RangeRing.MoteMode, "rise", "ember motes rise")
+expectEqual(MagnetSkinConfig.ById.EmberCore.RangeRing.Fx, "Ember", "ember uses the lava FX kit")
+expectEqual(MagnetSkinConfig.ById.Orbital.RangeRing.Dash, nil, "orbital hoops are solid")
+expectEqual(MagnetSkinConfig.ById.Orbital.RangeRing.Tilt ~= nil, true, "orbital hoops are tilted")
+expectEqual(MagnetSkinConfig.ById.Orbital.RangeRing.Bob ~= nil, true, "orbital hoops bob")
+expectEqual(MagnetSkinConfig.ById.EventHorizon.RangeRing.MoteMode, "spiral", "horizon motes spiral in")
+expectEqual(MagnetSkinConfig.ById.EventHorizon.RangeRing.Fx, "Void", "horizon uses the void FX kit")
+local _, unownedMagnet = PlayerDataSchema.validate({ ActiveMagnetSkin = "EventHorizon" }, 1000)
+expectEqual(
+	unownedMagnet and unownedMagnet.ActiveMagnetSkin,
+	"",
+	"wearing an unowned magnet skin is cleared"
+)
+local _, bogusMagnet = PlayerDataSchema.validate({ ActiveMagnetSkin = "NotASkin" }, 1000)
+expectEqual(bogusMagnet and bogusMagnet.ActiveMagnetSkin, "", "unknown magnet skin id is cleared")
 --[[
 	THE MAILBOX STARTS EMPTY AND SURVIVES A ROUND TRIP.
 
@@ -388,6 +461,21 @@ local threeEquippedOk, threeEquipped = PlayerDataSchema.validate({
 }, 2000)
 expectEqual(threeEquippedOk, true, "three equipped pets sanitise")
 expectEqual(#threeEquipped.EquippedPets, 3, "base slots keep three equipped pets on load")
+local fourGearOk, fourGear = PlayerDataSchema.validate({
+	SchemaVersion = 19,
+	OwnedPets = { Pup = 1, Zebra = 1, QueenKitty = 1, PastelAngel = 1 },
+	EquippedPets = { "Pup", "Zebra", "QueenKitty", "PastelAngel" },
+	GearUpgrades = { PetSlot = 1 },
+}, 2000)
+expectEqual(fourGearOk, true, "gear pet slot sanitises")
+expectEqual(#fourGear.EquippedPets, 4, "companion bay keeps a fourth equipped pet on load")
+local fourDroppedOk, fourDropped = PlayerDataSchema.validate({
+	SchemaVersion = 19,
+	OwnedPets = { Pup = 1, Zebra = 1, QueenKitty = 1, PastelAngel = 1 },
+	EquippedPets = { "Pup", "Zebra", "QueenKitty", "PastelAngel" },
+}, 2000)
+expectEqual(fourDroppedOk, true, "four equipped pets without a gear slot sanitise")
+expectEqual(#fourDropped.EquippedPets, 3, "a fourth pet is dropped without companion bay")
 expectEqual(defaultData.EquippedMagnet, "MagnetBasic", "default equipped magnet")
 expectEqual(defaultData.OwnedMagnets.MagnetBasic, true, "default owned magnet")
 expectEqual(defaultData.Inventory.CashPotion, 0, "default cash potion count")
@@ -413,7 +501,7 @@ local migratedOk, migrated = PlayerDataSchema.validate({
 	LastLoginTimestamp = 800,
 }, 1000)
 expectEqual(migratedOk, true, "version one migration")
-expectEqual(migrated.SchemaVersion, 18, "migrated schema version")
+expectEqual(migrated.SchemaVersion, 20, "migrated schema version")
 --- An ancient save arrives with an empty mailbox rather than a nil one, so the screen never sees nil.
 expectEqual(#migrated.Inbox, 0, "a migrated save has an empty mailbox")
 expectEqual(
@@ -639,7 +727,7 @@ local thirteenOk, thirteen = PlayerDataSchema.validate({
 	ActivePlotTheme = "FrontYard",
 }, 3000)
 expectEqual(thirteenOk, true, "version thirteen migration")
-expectEqual(thirteen.SchemaVersion, 18, "migrated to eighteen from thirteen")
+expectEqual(thirteen.SchemaVersion, 20, "migrated to twenty from thirteen")
 expectEqual(thirteen.DailyStreak, 0, "migrated player has no streak")
 expectEqual(thirteen.DailyCalendarDay, 1, "migrated player starts on calendar day one")
 expectEqual(thirteen.TutorialStep, 0, "migrated player tutorial not started")
@@ -776,6 +864,24 @@ expectEqual(
 	table.find(PitShopConfig.ZoneNames, "Event Shop") ~= nil,
 	true,
 	"event shop is the pit shop walk-in"
+)
+
+local GearShopConfig = require("../src/shared/Config/GearShopConfig")
+expectEqual(GearShopConfig.nextPrice(GearShopConfig.ById.HeadStart, 0), 1, "head start first rank costs one gear")
+expectEqual(GearShopConfig.ById.HatchLuck.RequiredPrestige, 5, "egg fortune unlocks at rebirth 5")
+expectEqual(GearShopConfig.ById.PetSlot.MaxLevel, 1, "companion bay is a single extra slot")
+expectEqual(
+	(GearShopConfig.ById.SecretTicket.GearPrice or 0) > 55,
+	true,
+	"a secret ticket costs more than maxing egg fortune"
+)
+expectEqual(GearShopConfig.ById.SkipRebirth, nil, "gear shop does not sell skip rebirth")
+expectEqual(GearShopConfig.startingCash(0), 0, "no nest egg is no starting cash")
+expectEqual(GearShopConfig.startingCash(1), 2500, "first nest egg starting cash")
+expectEqual(
+	GearShopConfig.nextPrice(GearShopConfig.ById.HeadStart, 5),
+	nil,
+	"maxed head start has no next price"
 )
 expectEqual(
 	ArenaConfig.Wreck.FitLongestStuds > ArenaConfig.FitLongestStuds.RobotArm,
@@ -1163,7 +1269,7 @@ local fourteenOk, fourteen = PlayerDataSchema.validate({
 	DailyStreak = 4,
 }, 4000)
 expectEqual(fourteenOk, true, "version fourteen migration")
-expectEqual(fourteen.SchemaVersion, 18, "migrated to eighteen")
+expectEqual(fourteen.SchemaVersion, 20, "migrated to twenty")
 expectEqual(fourteen.DailyStreak, 4, "migration preserves the streak")
 expectEqual(fourteen.EquippedTitle, "", "migrated player wears no title")
 expectEqual(next(fourteen.UnlockedTitles), nil, "migrated player holds no titles")
@@ -1192,7 +1298,7 @@ local fifteenOk, fifteen = PlayerDataSchema.validate({
 	Money = 400,
 }, 5000)
 expectEqual(fifteenOk, true, "version fifteen migration")
-expectEqual(fifteen.SchemaVersion, 18, "migrated fifteen to eighteen")
+expectEqual(fifteen.SchemaVersion, 20, "migrated fifteen to twenty")
 expectEqual(fifteen.SecretTickets, 0, "migrated player holds no tickets")
 
 --[[

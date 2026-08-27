@@ -160,6 +160,14 @@ function ShopService.Start()
 				RemoteService.GetEvent("OpenExclusiveShop"):FireClient(player)
 			end
 		)
+		bindZone(
+			childNamed(map, { "GearShop", "Gear Shop" }),
+			"CHS_Shop",
+			"Gear shop",
+			function(player)
+				RemoteService.GetEvent("OpenGearShop"):FireClient(player)
+			end
+		)
 	end
 
 	bindPitShop()
@@ -182,6 +190,11 @@ function ShopService.Start()
 				return
 			end
 			local _, message = PlayerStateService.TryBuyPitOffer(player, itemId)
+			RemoteService.GetEvent("Notify"):FireClient(player, message)
+			return
+		end
+		if action == "BuyGearItem" then
+			local _, message = PlayerStateService.TryBuyGearOffer(player, itemId)
 			RemoteService.GetEvent("Notify"):FireClient(player, message)
 		end
 	end)

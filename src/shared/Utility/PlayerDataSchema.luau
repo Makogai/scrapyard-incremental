@@ -2,7 +2,7 @@
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.CurrentVersion = 18
+PlayerDataSchema.CurrentVersion = 20
 
 --[[
 	The one cosmetic plot-skin pass, mirroring `PlotSkinConfig.Pass`.
@@ -13,6 +13,17 @@ PlayerDataSchema.CurrentVersion = 18
 	`tests/run.luau`, which asserts they agree.
 ]]
 local SKIN_PASS = "LavaSkin"
+--[[
+	Magnet skin ids, mirroring `MagnetSkinConfig.Order`. Literal for the same reason as
+	`SKIN_PASS`: this module requires nothing, and `tests/run.luau` asserts the two lists agree.
+]]
+local MAGNET_SKIN_IDS = {
+	YardPaint = true,
+	ChromeCoil = true,
+	EmberCore = true,
+	Orbital = true,
+	EventHorizon = true,
+}
 
 local PET_IDS = {
 	"Pup",
@@ -47,6 +58,19 @@ local MAXIMUM_PET_SLOT_UPGRADES = 2
 ]]
 local BASE_PET_SLOTS = 3
 local PASS_PET_SLOTS = 2
+--[[
+	Must match `GearShopConfig.ById.PetSlot.MaxLevel`. Load sanitises against this
+	literal the same way cash slots do, because this module cannot require that config.
+]]
+local MAXIMUM_GEAR_PET_SLOTS = 1
+local GEAR_UPGRADE_MAXIMUMS = {
+	HeadStart = 5,
+	NestEgg = 3,
+	PetSlot = 1,
+	DeepPockets = 3,
+	ScrapSense = 3,
+	HatchLuck = 4,
+}
 
 local UPGRADE_MAXIMUMS = {
 	MagnetStrength = 1000000,
@@ -274,6 +298,12 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		PrestigeCount = 0,
 		OwnedMagnets = { MagnetBasic = true },
 		EquippedMagnet = "MagnetBasic",
+		--[[
+			COSMETIC MAGNET SKINS. Empty owned set, empty worn id: the held magnet and reach ring
+			use the equipped magnet's own look until a skin is granted. Skins never change stats.
+		]]
+		OwnedMagnetSkins = {},
+		ActiveMagnetSkin = "",
 		Inventory = { CashPotion = 0, StrengthPotion = 0, LuckPotion = 0, GodPotion = 0 },
 		ActiveBoosts = {
 			CashBoostEndsAt = 0,
@@ -288,6 +318,14 @@ function PlayerDataSchema.createDefault(nowTimestamp: number): { [string]: any }
 		OwnedPets = {},
 		EquippedPets = {},
 		PetSlotUpgradeLevel = 0,
+		GearUpgrades = {
+			HeadStart = 0,
+			NestEgg = 0,
+			PetSlot = 0,
+			DeepPockets = 0,
+			ScrapSense = 0,
+			HatchLuck = 0,
+		},
 		EggOpenCounts = {},
 
 		--[[
@@ -637,6 +675,28 @@ function PlayerDataSchema.validate(
 		) and clean.OwnedMagnets[raw.EquippedMagnet]
 		then raw.EquippedMagnet
 		else "MagnetBasic"
+	--[[
+		Magnet skins, validated against the id list rather than trusted.
+
+		Wearing requires owning: a save that claims Event Horizon without the flag is treated as
+		the default look, not a worn legendary. Unknown ids are dropped.
+	]]
+	clean.OwnedMagnetSkins = {}
+	if typeof(raw.OwnedMagnetSkins) == "table" then
+		for skinId, owned in raw.OwnedMagnetSkins do
+			if MAGNET_SKIN_IDS[skinId] == true and owned == true then
+				clean.OwnedMagnetSkins[skinId] = true
+			end
+		end
+	end
+	clean.ActiveMagnetSkin = ""
+	if
+		typeof(raw.ActiveMagnetSkin) == "string"
+		and MAGNET_SKIN_IDS[raw.ActiveMagnetSkin] == true
+		and clean.OwnedMagnetSkins[raw.ActiveMagnetSkin] == true
+	then
+		clean.ActiveMagnetSkin = raw.ActiveMagnetSkin
+	end
 	local inventory = if typeof(raw.Inventory) == "table" then raw.Inventory else {}
 	clean.Inventory = {
 		CashPotion = boundedInteger(inventory.CashPotion, 0, 0, 9999),
@@ -690,10 +750,18 @@ function PlayerDataSchema.validate(
 	end
 	clean.PetSlotUpgradeLevel =
 		boundedInteger(raw.PetSlotUpgradeLevel, 0, 0, MAXIMUM_PET_SLOT_UPGRADES)
+	clean.GearUpgrades = {}
+	local rawGear = if typeof(raw.GearUpgrades) == "table" then raw.GearUpgrades else {}
+	for offerId, maximum in GEAR_UPGRADE_MAXIMUMS do
+		clean.GearUpgrades[offerId] = boundedInteger(rawGear[offerId], 0, 0, maximum)
+	end
 	local entitlementPetSlots = if clean.Entitlements.ExtraPetSlots == true
 		then PASS_PET_SLOTS
 		else 0
-	local maximumEquipped = BASE_PET_SLOTS + clean.PetSlotUpgradeLevel + entitlementPetSlots
+	local gearPetSlots =
+		math.min(MAXIMUM_GEAR_PET_SLOTS, clean.GearUpgrades.PetSlot or 0)
+	local maximumEquipped =
+		BASE_PET_SLOTS + clean.PetSlotUpgradeLevel + entitlementPetSlots + gearPetSlots
 	clean.EquippedPets = {}
 	local equippedCounts = {}
 	if typeof(raw.EquippedPets) == "table" then

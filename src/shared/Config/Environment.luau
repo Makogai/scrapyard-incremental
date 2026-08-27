@@ -29,4 +29,12 @@ return table.freeze({
 	CollectionQueryIntervalSeconds = 0.15,
 	MaximumRemoteRequestsPerWindow = 12,
 	RemoteRateLimitWindowSeconds = 5,
+	--[[
+		Final magnet reach, after upgrades, pets and potions.
+
+		A plot is 130×170. Quantum used to land past 40 studs at rebirth 6 with a
+		maxed range upgrade, which collected from the neighbour's yard. 16 studs
+		is the same cap the Pit already uses: you cover your own piles, not the street.
+	]]
+	MaximumMagnetRange = 16,
 })

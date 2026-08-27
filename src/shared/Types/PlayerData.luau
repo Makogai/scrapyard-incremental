@@ -55,6 +55,9 @@ export type PlayerData = {
 	PrestigeCount: number,
 	OwnedMagnets: { [string]: boolean },
 	EquippedMagnet: string,
+	--- Cosmetic magnet skins. `ActiveMagnetSkin` is "" for the equipped magnet's own look.
+	OwnedMagnetSkins: { [string]: boolean },
+	ActiveMagnetSkin: string,
 	Inventory: { [string]: number },
 	ActiveBoosts: { [string]: number },
 	RedeemedCodes: { [string]: boolean },
@@ -63,6 +66,11 @@ export type PlayerData = {
 	OwnedPets: { [string]: number },
 	EquippedPets: { string },
 	PetSlotUpgradeLevel: number,
+	--[[
+		Permanent Gear Shop ranks. Survive prestige. Keys are offer ids from
+		`GearShopConfig`; unknown keys are dropped on load.
+	]]
+	GearUpgrades: { [string]: number },
 	EggOpenCounts: { [string]: number },
 }
 

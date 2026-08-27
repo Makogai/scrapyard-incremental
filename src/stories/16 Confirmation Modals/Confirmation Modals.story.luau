@@ -33,17 +33,17 @@ local CASES = {
 		},
 	},
 	{
-		label = "Prestige",
+		label = "Rebirth",
 		props = {
-			title = "Prestige?",
+			title = "Rebirth?",
 			glyph = "recycle",
 			glyphGradient = Theme.Gradient.Purple,
 			headerColor = Theme.Gradient.Purple,
 			lines = {
 				"This cannot be undone.",
-				"You keep magnets, pets, potions, gears and cosmetics.",
+				"You keep magnets, pets, potions, gears, gear ranks and cosmetics.",
 			},
-			confirmText = "PRESTIGE",
+			confirmText = "REBIRTH",
 			confirmVariant = "Premium",
 		},
 	},
