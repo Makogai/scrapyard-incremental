@@ -345,6 +345,7 @@ function FoundationValidator.validate()
 	assert(#MagnetSkinConfig.Order == 5, "MagnetSkinConfig must list five skins")
 	local legendaryCount = 0
 	local seen: { [string]: boolean } = {}
+	local lastSkinPrice = 0
 	for _, skinId in MagnetSkinConfig.Order do
 		local skin = MagnetSkinConfig.ById[skinId]
 		assert(skin ~= nil, `MagnetSkinConfig.Order names unknown skin {skinId}`)
@@ -354,6 +355,9 @@ function FoundationValidator.validate()
 		assert(#skin.DisplayName > 0, `{skinId}.DisplayName must not be empty`)
 		assert(forms[skin.Form] == true, `{skinId} has unknown Form {skin.Form}`)
 		assert(rarities[skin.Rarity] == true, `{skinId} has unknown Rarity {skin.Rarity}`)
+		positive(skin.ShopPrice, `{skinId}.ShopPrice`)
+		assert(skin.ShopPrice > lastSkinPrice, `{skinId} must cost more than the previous skin`)
+		lastSkinPrice = skin.ShopPrice
 		if skin.Rarity == "Legendary" then
 			legendaryCount += 1
 			assert(skinId == "EventHorizon", "Event Horizon is the legendary magnet skin")

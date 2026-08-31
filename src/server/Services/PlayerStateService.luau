@@ -2348,6 +2348,32 @@ function PlayerStateService.TryBuyMagnet(player: Player, magnetId: string): (boo
 end
 
 --[[
+	Cosmetic magnet skin. Client sends the skin id only; price and ownership
+	are read from MagnetSkinConfig and the save. Does not change EquippedMagnet.
+]]
+function PlayerStateService.TryBuyMagnetSkin(player: Player, skinId: string): (boolean, string)
+	local session = sessions[player]
+	local definition = MagnetSkinConfig.ById[skinId]
+	if session == nil or definition == nil or typeof(definition.ShopPrice) ~= "number" then
+		return false, "SKIN IS NOT FOR SALE"
+	end
+	local data = session.Data
+	if data.OwnedMagnetSkins == nil then
+		data.OwnedMagnetSkins = {}
+	end
+	if data.OwnedMagnetSkins[skinId] == true then
+		return false, "SKIN ALREADY OWNED"
+	end
+	if data.Money < definition.ShopPrice then
+		return false, "NOT ENOUGH SCRAP CASH"
+	end
+	data.Money -= definition.ShopPrice
+	data.OwnedMagnetSkins[skinId] = true
+	pushState(player, data)
+	return true, `{definition.DisplayName} purchased!`
+end
+
+--[[
 	Pit shop: client sends an offer id, never a price. Location / "is the Pit open"
 	are checked by `ShopService` so this function only charges and grants.
 ]]

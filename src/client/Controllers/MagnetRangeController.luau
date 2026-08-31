@@ -345,17 +345,49 @@ function MagnetRangeController.Start()
 		local diameter = radius * 2
 		voidAnchor.Size = Vector3.new(diameter * 0.92, 0.16, diameter * 0.92)
 		voidAnchor.CFrame = CFrame.new(origin)
-		layVoidDisc(voidSwirlA, voidSwirlATex, origin, diameter * 1.02, time * 1.15, colour, 0.18, 1)
-		layVoidDisc(voidSwirlB, voidSwirlBTex, origin, diameter * 0.84, -time * 0.9, innerColour, 0.28, 1)
-		layVoidDisc(voidGlow, voidGlowTex, origin, diameter * 0.52, time * 0.35, colour, 0.42, 0.88)
-		local coreDiameter = math.max(2.4, radius * 0.36)
-		voidCore.Size = Vector3.new(0.12, coreDiameter, coreDiameter)
-		voidCore.CFrame = CFrame.new(origin) * CFrame.Angles(0, 0, math.rad(90))
+		--[[
+			Swirl / glow / halo share a plane. A near-solid Ink disc on that plane z-fights
+			and reads as a flashing black hole in the middle of the reach. Keep the void
+			as textures and a neon halo; stack them a few hundredths of a stud apart.
+		]]
 		voidCore.Color = coreColour
-		voidCore.Transparency = 0.08
+		voidCore.Transparency = 1
+		layVoidDisc(
+			voidSwirlA,
+			voidSwirlATex,
+			origin + Vector3.new(0, 0.05, 0),
+			diameter * 1.02,
+			time * 1.15,
+			colour,
+			0.18,
+			1
+		)
+		layVoidDisc(
+			voidSwirlB,
+			voidSwirlBTex,
+			origin,
+			diameter * 0.84,
+			-time * 0.9,
+			innerColour,
+			0.28,
+			1
+		)
+		layVoidDisc(
+			voidGlow,
+			voidGlowTex,
+			origin + Vector3.new(0, -0.05, 0),
+			diameter * 0.52,
+			time * 0.35,
+			colour,
+			0.42,
+			1
+		)
+		local coreDiameter = math.max(2.4, radius * 0.36)
 		local haloDiameter = coreDiameter * 1.55
 		voidHalo.Size = Vector3.new(0.05, haloDiameter, haloDiameter)
-		voidHalo.CFrame = CFrame.new(origin) * CFrame.Angles(0, time * 0.22, 0) * CFrame.Angles(0, 0, math.rad(90))
+		voidHalo.CFrame = CFrame.new(origin + Vector3.new(0, 0.08, 0))
+			* CFrame.Angles(0, time * 0.22, 0)
+			* CFrame.Angles(0, 0, math.rad(90))
 		voidHalo.Color = colour
 		voidHalo.Transparency = 0.72
 		voidLight.Enabled = true

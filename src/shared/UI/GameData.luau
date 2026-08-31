@@ -25,6 +25,7 @@ local AreaRules = require(ReplicatedStorage.Shared.Utility.AreaRules)
 local GameMath = require(ReplicatedStorage.Shared.Utility.GameMath)
 local Format = require(script.Parent.Format)
 local InventoryConfig = require(ReplicatedStorage.Shared.Config.InventoryConfig)
+local MagnetSkinConfig = require(ReplicatedStorage.Shared.Config.MagnetSkinConfig)
 local MonetizationConfig = require(ReplicatedStorage.Shared.Config.MonetizationConfig)
 local PetConfig = require(ReplicatedStorage.Shared.Config.PetConfig)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
@@ -259,6 +260,23 @@ function GameData.magnets(): { any }
 			strength = definition.BaseStrength,
 			shopPrice = definition.ShopPrice,
 			image = definition.IconId,
+		})
+	end
+	return list
+end
+
+function GameData.magnetSkins(): { any }
+	local list = {}
+	for _, skinId in ipairs(MagnetSkinConfig.Order) do
+		local definition = MagnetSkinConfig.ById[skinId]
+		table.insert(list, {
+			id = skinId,
+			name = definition.DisplayName,
+			description = definition.Description,
+			rarity = definition.Rarity,
+			glyph = definition.Glyph,
+			accent = definition.Accent,
+			shopPrice = definition.ShopPrice,
 		})
 	end
 	return list

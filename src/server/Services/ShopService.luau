@@ -184,6 +184,11 @@ function ShopService.Start()
 			RemoteService.GetEvent("Notify"):FireClient(player, message)
 			return
 		end
+		if action == "BuyMagnetSkin" then
+			local _, message = PlayerStateService.TryBuyMagnetSkin(player, itemId)
+			RemoteService.GetEvent("Notify"):FireClient(player, message)
+			return
+		end
 		if action == "BuyPitItem" then
 			if not ArenaService.IsOpen() or not ArenaService.PlayerIsInside(player) then
 				RemoteService.GetEvent("Notify"):FireClient(player, "Go to The Pit to shop")

@@ -321,6 +321,7 @@ for _, skinId in MagnetSkinConfig.Order do
 	expectEqual(definition ~= nil, true, `{skinId} is in ById`)
 	assert(definition ~= nil)
 	expectEqual(definition.Id, skinId, `{skinId} key matches`)
+	expectEqual(typeof(definition.ShopPrice) == "number" and definition.ShopPrice > 0, true, `{skinId} has a shop price`)
 	if definition.Rarity == "Legendary" then
 		magnetLegendary += 1
 		expectEqual(skinId, "EventHorizon", "Event Horizon is the legendary magnet skin")
@@ -338,6 +339,11 @@ for _, skinId in MagnetSkinConfig.Order do
 	)
 end
 expectEqual(magnetLegendary, 1, "exactly one legendary magnet skin")
+expectEqual(
+	MagnetSkinConfig.ById.YardPaint.ShopPrice < MagnetSkinConfig.ById.ChromeCoil.ShopPrice,
+	true,
+	"skin prices climb with rarity"
+)
 expectEqual(MagnetSkinConfig.ById.YardPaint.RangeRing.Motes, nil, "yard paint has no motes")
 expectEqual(
 	MagnetSkinConfig.ById.ChromeCoil.RangeRing.FlowSpeed ~= nil,

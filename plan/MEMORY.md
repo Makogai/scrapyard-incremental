@@ -1,6 +1,6 @@
 # Project Memory
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 ## Identity
 
@@ -354,7 +354,7 @@ Hatchable RarityLuck is under that premium's +20%: Junkyard Secret +12%, Worksho
 
 Each wheel spin adds another six turns from the last landing angle. The winner flash and prize banner wait until the pointer is on the wedge. Cash reward art is the painted coin `rbxassetid://130780043686108`. Workshop/Quantum silhouettes use the same flat black stamp as Junkyard.
 
-Daily and playtime rewards are separate windows (calendar vs clock icons on the HUD). Playtime seconds interpolate on a 1s ticker so the open window counts down. Event start audio is `EventSoundConfig` (Pit = `93775470439672`).
+Daily and playtime rewards are separate windows (calendar vs clock icons on the HUD). Playtime seconds interpolate on a 1s ticker so the open window counts down. Event start audio is `EventSoundConfig` (Pit = `93775470439672`). Playtime (and every other `clock` glyph) uses `Assets.Icons.clock` = `rbxassetid://102983889773102`.
 
 Scrap Normal base values were already the live table ($45 MetalCan through $1,750 ScrapCar). Rarity odds and payouts were retuned in `ScrapConfig`: Normal 93.825% ×1, Rare 5% ×2, Epic 1% ×4, Legendary 0.15% ×8, Nebula 0.025% ×25, with `VariantRollTotal` 100,000.
 
@@ -418,7 +418,7 @@ Five **pure cosmetic** magnet skins. One skin restyles both the held magnet and 
 | ChromeCoil | Chrome Coil | Uncommon | steel + cyan rim |
 | EmberCore | Ember Core | Rare | hot neon coil |
 | Orbital | Orbital | Epic | planet rings |
-| EventHorizon | Event Horizon | Legendary | black hole; lootbox rare later |
+| EventHorizon | Event Horizon | Legendary | dark-plate cyan horseshoe; lootbox rare later |
 
 Runtime primitive models from `MagnetSkinBuilder`. Skins are built in **AdvancedMagnet space** (flat in XZ, Grip PrimaryPart at the origin, head in +X) so the existing hand weld sits them in the palm. A standing Y-up build was why they floated.
 
@@ -430,7 +430,7 @@ Reach rings are per-skin, not one loop recoloured:
 - Orbital: solid tilted hoops that yaw and bob (`Bob`); lift is clamped so tilt never clips the floor
 - Event Horizon: tilted void hoops plus Animation 1 beams / Animation 3 swirl particles (`Fx = "Void"`); no floor pulses or strobing overlay discs
 
-Hand models are a U with pole tips (Yard red/blue, Chrome wrapped cyan), a glowing coil barrel, a globe with saturn rings, and a black-hole disc.
+Hand models are a U with pole tips (Yard red/blue, Chrome wrapped cyan), a glowing coil barrel, a globe with saturn rings, and Event Horizon as a dressed horseshoe (cyan energy, not a disc).
 
 Schema **v20**: `OwnedMagnetSkins`, `ActiveMagnetSkin` (`""` = default magnet look). Admin MAGNET SKINS section: GRANT wears the skin; DEFAULT LOOK takes it off.
 
@@ -459,6 +459,24 @@ Animation 3 swirl/glow used `ParticleEmitter` FacingCamera on a point at inner-h
 Studio Play of this pass was not run from this agent.
 
 Exact next action: Rojo sync, GRANT Event Horizon, confirm swirls spin flat on the reach circle and not on the character.
+
+## 2026-08-28 — Event Horizon pose, shape, and void core
+
+Three Horizon bugs from Play:
+
+1. Innermost reach circle flashed black: `RangeVoidCore` was a near-solid Ink disc on the same plane as the swirl textures (z-fighting). Core is hidden; swirl/glow/halo are stacked a few hundredths of a stud apart. Void kit otherwise unchanged.
+2. Held magnet was upside down (U opening at the sky, stick handle at the bottom): skins were built head-in-+X (AdvancedMagnet space). Attach's 90/90 maps +X to up. MagnetBasic is Y-up; skins now match that (grip at the curve, poles +Y) so the opening faces forward like the default.
+3. Square staple, not a U: box yoke + box poles. The horseshoe is a semicircle of cylinders and round poles. No stick handle -- you hold the bend, like the default union.
+
+Changelog 0.5.35. Skin weld adds a 180 around grip X so the U opens toward the palm (Play showed it pointing out the back of the hand). Default MagnetBasic is not flipped.
+
+## 2026-08-28 — Chrome Coil and Ember Core dressing
+
+Horizon keeps the cyan bands around the poles. Chrome Coil and Ember Core no longer share that look: Chrome is a cyan neon seam down the inner face of each arm; Ember is a translucent molten sleeve on dark poles plus a lava core (and a low-rate ember emitter). Yard Paint stays red/blue tips; Orbital stays planet rings. Changelog 0.5.36.
+
+Studio Play of this pass was not run from this agent.
+
+Exact next action: Rojo sync, GRANT Chrome Coil then Ember Core, confirm neither has Horizon's rings at the ends.
 
 ## 2026-08-27 — Horizon strobe off, Orbital bob
 

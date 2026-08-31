@@ -206,6 +206,10 @@ function Bridge.buyMagnet(magnetId: string)
 	fire("ShopAction", "BuyMagnet", magnetId)
 end
 
+function Bridge.buyMagnetSkin(skinId: string)
+	fire("ShopAction", "BuyMagnetSkin", skinId)
+end
+
 function Bridge.buyPitItem(offerId: string)
 	fire("ShopAction", "BuyPitItem", offerId)
 end

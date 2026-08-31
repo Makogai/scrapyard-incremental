@@ -5,7 +5,9 @@
 
 	Models come from the repositories `PetService` publishes -- `PetModels` keyed by
 	pet id, `EggModels` keyed by egg id -- so nothing here reaches into Workspace and
-	a missing model degrades to the fallback glyph instead of erroring.
+	a missing model degrades to the fallback glyph instead of erroring. Magnet skins
+	are built on the client from `MagnetSkinBuilder` (kind `"magnetSkin"`), so the
+	shop can preview them without a published folder.
 
 	Two modes:
 
@@ -27,6 +29,7 @@ local UI = script.Parent.Parent
 local Motion = require(UI.Motion)
 local P = require(UI.Primitives)
 local Icon = require(UI.Icon)
+local MagnetSkinBuilder = require(ReplicatedStorage.Shared.Utility.MagnetSkinBuilder)
 
 local e = React.createElement
 
@@ -55,6 +58,16 @@ local FIELD_OF_VIEW = 40
 ]]
 local function cloneModel(kind: string, id: (string | { string })?): Model?
 	if id == nil then
+		return nil
+	end
+	if kind == "magnetSkin" then
+		local skinCandidates = if type(id) == "table" then id else { id }
+		for _, candidate in skinCandidates do
+			local built = MagnetSkinBuilder.buildPreview(candidate)
+			if built ~= nil then
+				return built
+			end
+		end
 		return nil
 	end
 	local folder = ReplicatedStorage:FindFirstChild(REPOSITORIES[kind] or "PetModels")
@@ -180,7 +193,7 @@ end
 
 --[[
 	props:
-		kind        "pet" | "egg", default "pet"
+		kind        "pet" | "egg" | "scrap" | "magnetSkin", default "pet"
 		model       id within that repository
 		silhouette  render as a solid black shape
 		spin        true, or degrees per second

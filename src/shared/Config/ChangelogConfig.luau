@@ -32,6 +32,50 @@ return table.freeze({
 			that the build changed. There is no second list to keep in step.
 		]]
 		table.freeze({
+			Version = "0.5.36",
+			Date = "2026-08-28",
+			Title = "Chrome and Ember look like themselves",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Chrome Coil and Ember Core no longer wear Event Horizon's rings. Chrome has a cyan current down the arms; Ember is a molten sleeve around a lava core.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.35",
+			Date = "2026-08-28",
+			Title = "Event Horizon sits right",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Event Horizon's reach no longer flashes a black disc in the middle, and the magnet in your hand is a real U the right way up.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.34",
+			Date = "2026-08-28",
+			Title = "Event Horizon is a glowing magnet",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "Fix" :: ChangeKind,
+					Text = "Event Horizon in your hand is the same U-magnet as the default, dressed in dark plates and cyan glow -- not a disc stuck between the poles.",
+				}),
+			}),
+		}),
+		table.freeze({
+			Version = "0.5.33",
+			Date = "2026-08-27",
+			Title = "Magnet skins you can actually see",
+			Changes = table.freeze({
+				table.freeze({
+					Kind = "New" :: ChangeKind,
+					Text = "The Magnet Shop has a Skins tab. Each skin is a real horseshoe you can buy and wear, previewed on the card -- looks only, same pull as the magnet you already hold.",
+				}),
+			}),
+		}),
+		table.freeze({
 			Version = "0.5.32",
 			Date = "2026-08-27",
 			Title = "Event Horizon spins on the ground",

@@ -59,13 +59,18 @@ local function attach(player: Player)
 	magnet.Name = "EquippedMagnet"
 	magnet.Parent = character
 	--[[
-		Same pose for skins and real magnets. Skin models are built in AdvancedMagnet
-		space (grip at origin, head in +X) so this rotation puts the grip in the palm.
+		Same pose for skins and real magnets, then a 180 around the grip's X so a
+		Y-up horseshoe opens toward the palm instead of pointing out the back of
+		the hand. MagnetBasic is a BasePart on the unflipped target -- do not fold
+		this 180 into that CFrame.
 	]]
 	local target = hand.CFrame
 		* CFrame.new(0, -0.85, -0.25)
 		* CFrame.Angles(0, math.rad(90), math.rad(90))
 	if magnet:IsA("Model") then
+		if typeof(skinId) == "string" and skinId ~= "" then
+			target = target * CFrame.Angles(math.rad(180), 0, 0)
+		end
 		magnet:PivotTo(target)
 	elseif magnet:IsA("BasePart") then
 		magnet.CFrame = target

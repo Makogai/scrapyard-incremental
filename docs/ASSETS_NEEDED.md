@@ -42,7 +42,6 @@ Highest value first — the top group appears on almost every screen.
 	star = "",       -- rarity marks, Secret pet cards, the MegaBundle product
 	crate = "",      -- storage passes, cash packs, the Cash Crate product
 	bolt = "",       -- collection speed, Turbo Collector pass, boost readouts
-	clock = "",      -- potion timers, COMING SOON notices, daily rewards
 	trophy = "",     -- leaderboard, Sinister Lord pass
 	medal = "",      -- leaderboard ranks
 	check = "",      -- equipped ticks, completed rows
@@ -60,7 +59,7 @@ Highest value first — the top group appears on almost every screen.
 
 Already in and working: `gameLogo`, `arrow`, `coin`, `cash`, `gear`, `robux`, `upgrade`,
 `recycle`, `magnet`, `potion`, `scrap`, `lock`, `paw`, `pin`, `home`, `basket`,
-`bag`, `book`, `sliders`.
+`bag`, `book`, `sliders`, `clock`.
 
 There are also glyph names the drawing code knows but `Assets.Icons` has no key for:
 `gears`, `storage`, `prestige`, `pet`, `area`, `inventory`. If you have art

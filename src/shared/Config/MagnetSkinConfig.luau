@@ -11,7 +11,7 @@
 		ChromeCoil    current flowing around the circle
 		EmberCore     lava pool: bubbles, hopping fireballs, sparks, flowing rim
 		Orbital       solid 3D hoops at different heights, spinning
-		EventHorizon  tilted void hoops plus flat spinning swirl discs on the reach plane
+		EventHorizon  dark-plate horseshoe in the hand; tilted void hoops plus flat swirl discs on the reach plane
 ]]
 
 export type RangeRing = {
@@ -57,6 +57,8 @@ export type MagnetSkin = {
 	Glyph: string,
 	Accent: string,
 	Form: string,
+	--- Cash price in the Magnet Shop skins tab. Client sends the id only.
+	ShopPrice: number,
 	RangeRing: RangeRing,
 }
 
@@ -80,11 +82,12 @@ local byId: { [string]: MagnetSkin } = {
 	YardPaint = skin({
 		Id = "YardPaint",
 		DisplayName = "Yard Paint",
-		Description = "A rusty orange respray. The starter skin.",
+		Description = "A rusty orange respray. Classic red and blue poles.",
 		Rarity = "Common",
 		Glyph = "magnet",
 		Accent = "Orange",
 		Form = "Horseshoe",
+		ShopPrice = 8000,
 		RangeRing = ring({
 			Accent = "Orange",
 			Fill = 0.05,
@@ -100,11 +103,12 @@ local byId: { [string]: MagnetSkin } = {
 	ChromeCoil = skin({
 		Id = "ChromeCoil",
 		DisplayName = "Chrome Coil",
-		Description = "Polished steel with a cool rim.",
+		Description = "Polished steel with a cyan current down each arm.",
 		Rarity = "Uncommon",
 		Glyph = "magnet",
 		Accent = "Cyan",
 		Form = "Horseshoe",
+		ShopPrice = 35000,
 		RangeRing = ring({
 			Accent = "Cyan",
 			AccentSecondary = "Blue",
@@ -123,11 +127,12 @@ local byId: { [string]: MagnetSkin } = {
 	EmberCore = skin({
 		Id = "EmberCore",
 		DisplayName = "Ember Core",
-		Description = "A coil of molten scrap. Lava under the pull.",
+		Description = "A horseshoe sheathed in molten scrap.",
 		Rarity = "Rare",
 		Glyph = "magnet",
 		Accent = "Orange",
 		Form = "Coil",
+		ShopPrice = 120000,
 		RangeRing = ring({
 			Accent = "Orange",
 			AccentSecondary = "Gold",
@@ -152,11 +157,12 @@ local byId: { [string]: MagnetSkin } = {
 	Orbital = skin({
 		Id = "Orbital",
 		DisplayName = "Orbital",
-		Description = "Planet rings around the pull.",
+		Description = "Planet rings around a horseshoe core.",
 		Rarity = "Epic",
 		Glyph = "star",
 		Accent = "Gold",
 		Form = "Planet",
+		ShopPrice = 400000,
 		RangeRing = ring({
 			Accent = "Gold",
 			AccentSecondary = "Orange",
@@ -178,11 +184,12 @@ local byId: { [string]: MagnetSkin } = {
 	EventHorizon = skin({
 		Id = "EventHorizon",
 		DisplayName = "Event Horizon",
-		Description = "A black-hole core. The lootbox rare.",
+		Description = "The classic horseshoe in dark plates and cyan energy.",
 		Rarity = "Legendary",
 		Glyph = "star",
-		Accent = "Purple",
+		Accent = "Cyan",
 		Form = "Void",
+		ShopPrice = 1500000,
 		RangeRing = ring({
 			Accent = "Purple",
 			AccentSecondary = "Pink",

@@ -106,6 +106,8 @@ local function seedMock()
 	end
 	Atoms.upgradeLevels(levels)
 	Atoms.ownedMagnets(owned)
+	Atoms.ownedMagnetSkins({ YardPaint = true })
+	Atoms.activeMagnetSkin("")
 	Atoms.inventory(inventory)
 	local petsOwned = {
 		Pup = 2,
@@ -302,6 +304,11 @@ local function liveActions()
 	function self.buyMagnet(magnetId: string)
 		Sound.play("purchase")
 		Bridge.buyMagnet(magnetId)
+	end
+
+	function self.buyMagnetSkin(skinId: string)
+		Sound.play("purchase")
+		Bridge.buyMagnetSkin(skinId)
 	end
 
 	function self.buyPitItem(offerId: string)
@@ -756,6 +763,21 @@ local function mockActions()
 					levels[offer.id] = (levels[offer.id] or 0) + 1
 					Atoms.gearUpgrades(levels)
 				end
+				break
+			end
+		end
+	end
+
+	function self.buyMagnetSkin(skinId: string)
+		if (Atoms.ownedMagnetSkins()[skinId] == true) then
+			return
+		end
+		for _, skin in ipairs(GameData.magnetSkins()) do
+			if skin.id == skinId and typeof(skin.shopPrice) == "number" and Atoms.money() >= skin.shopPrice then
+				Atoms.money(Atoms.money() - skin.shopPrice)
+				local owned = table.clone(Atoms.ownedMagnetSkins())
+				owned[skinId] = true
+				Atoms.ownedMagnetSkins(owned)
 				break
 			end
 		end
